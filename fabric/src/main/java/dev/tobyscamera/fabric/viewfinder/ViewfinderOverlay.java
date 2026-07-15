@@ -29,7 +29,7 @@ public final class ViewfinderOverlay {
         graphics.fill(left + size, top, width, top + size, MASK_COLOR);
         drawBorder(graphics, left, top, size);
         drawGrid(graphics, left, top, size);
-        graphics.drawString(minecraft.font, "x%.2f  G: %s  LMB: shutter  Esc: close".formatted(session.targetZoom(), session.grid().name().toLowerCase()), left + 6, top + size - 14, BORDER_COLOR, true);
+        graphics.drawString(minecraft.font, "x%.2f  [/] zoom  G: %s  LMB: shutter  Esc: close".formatted(session.targetZoom(), session.grid().name().toLowerCase()), left + 6, top + size - 14, BORDER_COLOR, true);
         if (shutterTicks > 0) graphics.fill(left, top, left + size, top + size, 0xDD000000);
     }
 

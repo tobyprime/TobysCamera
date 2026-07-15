@@ -37,6 +37,12 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final KeyMapping GRID_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.grid", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G,
             KeyMapping.Category.register(Identifier.fromNamespaceAndPath("tobyscamera", "camera"))));
+    private static final KeyMapping ZOOM_IN_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+            "key.tobyscamera.zoom_in", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_BRACKET,
+            KeyMapping.Category.register(Identifier.fromNamespaceAndPath("tobyscamera", "camera"))));
+    private static final KeyMapping ZOOM_OUT_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+            "key.tobyscamera.zoom_out", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_BRACKET,
+            KeyMapping.Category.register(Identifier.fromNamespaceAndPath("tobyscamera", "camera"))));
 
     @Override
     public void onInitializeClient() {
@@ -66,6 +72,8 @@ public final class TobysCameraClient implements ClientModInitializer {
             if (VIEWFINDER.state() == ViewfinderState.CLOSED && holdingCamera) VIEWFINDER.open(); else VIEWFINDER.close();
         }
         while (GRID_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.cycleGrid();
+        while (ZOOM_IN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(1.0);
+        while (ZOOM_OUT_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(-1.0);
         while (client.options.keyAttack.consumeClick()) {
             if (VIEWFINDER.pressShutter()) UPLOADS.requestCapture();
         }
