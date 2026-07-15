@@ -6,6 +6,7 @@ import dev.tobyscamera.common.protocol.Packets;
 import dev.tobyscamera.fabric.camera.CapturedFrame;
 import dev.tobyscamera.fabric.camera.CenterSquareCropProcessor;
 import dev.tobyscamera.fabric.camera.HeldCameraChecker;
+import dev.tobyscamera.fabric.camera.NativePixelFormat;
 import dev.tobyscamera.fabric.camera.PhotoUploadController;
 import dev.tobyscamera.fabric.camera.ResizeToGridProcessor;
 import dev.tobyscamera.fabric.net.CameraPayload;
@@ -93,7 +94,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     private CapturedFrame toFrame(com.mojang.blaze3d.platform.NativeImage nativeImage, int gridSize) {
         try {
             BufferedImage image = new BufferedImage(nativeImage.getWidth(), nativeImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
-            for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) image.setRGB(x, y, nativeImage.getPixel(x, y));
+            for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) image.setRGB(x, y, NativePixelFormat.toArgb(nativeImage.getPixel(x, y)));
             CapturedFrame captured = new CapturedFrame(image, gridSize);
             return new ResizeToGridProcessor().process(new CenterSquareCropProcessor().process(captured));
         } finally { nativeImage.close(); }

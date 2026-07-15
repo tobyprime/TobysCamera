@@ -2,6 +2,7 @@ package dev.tobyscamera.fabric.viewfinder;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.tobyscamera.fabric.camera.CapturedFrame;
+import dev.tobyscamera.fabric.camera.NativePixelFormat;
 import java.util.UUID;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -59,7 +60,7 @@ public final class PreviewScreen extends Screen {
 
     private static NativeImage nativeImage(CapturedFrame frame) {
         NativeImage image = new NativeImage(frame.image().getWidth(), frame.image().getHeight(), false);
-        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) image.setPixel(x, y, frame.image().getRGB(x, y));
+        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) image.setPixel(x, y, NativePixelFormat.toAbgr(frame.image().getRGB(x, y)));
         return image;
     }
 }
