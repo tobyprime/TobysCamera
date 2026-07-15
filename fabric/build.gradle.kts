@@ -2,6 +2,13 @@ plugins {
     id("fabric-loom")
 }
 
+loom {
+    mixin {
+        useLegacyMixinAp = true
+        defaultRefmapName.set("tobyscamera.refmap.json")
+    }
+}
+
 dependencies {
     implementation(project(":common"))
     minecraft("com.mojang:minecraft:${property("minecraft_version")}")

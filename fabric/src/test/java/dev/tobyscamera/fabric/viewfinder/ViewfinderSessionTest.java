@@ -44,4 +44,15 @@ class ViewfinderSessionTest {
         assertTrue(session.acceptGrant(1));
         assertFalse(session.acceptGrant(1));
     }
+
+    @Test
+    void keepsZoomActiveOnlyBeforeCapture() {
+        ViewfinderSession session = new ViewfinderSession();
+        session.open();
+        assertTrue(session.zoomActive());
+        session.pressShutter();
+        assertTrue(session.zoomActive());
+        session.acceptGrant(1);
+        assertFalse(session.zoomActive());
+    }
 }

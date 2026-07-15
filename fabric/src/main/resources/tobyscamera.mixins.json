@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "dev.tobyscamera.fabric.mixin",
+  "refmap": "tobyscamera.refmap.json",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "CameraMixin",
+    "KeyboardHandlerMixin",
+    "MinecraftMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

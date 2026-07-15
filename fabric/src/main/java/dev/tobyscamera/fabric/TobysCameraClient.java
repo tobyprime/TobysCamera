@@ -14,6 +14,7 @@ import dev.tobyscamera.fabric.net.CameraPayload;
 import dev.tobyscamera.fabric.viewfinder.CaptureService;
 import dev.tobyscamera.fabric.viewfinder.PreviewScreen;
 import dev.tobyscamera.fabric.viewfinder.ViewfinderOverlay;
+import dev.tobyscamera.fabric.viewfinder.ViewfinderInputController;
 import dev.tobyscamera.fabric.viewfinder.ViewfinderSession;
 import dev.tobyscamera.fabric.viewfinder.ViewfinderState;
 import java.awt.image.BufferedImage;
@@ -35,6 +36,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final ViewfinderSession VIEWFINDER = new ViewfinderSession();
     private static final ViewfinderOverlay OVERLAY = new ViewfinderOverlay(VIEWFINDER);
     private static final CaptureService CAPTURE = new CaptureService();
+    private static final ViewfinderInputController INPUTS = new ViewfinderInputController(VIEWFINDER, UPLOADS::requestCapture);
     private static final KeyMapping VIEWFINDER_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.viewfinder", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P,
             CameraKeyCategory.value()));
@@ -83,13 +85,22 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (GRID_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.cycleGrid();
         while (ZOOM_IN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(1.0);
         while (ZOOM_OUT_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(-1.0);
-        while (client.options.keyAttack.consumeClick()) {
-            if (VIEWFINDER.pressShutter()) UPLOADS.requestCapture();
-        }
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING && CAPTURE.tick()) {
             int gridSize = CAPTURE.takeGridSize();
             Screenshot.takeScreenshot(client.getMainRenderTarget(), nativeImage -> openPreview(client, toFrame(nativeImage, gridSize)));
         }
+    }
+
+    public static boolean pressViewfinderShutter() {
+        return INPUTS.pressShutter();
+    }
+
+    public static boolean closeViewfinder() {
+        return INPUTS.close();
+    }
+
+    public static float viewfinderZoom() {
+        return VIEWFINDER.zoomActive() ? VIEWFINDER.targetZoom() : 1.0f;
     }
 
     private void openPreview(net.minecraft.client.Minecraft client, CapturedFrame frame) {
