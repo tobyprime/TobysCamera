@@ -8,6 +8,7 @@ import java.util.UUID;
 public interface PhotoRepository extends AutoCloseable {
     void save(PhotoRecord record, Map<TileCoordinate, byte[]> tiles) throws IOException;
     List<PhotoRecord> loadAll() throws IOException;
+    PhotoRecord find(UUID photoId) throws IOException;
     byte[] readTile(UUID photoId, TileCoordinate coordinate) throws IOException;
     @Override void close() throws IOException;
 }

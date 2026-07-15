@@ -9,6 +9,9 @@ public final class HeldCameraChecker {
 
     public static boolean isCamera(ItemStack stack) {
         CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-        return data != null && data.copyTag().contains("tobyscamera:camera");
+        if (data == null) return false;
+        var tag = data.copyTag();
+        return tag.contains("tobyscamera:camera")
+                || tag.getCompoundOrEmpty("PublicBukkitValues").contains("tobyscamera:camera");
     }
 }

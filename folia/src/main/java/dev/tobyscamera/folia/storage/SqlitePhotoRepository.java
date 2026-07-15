@@ -81,6 +81,12 @@ public final class SqlitePhotoRepository implements PhotoRepository {
     }
 
     @Override
+    public synchronized PhotoRecord find(UUID photoId) throws IOException {
+        for (PhotoRecord record : loadAll()) if (record.photoId().equals(photoId)) return record;
+        return null;
+    }
+
+    @Override
     public byte[] readTile(UUID photoId, TileCoordinate coordinate) throws IOException {
         return Files.readAllBytes(photosDirectory.resolve(photoId.toString()).resolve(coordinate.x() + "-" + coordinate.y() + ".tile"));
     }

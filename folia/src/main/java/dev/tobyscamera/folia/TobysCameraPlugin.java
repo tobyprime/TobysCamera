@@ -6,6 +6,8 @@ import dev.tobyscamera.folia.camera.CameraItemValidator;
 import dev.tobyscamera.folia.config.PluginSettings;
 import dev.tobyscamera.folia.net.PluginPayloadGateway;
 import dev.tobyscamera.folia.map.MapPhotoService;
+import dev.tobyscamera.folia.delivery.MapDeliveryService;
+import dev.tobyscamera.folia.delivery.PendingDeliveryRepository;
 import dev.tobyscamera.folia.storage.PhotoRepository;
 import dev.tobyscamera.folia.storage.SqlitePhotoRepository;
 import dev.tobyscamera.folia.storage.TileCoordinate;
@@ -16,11 +18,15 @@ import java.util.Map;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.event.Listener;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.player.PlayerJoinEvent;
 
-public final class TobysCameraPlugin extends JavaPlugin {
+public final class TobysCameraPlugin extends JavaPlugin implements Listener {
     private UploadCoordinator coordinator;
     private PhotoRepository repository;
     private MapPhotoService photos;
+    private MapDeliveryService deliveries;
 
     @Override
     public void onEnable() {
@@ -32,6 +38,8 @@ public final class TobysCameraPlugin extends JavaPlugin {
             throw new IllegalStateException("Could not initialize photo storage", exception);
         }
         photos = new MapPhotoService(this, repository);
+        try { deliveries = new MapDeliveryService(photos, new PendingDeliveryRepository(getDataFolder().toPath())); }
+        catch (IOException exception) { throw new IllegalStateException("Could not initialize pending deliveries", exception); }
         getServer().getGlobalRegionScheduler().run(this, ignored -> {
             try { photos.restore(); } catch (IOException exception) { getLogger().severe("Could not restore saved photo maps: " + exception.getMessage()); }
         });
@@ -40,6 +48,7 @@ public final class TobysCameraPlugin extends JavaPlugin {
         PluginPayloadGateway gateway = new PluginPayloadGateway(this, coordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
         getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);
+        getServer().getPluginManager().registerEvents(this, this);
     }
 
     @Override
@@ -67,16 +76,26 @@ public final class TobysCameraPlugin extends JavaPlugin {
             try {
                 var record = photos.create(player.getUniqueId(), world, session);
                 player.getScheduler().run(this, task -> {
-                    for (var coordinate : record.mapIds().keySet()) {
-                        var leftovers = player.getInventory().addItem(photos.mapItem(record, coordinate));
-                        leftovers.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
-                    }
+                    try { deliveries.deliver(player, record); } catch (IOException exception) { throw new IllegalStateException(exception); }
                     send(player, new Packets.PhotoCreated(record.photoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight()));
-                }, () -> { });
+                }, () -> { try { deliveries.queue(player, record); } catch (IOException exception) { getLogger().warning("Could not queue photo delivery: " + exception.getMessage()); } });
             } catch (IOException | RuntimeException exception) {
                 player.getScheduler().run(this, task -> send(player, new Packets.UploadRejected("Could not create photo maps")), () -> { });
                 getLogger().warning("Could not create photo map: " + exception.getMessage());
             }
         });
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        player.getScheduler().run(this, task -> {
+            try {
+                for (var photoId : new PendingDeliveryRepository(getDataFolder().toPath()).take(player.getUniqueId())) {
+                    var record = repository.find(photoId);
+                    if (record != null) deliveries.deliver(player, record);
+                }
+            } catch (IOException exception) { getLogger().warning("Could not deliver queued photos: " + exception.getMessage()); }
+        }, () -> { });
     }
 }
