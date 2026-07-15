@@ -13,4 +13,9 @@ abstract class MinecraftMixin {
     private void tobyscamera$takePhotoInsteadOfAttacking(CallbackInfoReturnable<Boolean> callback) {
         if (TobysCameraClient.pressViewfinderShutter()) callback.setReturnValue(false);
     }
+
+    @Inject(method = "continueAttack", at = @At("HEAD"), cancellable = true)
+    private void tobyscamera$blockContinuedViewfinderAttack(boolean down, org.spongepowered.asm.mixin.injection.callback.CallbackInfo callback) {
+        if (TobysCameraClient.suppressesViewfinderAttack()) callback.cancel();
+    }
 }

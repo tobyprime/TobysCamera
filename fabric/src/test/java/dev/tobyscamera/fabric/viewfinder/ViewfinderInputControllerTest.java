@@ -32,4 +32,18 @@ class ViewfinderInputControllerTest {
         assertTrue(controls.close());
         assertEquals(ViewfinderState.CLOSED, session.state());
     }
+
+    @Test
+    void suppressesVanillaAttackWhileTheViewfinderOwnsInput() {
+        ViewfinderSession session = new ViewfinderSession();
+        ViewfinderInputController controls = new ViewfinderInputController(session, () -> { });
+
+        assertFalse(controls.suppressesVanillaAttack());
+        session.open();
+        assertTrue(controls.suppressesVanillaAttack());
+        session.pressShutter();
+        assertTrue(controls.suppressesVanillaAttack());
+        session.close();
+        assertFalse(controls.suppressesVanillaAttack());
+    }
 }

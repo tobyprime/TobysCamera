@@ -22,4 +22,8 @@ public final class ViewfinderInputController {
         session.close();
         return true;
     }
+
+    public boolean suppressesVanillaAttack() {
+        return session.state() != ViewfinderState.CLOSED;
+    }
 }
