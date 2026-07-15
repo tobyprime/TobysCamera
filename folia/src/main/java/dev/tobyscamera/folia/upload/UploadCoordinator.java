@@ -67,6 +67,10 @@ public final class UploadCoordinator {
     private void begin(Player player, Packets.UploadBegin begin) {
         UploadGrant grant = validGrantOrKick(player, begin.token());
         if (grant == null) return;
+        if (sessions.containsKey(begin.token())) {
+            kick(player);
+            return;
+        }
         if (!cameraValidator.isHoldingCamera(player)) {
             sender.send(player, new Packets.UploadRejected("A tagged camera must still be held"));
             return;
