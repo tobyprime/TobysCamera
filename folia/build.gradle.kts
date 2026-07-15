@@ -21,3 +21,9 @@ tasks.processResources {
         expand("version" to project.version)
     }
 }
+
+tasks.jar {
+    dependsOn(":common:jar")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from({ configurations.runtimeClasspath.get().filter { it.name.endsWith(".jar") }.map { zipTree(it) } })
+}

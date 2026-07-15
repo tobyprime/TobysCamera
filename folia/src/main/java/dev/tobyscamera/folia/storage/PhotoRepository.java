@@ -1,0 +1,13 @@
+package dev.tobyscamera.folia.storage;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+public interface PhotoRepository extends AutoCloseable {
+    void save(PhotoRecord record, Map<TileCoordinate, byte[]> tiles) throws IOException;
+    List<PhotoRecord> loadAll() throws IOException;
+    byte[] readTile(UUID photoId, TileCoordinate coordinate) throws IOException;
+    @Override void close() throws IOException;
+}

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "tobyscamera",
+  "version": "${version}",
+  "name": "TobysCamera",
+  "environment": "client",
+  "entrypoints": { "client": ["dev.tobyscamera.fabric.TobysCameraClient"] },
+  "depends": { "fabricloader": ">=0.19.3", "minecraft": "1.21.11", "java": ">=21", "fabric-api": "*" }
+}

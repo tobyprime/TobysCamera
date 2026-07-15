@@ -9,3 +9,9 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:${property("fabric_loader_version")}")
     modImplementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
 }
+
+tasks.processResources {
+    filesMatching("fabric.mod.json") {
+        expand("version" to project.version)
+    }
+}
