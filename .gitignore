@@ -2,6 +2,7 @@
 .gradle/
 **/build/
 folia/run/
+fabric/run/
 *.class
 *.jar
 plugins/TobysCamera/

@@ -9,6 +9,7 @@ import dev.tobyscamera.fabric.camera.HeldCameraChecker;
 import dev.tobyscamera.fabric.camera.NativePixelFormat;
 import dev.tobyscamera.fabric.camera.PhotoUploadController;
 import dev.tobyscamera.fabric.camera.ResizeToGridProcessor;
+import dev.tobyscamera.fabric.input.CameraKeyCategory;
 import dev.tobyscamera.fabric.net.CameraPayload;
 import dev.tobyscamera.fabric.viewfinder.CaptureService;
 import dev.tobyscamera.fabric.viewfinder.PreviewScreen;
@@ -36,16 +37,16 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final CaptureService CAPTURE = new CaptureService();
     private static final KeyMapping VIEWFINDER_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.viewfinder", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P,
-            KeyMapping.Category.register(Identifier.fromNamespaceAndPath("tobyscamera", "camera"))));
+            CameraKeyCategory.value()));
     private static final KeyMapping GRID_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.grid", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G,
-            KeyMapping.Category.register(Identifier.fromNamespaceAndPath("tobyscamera", "camera"))));
+            CameraKeyCategory.value()));
     private static final KeyMapping ZOOM_IN_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.zoom_in", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_BRACKET,
-            KeyMapping.Category.register(Identifier.fromNamespaceAndPath("tobyscamera", "camera"))));
+            CameraKeyCategory.value()));
     private static final KeyMapping ZOOM_OUT_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.zoom_out", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_BRACKET,
-            KeyMapping.Category.register(Identifier.fromNamespaceAndPath("tobyscamera", "camera"))));
+            CameraKeyCategory.value()));
 
     @Override
     public void onInitializeClient() {
