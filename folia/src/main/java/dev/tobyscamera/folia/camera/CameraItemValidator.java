@@ -4,7 +4,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-public final class CameraItemValidator {
+public final class CameraItemValidator implements CameraValidator {
     private final NamespacedKey key;
 
     public CameraItemValidator(String key) {
@@ -12,7 +12,7 @@ public final class CameraItemValidator {
         if (this.key == null) throw new IllegalArgumentException("invalid camera tag key: " + key);
     }
 
-    public boolean isHoldingCamera(Player player) {
+    @Override public boolean isHoldingCamera(Player player) {
         return hasTag(player.getInventory().getItemInMainHand()) || hasTag(player.getInventory().getItemInOffHand());
     }
 

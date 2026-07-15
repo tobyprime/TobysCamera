@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.Sound;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
@@ -44,7 +45,8 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
             try { photos.restore(); } catch (IOException exception) { getLogger().severe("Could not restore saved photo maps: " + exception.getMessage()); }
         });
         coordinator = new UploadCoordinator(settings, new CameraItemValidator(settings.cameraTagKey()), this::send,
-                (player, session) -> createAndDeliver(player, session));
+                (player, session) -> createAndDeliver(player, session),
+                player -> player.playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.3f));
         PluginPayloadGateway gateway = new PluginPayloadGateway(this, coordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
         getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);

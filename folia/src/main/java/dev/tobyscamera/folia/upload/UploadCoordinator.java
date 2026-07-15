@@ -7,32 +7,34 @@ import dev.tobyscamera.common.upload.SlidingWindowRateLimiter;
 import dev.tobyscamera.common.upload.UploadFailure;
 import dev.tobyscamera.common.upload.UploadGrant;
 import dev.tobyscamera.common.upload.UploadSession;
-import dev.tobyscamera.folia.camera.CameraItemValidator;
+import dev.tobyscamera.folia.camera.CameraValidator;
 import dev.tobyscamera.folia.config.PluginSettings;
 import dev.tobyscamera.folia.net.PluginPayloadGateway;
+import dev.tobyscamera.folia.sound.ShutterSoundService;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
-import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
 public final class UploadCoordinator {
     private final PluginSettings settings;
-    private final CameraItemValidator cameraValidator;
+    private final CameraValidator cameraValidator;
     private final PluginPayloadGatewaySender sender;
     private final CompletedUploadHandler completionHandler;
+    private final ShutterSoundService shutterSound;
     private final SlidingWindowRateLimiter rateLimiter;
     private final Map<UUID, UploadGrant> grants = new HashMap<>();
     private final Map<UUID, UploadSession> sessions = new HashMap<>();
 
-    public UploadCoordinator(PluginSettings settings, CameraItemValidator cameraValidator,
-            PluginPayloadGatewaySender sender, CompletedUploadHandler completionHandler) {
+    public UploadCoordinator(PluginSettings settings, CameraValidator cameraValidator,
+            PluginPayloadGatewaySender sender, CompletedUploadHandler completionHandler, ShutterSoundService shutterSound) {
         this.settings = settings;
         this.cameraValidator = cameraValidator;
         this.sender = sender;
         this.completionHandler = completionHandler;
+        this.shutterSound = shutterSound;
         this.rateLimiter = new SlidingWindowRateLimiter(new RateLimit(settings.perSecond(), settings.perMinute()));
     }
 
@@ -59,7 +61,7 @@ public final class UploadCoordinator {
         }
         UUID token = UUID.randomUUID();
         grants.put(token, new UploadGrant(token, player.getUniqueId(), now, now.plusSeconds(settings.tokenTtlSeconds())));
-        player.playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.3f);
+        shutterSound.playFor(player);
         sender.send(player, new Packets.UploadGranted(token, now.plusSeconds(settings.tokenTtlSeconds()).toEpochMilli(),
                 settings.maxGridSize(), UploadSession.TILE_BYTES));
     }
