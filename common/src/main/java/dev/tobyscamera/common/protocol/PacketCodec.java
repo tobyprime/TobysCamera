@@ -30,7 +30,7 @@ public final class PacketCodec {
                 case Packets.UploadGranted value -> {
                     writeUuid(out, value.token());
                     out.writeLong(value.expiresAtEpochMillis());
-                    out.writeInt(value.maxGridSize());
+                    out.writeInt(value.gridSize());
                     out.writeInt(value.tileBytes());
                 }
                 case Packets.RateLimited value -> out.writeLong(value.retryAfterMillis());

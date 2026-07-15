@@ -16,7 +16,7 @@ class UploadSessionTest {
     @Test
     void acceptsContiguousChunksAndCompletesEveryTile() {
         UploadSession session = new UploadSession(new UploadGrant(TOKEN, PLAYER,
-                Instant.parse("2026-07-16T00:00:00Z"), Instant.parse("2026-07-16T00:01:00Z")), 2, 2, 4);
+                Instant.parse("2026-07-16T00:00:00Z"), Instant.parse("2026-07-16T00:01:00Z"), 2), 2, 2);
         byte[] first = new byte[8_192];
         byte[] second = new byte[8_192];
         second[0] = 42;
@@ -35,12 +35,20 @@ class UploadSessionTest {
     @Test
     void rejectsForeignPlayerOutOfOrderAndOutOfRangeChunks() {
         UploadSession session = new UploadSession(new UploadGrant(TOKEN, PLAYER,
-                Instant.EPOCH, Instant.MAX), 1, 1, 4);
+                Instant.EPOCH, Instant.MAX, 1), 1, 1);
         byte[] bytes = new byte[8_192];
 
         assertThrows(UploadFailure.class, () -> session.append(UUID.randomUUID(), 0, 0, 0, bytes));
         assertThrows(UploadFailure.class, () -> session.append(PLAYER, 1, 0, 0, bytes));
         assertThrows(UploadFailure.class, () -> session.append(PLAYER, 0, 0, 1, bytes));
         assertFalse(session.isComplete());
+    }
+
+    @Test
+    void rejectsUploadGridThatDoesNotExactlyMatchGrant() {
+        UploadGrant grant = new UploadGrant(TOKEN, PLAYER, Instant.EPOCH, Instant.MAX, 2);
+
+        assertThrows(UploadFailure.class, () -> new UploadSession(grant, 1, 1));
+        assertThrows(UploadFailure.class, () -> new UploadSession(grant, 2, 1));
     }
 }

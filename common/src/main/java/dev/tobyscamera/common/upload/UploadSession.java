@@ -11,9 +11,9 @@ public final class UploadSession {
     private final byte[][] tiles;
     private final int[] received;
 
-    public UploadSession(UploadGrant grant, int width, int height, int maximumGridSize) {
-        if (width < 1 || height < 1 || width > maximumGridSize || height > maximumGridSize) {
-            throw new UploadFailure("grid is outside allowed bounds");
+    public UploadSession(UploadGrant grant, int width, int height) {
+        if (width != grant.gridSize() || height != grant.gridSize()) {
+            throw new UploadFailure("grid must match grant");
         }
         this.grant = grant;
         this.width = width;

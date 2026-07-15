@@ -11,7 +11,7 @@ public final class Packets {
         @Override public PacketType type() { return PacketType.CAPTURE_INTENT; }
     }
 
-    public record UploadGranted(UUID token, long expiresAtEpochMillis, int maxGridSize, int tileBytes)
+    public record UploadGranted(UUID token, long expiresAtEpochMillis, int gridSize, int tileBytes)
             implements CameraPacket {
         @Override public PacketType type() { return PacketType.UPLOAD_GRANTED; }
     }

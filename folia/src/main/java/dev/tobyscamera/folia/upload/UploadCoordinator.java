@@ -60,7 +60,7 @@ public final class UploadCoordinator {
             return;
         }
         UUID token = UUID.randomUUID();
-        grants.put(token, new UploadGrant(token, player.getUniqueId(), now, now.plusSeconds(settings.tokenTtlSeconds())));
+        grants.put(token, new UploadGrant(token, player.getUniqueId(), now, now.plusSeconds(settings.tokenTtlSeconds()), settings.maxGridSize()));
         shutterSound.playFor(player);
         sender.send(player, new Packets.UploadGranted(token, now.plusSeconds(settings.tokenTtlSeconds()).toEpochMilli(),
                 settings.maxGridSize(), UploadSession.TILE_BYTES));
@@ -78,7 +78,7 @@ public final class UploadCoordinator {
             return;
         }
         try {
-            sessions.put(begin.token(), new UploadSession(grant, begin.gridWidth(), begin.gridHeight(), settings.maxGridSize()));
+            sessions.put(begin.token(), new UploadSession(grant, begin.gridWidth(), begin.gridHeight()));
         } catch (UploadFailure exception) {
             sender.send(player, new Packets.UploadRejected(exception.getMessage()));
         }
