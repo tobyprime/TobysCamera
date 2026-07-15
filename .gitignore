@@ -1,0 +1,6 @@
+.worktrees/
+.gradle/
+**/build/
+*.class
+*.jar
+plugins/TobysCamera/
