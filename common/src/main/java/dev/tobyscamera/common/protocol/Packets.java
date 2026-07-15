@@ -1,0 +1,53 @@
+package dev.tobyscamera.common.protocol;
+
+import java.util.List;
+import java.util.UUID;
+
+public final class Packets {
+    private Packets() {
+    }
+
+    public record CaptureIntent() implements CameraPacket {
+        @Override public PacketType type() { return PacketType.CAPTURE_INTENT; }
+    }
+
+    public record UploadGranted(UUID token, long expiresAtEpochMillis, int maxGridSize, int tileBytes)
+            implements CameraPacket {
+        @Override public PacketType type() { return PacketType.UPLOAD_GRANTED; }
+    }
+
+    public record RateLimited(long retryAfterMillis) implements CameraPacket {
+        @Override public PacketType type() { return PacketType.RATE_LIMITED; }
+    }
+
+    public record UploadBegin(UUID token, int gridWidth, int gridHeight) implements CameraPacket {
+        @Override public PacketType type() { return PacketType.UPLOAD_BEGIN; }
+    }
+
+    public record UploadTileChunk(UUID token, int tileX, int tileY, int offset, byte[] data)
+            implements CameraPacket {
+        public UploadTileChunk {
+            data = data.clone();
+        }
+
+        @Override public byte[] data() { return data.clone(); }
+        @Override public PacketType type() { return PacketType.UPLOAD_TILE_CHUNK; }
+    }
+
+    public record UploadFinish(UUID token) implements CameraPacket {
+        @Override public PacketType type() { return PacketType.UPLOAD_FINISH; }
+    }
+
+    public record PhotoCreated(UUID photoId, List<Integer> mapIds, int gridWidth, int gridHeight)
+            implements CameraPacket {
+        public PhotoCreated {
+            mapIds = List.copyOf(mapIds);
+        }
+
+        @Override public PacketType type() { return PacketType.PHOTO_CREATED; }
+    }
+
+    public record UploadRejected(String reason) implements CameraPacket {
+        @Override public PacketType type() { return PacketType.UPLOAD_REJECTED; }
+    }
+}

@@ -1,0 +1,11 @@
+camera-tag-key: "tobyscamera:camera"
+token-ttl-seconds: 60
+rate-limit:
+  per-second: 1
+  per-minute: 12
+upload:
+  max-grid-size: 4
+  chunk-bytes: 8192
+  timeout-seconds: 30
+invalid-token:
+  kick-message: "Invalid or expired photo upload token"
