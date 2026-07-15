@@ -32,7 +32,7 @@ settings.
    /give @s minecraft:spyglass[custom_data={PublicBukkitValues:{"tobyscamera:camera":1b}}]
    ```
 
-4. Hold the camera and right-click to open the square viewfinder. Use `[` / `]` to zoom, `G` to switch guides, and left click to take a picture. The server should play a shutter sound and issue a short-lived upload Token.
+4. Hold the camera and right-click to open the square viewfinder. Use `[` / `]` to zoom, `G` to switch guides, and `Enter` to take a picture. The shutter key appears under the **TobysCamera** category in Minecraft's Controls settings and can be rebound. The server should play a shutter sound and issue a short-lived upload Token.
 5. The client captures its rendered frame and opens a preview. Select **Use photo** to upload map palette tiles or **Retake** to return to the viewfinder.
 6. Verify the resulting 1x1, 2x2 and 4x4 `filled_map` items can be held or put in item frames by an unmodded player.
 7. Restart the server and verify the same maps still render. Fill the photographer's inventory to verify overflow drops at their feet; disconnect during delivery to verify the pending delivery is retried on join.

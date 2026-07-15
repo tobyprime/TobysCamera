@@ -10,6 +10,7 @@ import dev.tobyscamera.fabric.camera.NativePixelFormat;
 import dev.tobyscamera.fabric.camera.PhotoUploadController;
 import dev.tobyscamera.fabric.camera.ResizeToGridProcessor;
 import dev.tobyscamera.fabric.input.CameraKeyCategory;
+import dev.tobyscamera.fabric.input.CameraKeyBindings;
 import dev.tobyscamera.fabric.net.CameraPayload;
 import dev.tobyscamera.fabric.viewfinder.CaptureService;
 import dev.tobyscamera.fabric.viewfinder.PreviewScreen;
@@ -37,7 +38,6 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final ViewfinderOverlay OVERLAY = new ViewfinderOverlay(VIEWFINDER);
     private static final CaptureService CAPTURE = new CaptureService();
     private static final ViewfinderInputController INPUTS = new ViewfinderInputController(VIEWFINDER, UPLOADS::requestCapture);
-    private boolean attackWasDown;
     private static final KeyMapping VIEWFINDER_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.viewfinder", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P,
             CameraKeyCategory.value()));
@@ -50,6 +50,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final KeyMapping ZOOM_OUT_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.zoom_out", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_BRACKET,
             CameraKeyCategory.value()));
+    private static final KeyMapping SHUTTER_KEY = KeyBindingHelper.registerKeyBinding(CameraKeyBindings.shutter());
 
     @Override
     public void onInitializeClient() {
@@ -86,21 +87,11 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (GRID_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.cycleGrid();
         while (ZOOM_IN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(1.0);
         while (ZOOM_OUT_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(-1.0);
-        boolean attackDown = client.options.keyAttack.isDown();
-        if (attackDown && !attackWasDown) INPUTS.pressShutter();
-        attackWasDown = attackDown;
+        while (SHUTTER_KEY.consumeClick()) INPUTS.pressShutter();
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING && CAPTURE.tick()) {
             int gridSize = CAPTURE.takeGridSize();
             Screenshot.takeScreenshot(client.getMainRenderTarget(), nativeImage -> openPreview(client, toFrame(nativeImage, gridSize)));
         }
-    }
-
-    public static boolean pressViewfinderShutter() {
-        return INPUTS.pressShutter();
-    }
-
-    public static boolean suppressesViewfinderAttack() {
-        return INPUTS.suppressesVanillaAttack();
     }
 
     public static boolean closeViewfinder() {
