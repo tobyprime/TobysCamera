@@ -9,9 +9,10 @@ unchanged.
 ## Approach
 
 The `folia` Gradle module will use Paper's official `paperweight.userdev` plugin and
-its matching `paperDevBundle`.  Paperweight owns the development server download,
-cache, working directory and plugin loading.  This avoids a custom server-download or
-copy task.
+its matching `paperDevBundle` for compilation and remapping.  Paper's documentation
+recommends the `xyz.jpenilla.run-paper` Run-Task plugin for local server execution;
+it owns the development server download, cache, working directory and plugin loading.
+This avoids a custom server-download or copy task.
 
 The module will expose Paperweight's `:folia:runServer` task.  The root project will
 provide a `runServer` lifecycle alias that depends on it, so local development starts
@@ -20,6 +21,14 @@ with:
 ```powershell
 .\gradlew.bat runServer
 ```
+
+The Fabric module's unused development-server task is disabled so Gradle's unqualified
+task selection resolves this command to the Paper server only. Fabric client development
+continues to use `:fabric:runClient`.
+
+Before each development start, the task writes `eula=true` and preserves all existing
+`server.properties` values while setting `online-mode=false`. These settings apply only
+to the ignored local `folia/run` directory.
 
 ## Compatibility
 

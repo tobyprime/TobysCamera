@@ -15,6 +15,12 @@ dependencies {
 
 tasks.test { useJUnitPlatform() }
 
+// The root runServer task is reserved for the Paper plugin development server.
+// Fabric development for this client-only module uses runClient.
+tasks.named("runServer") {
+    enabled = false
+}
+
 tasks.processResources {
     filesMatching("fabric.mod.json") {
         expand("version" to project.version)

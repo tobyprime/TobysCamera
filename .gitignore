@@ -1,6 +1,7 @@
 .worktrees/
 .gradle/
 **/build/
+folia/run/
 *.class
 *.jar
 plugins/TobysCamera/

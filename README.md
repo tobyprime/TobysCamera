@@ -13,6 +13,15 @@ $env:GRADLE_OPTS='-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7890 -Dhttps.proxy
 
 The Fabric and Folia jars are generated in `fabric/build/libs` and `folia/build/libs`.
 
+## Local Paper development server
+
+Run `./gradlew runServer` (or `./gradlew.bat runServer` on Windows) to build the
+plugin and start a local Paper 1.21.11 server. This development server automatically
+loads the plugin JAR, accepts the EULA for this local project run, and sets
+`online-mode=false`. It is for local testing only; deploy the generated
+Folia-compatible JAR to Folia in production, with its production authentication
+settings.
+
 ## Server setup and manual verification
 
 1. Put the Folia jar in `plugins/`, start the server once, then configure `plugins/TobysCamera/config.yml` as required.
