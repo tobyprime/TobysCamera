@@ -27,7 +27,7 @@ public final class MapPhotoService {
         this.repository = repository;
     }
 
-    public PhotoRecord create(UUID ownerId, World world, UploadSession session) throws IOException {
+    public PhotoRecord createMaps(UUID ownerId, World world, UploadSession session) {
         UUID photoId = UUID.randomUUID();
         Map<TileCoordinate, Integer> mapIds = new LinkedHashMap<>();
         Map<TileCoordinate, byte[]> tiles = new LinkedHashMap<>();
@@ -41,8 +41,15 @@ public final class MapPhotoService {
             mapIds.put(coordinate, view.getId()); tiles.put(coordinate, pixels);
         }
         PhotoRecord record = new PhotoRecord(photoId, ownerId, Instant.now(), session.width(), session.height(), mapIds);
-        repository.save(record, tiles);
         return record;
+    }
+
+    public void persist(PhotoRecord record, UploadSession session) throws IOException {
+        Map<TileCoordinate, byte[]> tiles = new LinkedHashMap<>();
+        for (int y = 0; y < session.height(); y++) for (int x = 0; x < session.width(); x++) {
+            tiles.put(new TileCoordinate(x, y), session.tile(x, y));
+        }
+        repository.save(record, tiles);
     }
 
     public void restore() throws IOException {

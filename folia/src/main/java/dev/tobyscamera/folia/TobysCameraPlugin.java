@@ -74,12 +74,19 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
         var world = player.getWorld();
         getServer().getGlobalRegionScheduler().run(this, ignored -> {
             try {
-                var record = photos.create(player.getUniqueId(), world, session);
-                player.getScheduler().run(this, task -> {
-                    try { deliveries.deliver(player, record); } catch (IOException exception) { throw new IllegalStateException(exception); }
-                    send(player, new Packets.PhotoCreated(record.photoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight()));
-                }, () -> { try { deliveries.queue(player, record); } catch (IOException exception) { getLogger().warning("Could not queue photo delivery: " + exception.getMessage()); } });
-            } catch (IOException | RuntimeException exception) {
+                var record = photos.createMaps(player.getUniqueId(), world, session);
+                getServer().getAsyncScheduler().runNow(this, asyncTask -> {
+                    try {
+                        photos.persist(record, session);
+                        player.getScheduler().run(this, task -> {
+                            try { deliveries.deliver(player, record); } catch (IOException exception) { throw new IllegalStateException(exception); }
+                            send(player, new Packets.PhotoCreated(record.photoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight()));
+                        }, () -> { try { deliveries.queue(player, record); } catch (IOException exception) { getLogger().warning("Could not queue photo delivery: " + exception.getMessage()); } });
+                    } catch (IOException exception) {
+                        player.getScheduler().run(this, task -> send(player, new Packets.UploadRejected("Could not save photo maps")), () -> { });
+                    }
+                });
+            } catch (RuntimeException exception) {
                 player.getScheduler().run(this, task -> send(player, new Packets.UploadRejected("Could not create photo maps")), () -> { });
                 getLogger().warning("Could not create photo map: " + exception.getMessage());
             }
