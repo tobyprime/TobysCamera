@@ -3,7 +3,6 @@ package dev.tobyscamera.fabric.camera;
 import dev.tobyscamera.common.protocol.CameraPacket;
 import dev.tobyscamera.common.protocol.Packets;
 import dev.tobyscamera.fabric.net.CameraPayload;
-import java.awt.image.BufferedImage;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
@@ -11,18 +10,18 @@ public final class PhotoUploadController {
     private final MapTileEncoder encoder = new MapTileEncoder();
     private UUID token;
     private long expiresAt;
-    private BufferedImage preview;
+    private int gridSize;
 
     public void requestCapture() { send(new Packets.CaptureIntent()); }
 
     public void handleServerPacket(CameraPacket packet) {
-        if (packet instanceof Packets.UploadGranted grant) { token = grant.token(); expiresAt = grant.expiresAtEpochMillis(); }
-        if (packet instanceof Packets.RateLimited || packet instanceof Packets.UploadRejected || packet instanceof Packets.PhotoCreated) token = null;
+        if (packet instanceof Packets.UploadGranted grant) { token = grant.token(); expiresAt = grant.expiresAtEpochMillis(); gridSize = grant.gridSize(); }
+        if (packet instanceof Packets.RateLimited || packet instanceof Packets.UploadRejected || packet instanceof Packets.PhotoCreated) clearGrant();
     }
 
-    public boolean confirm(BufferedImage image) {
-        if (token == null || System.currentTimeMillis() >= expiresAt) { token = null; return false; }
-        MapTileEncoder.EncodedPhoto photo = encoder.encode(image);
+    public boolean confirm(CapturedFrame frame) {
+        if (token == null || System.currentTimeMillis() >= expiresAt || frame.gridSize() != gridSize) { clearGrant(); return false; }
+        MapTileEncoder.EncodedPhoto photo = encoder.encode(frame);
         send(new Packets.UploadBegin(token, photo.gridWidth(), photo.gridHeight()));
         for (int y = 0; y < photo.gridHeight(); y++) for (int x = 0; x < photo.gridWidth(); x++) {
             byte[] tile = photo.tiles().get(y * photo.gridWidth() + x);
@@ -33,13 +32,13 @@ public final class PhotoUploadController {
             }
         }
         send(new Packets.UploadFinish(token));
-        token = null;
+        clearGrant();
         return true;
     }
 
-    public void setPreview(BufferedImage image) { preview = image; }
-    public boolean confirmPreview() { return preview != null && confirm(preview); }
-    public boolean awaitingPreview() { return token != null && preview == null; }
+    public boolean hasValidGrant() { return token != null && System.currentTimeMillis() < expiresAt; }
+    public int gridSize() { return gridSize; }
+    public void clearGrant() { token = null; expiresAt = 0; gridSize = 0; }
 
     private static void send(CameraPacket packet) { ClientPlayNetworking.send(new CameraPayload(dev.tobyscamera.common.protocol.PacketCodec.encode(packet))); }
 }

@@ -6,6 +6,10 @@ import java.util.List;
 import net.minecraft.world.level.material.MapColor;
 
 public final class MapTileEncoder {
+    public EncodedPhoto encode(CapturedFrame frame) {
+        return encode(frame.image(), frame.gridSize());
+    }
+
     public EncodedPhoto encode(BufferedImage source) {
         int gridWidth = Math.min(4, Math.max(1, (source.getWidth() + 127) / 128));
         int gridHeight = Math.min(4, Math.max(1, (source.getHeight() + 127) / 128));
@@ -22,6 +26,22 @@ public final class MapTileEncoder {
             tiles.add(tile);
         }
         return new EncodedPhoto(gridWidth, gridHeight, List.copyOf(tiles));
+    }
+
+    private EncodedPhoto encode(BufferedImage source, int gridSize) {
+        int expectedSize = gridSize * 128;
+        if (source.getWidth() != expectedSize || source.getHeight() != expectedSize) {
+            throw new IllegalArgumentException("prepared frame size must match server grid");
+        }
+        List<byte[]> tiles = new ArrayList<>(gridSize * gridSize);
+        for (int tileY = 0; tileY < gridSize; tileY++) for (int tileX = 0; tileX < gridSize; tileX++) {
+            byte[] tile = new byte[16_384];
+            for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) {
+                tile[y * 128 + x] = nearestMapColor(source.getRGB(tileX * 128 + x, tileY * 128 + y));
+            }
+            tiles.add(tile);
+        }
+        return new EncodedPhoto(gridSize, gridSize, List.copyOf(tiles));
     }
 
     private static byte nearestMapColor(int argb) {
