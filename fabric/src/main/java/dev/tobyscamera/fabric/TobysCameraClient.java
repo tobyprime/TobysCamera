@@ -21,10 +21,12 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Screenshot;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.InteractionResult;
 import org.lwjgl.glfw.GLFW;
 
 public final class TobysCameraClient implements ClientModInitializer {
@@ -50,6 +52,11 @@ public final class TobysCameraClient implements ClientModInitializer {
         PayloadTypeRegistry.playC2S().register(CameraPayload.TYPE, CameraPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(CameraPayload.TYPE, CameraPayload.CODEC);
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("tobyscamera", "viewfinder"), (graphics, delta) -> OVERLAY.render(graphics));
+        UseItemCallback.EVENT.register((player, level, hand) -> {
+            if (!level.isClientSide() || !HeldCameraChecker.isCamera(player.getItemInHand(hand))) return InteractionResult.PASS;
+            if (VIEWFINDER.state() == ViewfinderState.CLOSED) VIEWFINDER.open();
+            return InteractionResult.FAIL;
+        });
         ClientPlayNetworking.registerGlobalReceiver(CameraPayload.TYPE, (payload, context) -> handleServerPacket(context.client(), PacketCodec.decode(payload.data())));
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
     }
