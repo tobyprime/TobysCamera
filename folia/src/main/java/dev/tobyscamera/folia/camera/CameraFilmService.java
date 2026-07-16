@@ -69,6 +69,10 @@ public final class CameraFilmService {
         return true;
     }
 
+    public static int capVideoFps(int componentMaximum, int configuredMaximum) {
+        return Math.max(1, Math.min(Math.min(20, Math.max(1, configuredMaximum)), componentMaximum));
+    }
+
     public static List<Component> lore(int remaining, int maximum) {
         return List.of(
                 Component.text("剩余胶卷: " + remaining, NamedTextColor.GRAY),
