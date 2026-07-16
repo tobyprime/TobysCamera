@@ -17,5 +17,11 @@ public final class VideoUploadSession {
         System.arraycopy(bytes, 0, tiles[index], offset, bytes.length); received[index] += bytes.length;
     }
     public synchronized boolean isComplete() { return Arrays.stream(received).allMatch(v -> v == UploadSession.TILE_BYTES); }
+    public synchronized byte[] tile(int frame, int x, int y) {
+        if (frame < 0 || frame >= frameCount || x < 0 || x >= width || y < 0 || y >= height) throw new UploadFailure("tile is outside video");
+        int index = (frame * height + y) * width + x;
+        if (received[index] != UploadSession.TILE_BYTES) throw new UploadFailure("tile is incomplete");
+        return tiles[index].clone();
+    }
     public int width() { return width; } public int height() { return height; } public int fps() { return fps; } public int frameCount() { return frameCount; }
 }
