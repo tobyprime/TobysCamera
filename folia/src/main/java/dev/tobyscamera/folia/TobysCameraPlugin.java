@@ -124,11 +124,18 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
                     try {
                         videos.persist(record, session);
                         player.getScheduler().run(this, task2 -> {
-                            for (var coordinate : record.mapIds().keySet()) {
-                                var leftovers = player.getInventory().addItem(videos.mapItem(record, coordinate, metadata));
-                                leftovers.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
+                            try {
+                                var maps = record.mapIds().keySet().stream().map(coordinate -> videos.mapItem(record, coordinate, metadata)).toList();
+                                for (var map : maps) {
+                                    var leftovers = player.getInventory().addItem(map);
+                                    leftovers.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
+                                }
+                                getLogger().info("Delivered " + maps.size() + " video map(s) for " + record.videoId() + " to " + player.getName() + ".");
+                                send(player, new Packets.VideoCreated(record.videoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight(), record.fps(), record.frameCount()));
+                            } catch (RuntimeException exception) {
+                                getLogger().warning("Could not deliver video maps to " + player.getName() + ": " + exception.getMessage());
+                                send(player, new Packets.UploadRejected("Could not deliver video maps"));
                             }
-                            send(player, new Packets.VideoCreated(record.videoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight(), record.fps(), record.frameCount()));
                         }, () -> { });
                     } catch (IOException exception) {
                         player.getScheduler().run(this, task2 -> send(player, new Packets.UploadRejected("Could not save video maps")), () -> { });
