@@ -169,7 +169,6 @@ public final class TobysCameraClient implements ClientModInitializer {
     }
 
     private static void startLocalCapture(int gridSize) {
-        UPLOADS.requestCapture();
         OVERLAY.flashShutter();
         if (VIEWFINDER.mode() == CaptureMode.VIDEO) {
             try {
@@ -181,6 +180,7 @@ public final class TobysCameraClient implements ClientModInitializer {
             }
             return;
         }
+        UPLOADS.requestCapture();
         CAPTURE.requestAfterNextFrame(gridSize);
     }
 
