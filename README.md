@@ -40,7 +40,7 @@ settings.
 
 ## Video maps
 
-While the viewfinder is open, `V` (rebindable in **TobysCamera** controls) switches between photo and video modes. In video mode, `-` / `=` select only tick-aligned `1 / 5 / 10 / 20 FPS` rates within the held camera's `tobyscamera:max_video_fps` component. Press the shutter once to start and again to stop. The confirmation screen trims the retained frame range, chooses the final rectangular map layout and dithering, then uploads exactly the palette bytes that it previews.
+Only cameras with the `tobyscamera:video` component can record video. While holding one, `V` (rebindable in **TobysCamera** controls) switches between photo and video modes. In video mode, `-` / `=` select only tick-aligned `1 / 5 / 10 / 20 FPS` rates within the held camera's `tobyscamera:max_video_fps` component. Press the shutter once to start and again to stop. The confirmation screen trims the retained frame range, chooses the final rectangular map layout and dithering, then uploads exactly the palette bytes that it previews.
 
 The plugin's reloadable `video:` configuration has these defaults:
 
@@ -58,7 +58,7 @@ Each retained frame costs one film for every final map tile: a 12-frame 2×3 vid
 
 ### Video manual verification
 
-1. Give yourself a tagged camera with enough film, or a `tobyscamera:no_film_required` camera. Hold it, right-click, press `V`, choose an FPS with `-` / `=`, then press the configured shutter key to start and stop a short recording.
+1. Give yourself a tagged camera with `tobyscamera:video`, enough film (or `tobyscamera:no_film_required`), and optionally `tobyscamera:max_video_fps`. Hold it, right-click, press `V`, choose an FPS with `-` / `=`, then press the configured shutter key to start and stop a short recording.
 2. In confirmation, move the start/end controls to remove at least one frame from each side. Select a non-square composition (for example 4:3) and a print size that produces a rectangular map layout. The displayed preview must match the final map palette, including black borders and dithering.
 3. Confirm printing. Check that the server grants the upload, the client throttles rather than freezing, and every delivered `filled_map` has matching grid position, photographer, location and time lore.
 4. Place the delivered maps in item frames. They should loop at the selected FPS after a server restart. Place more than `video.max-active-map-frames` maps at varied distances; only the nearest configured number should receive refreshes each pass.

@@ -46,6 +46,7 @@ public final class VideoUploadCoordinator {
         discardPhotoCaptureIntent.accept(player);
         var camera = films.heldCamera(player);
         if (camera == null) { sender.send(player, new Packets.UploadRejected("A tagged camera must be held")); return; }
+        if (!films.supportsVideo(camera)) { sender.send(player, new Packets.UploadRejected("This camera does not support video")); return; }
         int maximum = films.maximumForFilm(camera, settings.maxGridSize());
         if (begin.gridWidth() < 1 || begin.gridHeight() < 1 || begin.gridWidth() > maximum || begin.gridHeight() > maximum
                 || !VideoFrameRate.isSupported(begin.fps()) || begin.fps() > films.maximumVideoFps(camera, settings.videoMaxFps()) || begin.frameCount() < 1 || begin.frameCount() > settings.videoMaxFrames()) {

@@ -33,4 +33,17 @@ class ViewfinderInputControllerTest {
         assertEquals(ViewfinderState.CLOSED, session.state());
     }
 
+    @Test
+    void refusesToStartVideoWithoutVideoCapability() {
+        ViewfinderSession session = new ViewfinderSession();
+        session.open();
+        session.toggleMode();
+        AtomicInteger requests = new AtomicInteger();
+        ViewfinderInputController controls = new ViewfinderInputController(session, () -> 1, () -> false, ignored -> requests.incrementAndGet());
+
+        assertFalse(controls.pressShutter());
+        assertEquals(ViewfinderState.VIEWFINDER, session.state());
+        assertEquals(0, requests.get());
+    }
+
 }

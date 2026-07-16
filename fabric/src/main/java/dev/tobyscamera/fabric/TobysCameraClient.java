@@ -64,7 +64,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static boolean videoCaptureRequested;
     private static VideoCaptureFormat videoCaptureFormat;
     private static final ViewfinderInputController INPUTS = new ViewfinderInputController(
-            VIEWFINDER, TobysCameraClient::heldCameraGridSize, TobysCameraClient::startLocalCapture);
+            VIEWFINDER, TobysCameraClient::heldCameraGridSize, TobysCameraClient::heldCameraSupportsVideo, TobysCameraClient::startLocalCapture);
     private static final KeyMapping VIEWFINDER_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.viewfinder", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P,
             CameraKeyCategory.value()));
@@ -126,9 +126,9 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (ZOOM_IN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(1.0);
         while (ZOOM_OUT_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(-1.0);
         while (COMPOSITION_KEY.consumeClick()) toggleCompositionEditor(client);
-        while (MODE_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) { VIEWFINDER.toggleMode(); if (VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.capVideoFps(heldCameraVideoFps()); }
-        while (FPS_UP_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.adjustVideoFps(1, heldCameraVideoFps());
-        while (FPS_DOWN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.adjustVideoFps(-1, heldCameraVideoFps());
+        while (MODE_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && (VIEWFINDER.mode() == CaptureMode.VIDEO || heldCameraSupportsVideo())) { VIEWFINDER.toggleMode(); if (VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.capVideoFps(heldCameraVideoFps()); }
+        while (FPS_UP_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO && heldCameraSupportsVideo()) VIEWFINDER.adjustVideoFps(1, heldCameraVideoFps());
+        while (FPS_DOWN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO && heldCameraSupportsVideo()) VIEWFINDER.adjustVideoFps(-1, heldCameraVideoFps());
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING) CAPTURE.tick();
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING && VIEWFINDER.mode() == CaptureMode.VIDEO
                 && !videoReadbackPending && VIDEO_CAPTURE.captureDue(System.currentTimeMillis())) videoCaptureRequested = true;
@@ -265,6 +265,11 @@ public final class TobysCameraClient implements ClientModInitializer {
         var player = net.minecraft.client.Minecraft.getInstance().player;
         if (player == null) return 0;
         return Math.max(HeldCameraChecker.maximumVideoFps(player.getMainHandItem()), HeldCameraChecker.maximumVideoFps(player.getOffhandItem()));
+    }
+
+    private static boolean heldCameraSupportsVideo() {
+        var player = net.minecraft.client.Minecraft.getInstance().player;
+        return player != null && (HeldCameraChecker.supportsVideo(player.getMainHandItem()) || HeldCameraChecker.supportsVideo(player.getOffhandItem()));
     }
 
     private static void openVideoPreview(net.minecraft.client.Minecraft client) {

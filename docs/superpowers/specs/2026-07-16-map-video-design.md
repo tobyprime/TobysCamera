@@ -20,7 +20,7 @@ This design preserves existing photo behavior and protocol semantics.
 - Each retained video frame consumes one film per final map tile. Required film is `frameCount * gridWidth * gridHeight`.
 - The server validates the final grid, FPS, and retained-frame count before issuing a video upload grant, then charges the entire required amount atomically. A film-free camera remains exempt.
 - Configurable server limits have conservative defaults: `video-max-fps: 10`, `video-max-frames: 100`, `video-max-upload-chunks-per-second: 120`, and an absolute FPS ceiling of 20. These are reloadable with the plugin configuration.
-- The camera component's `tobyscamera:max_video_fps` is client-readable and server-validated. Missing components use the configured server maximum for backwards compatibility.
+- A camera must carry the client-readable `tobyscamera:video` component to enable video mode. Its `tobyscamera:max_video_fps` component is client-readable and server-validated; the configured server maximum remains the cap when this optional FPS limit is absent.
 
 ## Protocol and upload rate limiting
 
