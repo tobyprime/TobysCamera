@@ -20,22 +20,10 @@ public final class ViewfinderSession {
 
     public void close() { state = ViewfinderState.CLOSED; gridSize = 0; }
 
-    public boolean pressShutter() {
-        if (state != ViewfinderState.VIEWFINDER) return false;
-        state = ViewfinderState.AWAITING_GRANT;
-        return true;
-    }
-
-    public boolean acceptGrant(int gridSize) {
-        if (state != ViewfinderState.AWAITING_GRANT || gridSize < 1 || gridSize > 4) return false;
+    public boolean pressShutter(int gridSize) {
+        if (state != ViewfinderState.VIEWFINDER || gridSize < 1 || gridSize > 4) return false;
         this.gridSize = gridSize;
         state = ViewfinderState.CAPTURING;
-        return true;
-    }
-
-    public boolean rejectGrant() {
-        if (state != ViewfinderState.AWAITING_GRANT) return false;
-        state = ViewfinderState.VIEWFINDER;
         return true;
     }
 
@@ -68,5 +56,5 @@ public final class ViewfinderSession {
     public CameraComposition composition() { return composition; }
     public int gridSize() { return gridSize; }
     public boolean captureHidden() { return state == ViewfinderState.CAPTURING; }
-    public boolean zoomActive() { return state == ViewfinderState.VIEWFINDER || state == ViewfinderState.AWAITING_GRANT || state == ViewfinderState.CAPTURING; }
+    public boolean zoomActive() { return state == ViewfinderState.VIEWFINDER || state == ViewfinderState.CAPTURING; }
 }

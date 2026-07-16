@@ -30,12 +30,10 @@ public final class PacketCodec {
                 case Packets.UploadGranted value -> {
                     writeUuid(out, value.token());
                     out.writeLong(value.expiresAtEpochMillis());
-                    out.writeInt(value.gridSize());
                     out.writeInt(value.tileBytes());
                 }
                 case Packets.RateLimited value -> out.writeLong(value.retryAfterMillis());
                 case Packets.UploadBegin value -> {
-                    writeUuid(out, value.token());
                     out.writeInt(value.gridWidth());
                     out.writeInt(value.gridHeight());
                 }
@@ -70,9 +68,9 @@ public final class PacketCodec {
             if (in.get() != VERSION) throw new ProtocolException("unsupported protocol version");
             CameraPacket packet = switch (PacketType.fromId(in.get())) {
                 case CAPTURE_INTENT -> new Packets.CaptureIntent();
-                case UPLOAD_GRANTED -> new Packets.UploadGranted(readUuid(in), in.getLong(), in.getInt(), in.getInt());
+                case UPLOAD_GRANTED -> new Packets.UploadGranted(readUuid(in), in.getLong(), in.getInt());
                 case RATE_LIMITED -> new Packets.RateLimited(in.getLong());
-                case UPLOAD_BEGIN -> new Packets.UploadBegin(readUuid(in), in.getInt(), in.getInt());
+                case UPLOAD_BEGIN -> new Packets.UploadBegin(in.getInt(), in.getInt());
                 case UPLOAD_TILE_CHUNK -> readChunk(in);
                 case UPLOAD_FINISH -> new Packets.UploadFinish(readUuid(in));
                 case PHOTO_CREATED -> readPhotoCreated(in);

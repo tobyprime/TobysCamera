@@ -11,7 +11,8 @@ public final class Packets {
         @Override public PacketType type() { return PacketType.CAPTURE_INTENT; }
     }
 
-    public record UploadGranted(UUID token, long expiresAtEpochMillis, int gridSize, int tileBytes)
+    /** Sent only after the server has accepted and charged an UploadBegin request. */
+    public record UploadGranted(UUID token, long expiresAtEpochMillis, int tileBytes)
             implements CameraPacket {
         @Override public PacketType type() { return PacketType.UPLOAD_GRANTED; }
     }
@@ -20,7 +21,8 @@ public final class Packets {
         @Override public PacketType type() { return PacketType.RATE_LIMITED; }
     }
 
-    public record UploadBegin(UUID token, int gridWidth, int gridHeight) implements CameraPacket {
+    /** Requests an upload session. It deliberately has no token: the server issues one after charging film. */
+    public record UploadBegin(int gridWidth, int gridHeight) implements CameraPacket {
         @Override public PacketType type() { return PacketType.UPLOAD_BEGIN; }
     }
 

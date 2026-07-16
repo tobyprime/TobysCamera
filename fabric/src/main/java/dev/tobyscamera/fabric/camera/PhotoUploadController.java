@@ -11,22 +11,29 @@ import org.slf4j.Logger;
 public final class PhotoUploadController {
     private static final Logger LOGGER = LogUtils.getLogger();
     private final MapTileEncoder encoder = new MapTileEncoder();
+    private MapTileEncoder.EncodedPhoto pendingPhoto;
     private UUID token;
-    private long expiresAt;
-    private int gridSize;
 
     public void requestCapture() { send(new Packets.CaptureIntent()); }
 
     public void handleServerPacket(CameraPacket packet) {
-        if (packet instanceof Packets.UploadGranted grant) { token = grant.token(); expiresAt = grant.expiresAtEpochMillis(); gridSize = grant.gridSize(); }
-        if (packet instanceof Packets.RateLimited || packet instanceof Packets.UploadRejected || packet instanceof Packets.PhotoCreated) clearGrant();
+        if (packet instanceof Packets.UploadGranted grant) startUpload(grant);
+        if (packet instanceof Packets.RateLimited || packet instanceof Packets.UploadRejected || packet instanceof Packets.PhotoCreated) clearPending();
     }
 
     public boolean confirm(CapturedFrame frame, int printSize) {
-        if (token == null || System.currentTimeMillis() >= expiresAt || frame.gridSize() != gridSize || printSize < 1 || printSize > gridSize) { clearGrant(); return false; }
+        if (pendingPhoto != null || printSize < 1 || printSize > frame.gridSize()) return false;
         PrintLayout layout = PrintLayout.forMaximumSide(printSize, frame.composition().aspectRatio());
         MapTileEncoder.EncodedPhoto photo = encoder.encode(new PrintCanvasProcessor().process(frame.image(), layout));
-        send(new Packets.UploadBegin(token, photo.gridWidth(), photo.gridHeight()));
+        pendingPhoto = photo;
+        send(new Packets.UploadBegin(photo.gridWidth(), photo.gridHeight()));
+        return true;
+    }
+
+    private void startUpload(Packets.UploadGranted grant) {
+        if (pendingPhoto == null || System.currentTimeMillis() >= grant.expiresAtEpochMillis()) { clearPending(); return; }
+        token = grant.token();
+        MapTileEncoder.EncodedPhoto photo = pendingPhoto;
         for (int y = 0; y < photo.gridHeight(); y++) for (int x = 0; x < photo.gridWidth(); x++) {
             byte[] tile = photo.tiles().get(y * photo.gridWidth() + x);
             for (int offset = 0; offset < tile.length; offset += 8_192) {
@@ -36,13 +43,10 @@ public final class PhotoUploadController {
             }
         }
         send(new Packets.UploadFinish(token));
-        clearGrant();
-        return true;
+        clearPending();
     }
 
-    public boolean hasValidGrant() { return token != null && System.currentTimeMillis() < expiresAt; }
-    public int gridSize() { return gridSize; }
-    public void clearGrant() { token = null; expiresAt = 0; gridSize = 0; }
+    public void clearPending() { pendingPhoto = null; token = null; }
 
     private static void send(CameraPacket packet) {
         LOGGER.info("Sending camera packet {}.", packet.getClass().getSimpleName());

@@ -7,9 +7,8 @@ import dev.tobyscamera.common.upload.SlidingWindowRateLimiter;
 import dev.tobyscamera.common.upload.UploadFailure;
 import dev.tobyscamera.common.upload.UploadGrant;
 import dev.tobyscamera.common.upload.UploadSession;
-import dev.tobyscamera.folia.camera.CameraValidator;
+import dev.tobyscamera.folia.camera.CameraFilmService;
 import dev.tobyscamera.folia.config.PluginSettings;
-import dev.tobyscamera.folia.net.PluginPayloadGateway;
 import dev.tobyscamera.folia.sound.ShutterSoundService;
 import java.time.Instant;
 import java.util.HashMap;
@@ -23,7 +22,7 @@ import org.slf4j.LoggerFactory;
 public final class UploadCoordinator {
     private static final Logger LOGGER = LoggerFactory.getLogger(UploadCoordinator.class);
     private final PluginSettings settings;
-    private final CameraValidator cameraValidator;
+    private final CameraFilmService films;
     private final PluginPayloadGatewaySender sender;
     private final CompletedUploadHandler completionHandler;
     private final ShutterSoundService shutterSound;
@@ -31,10 +30,10 @@ public final class UploadCoordinator {
     private final Map<UUID, UploadGrant> grants = new HashMap<>();
     private final Map<UUID, UploadSession> sessions = new HashMap<>();
 
-    public UploadCoordinator(PluginSettings settings, CameraValidator cameraValidator,
+    public UploadCoordinator(PluginSettings settings, CameraFilmService films,
             PluginPayloadGatewaySender sender, CompletedUploadHandler completionHandler, ShutterSoundService shutterSound) {
         this.settings = settings;
-        this.cameraValidator = cameraValidator;
+        this.films = films;
         this.sender = sender;
         this.completionHandler = completionHandler;
         this.shutterSound = shutterSound;
@@ -53,40 +52,46 @@ public final class UploadCoordinator {
     }
 
     private void capture(Player player) {
-        if (!cameraValidator.isHoldingCamera(player)) {
+        if (films.heldCamera(player) == null) {
             LOGGER.info("Rejected capture intent for {} because no tagged camera is held.", player.getName());
+            sender.send(player, new Packets.UploadRejected("A tagged camera must be held"));
+            return;
+        }
+        shutterSound.playFor(player);
+    }
+
+    private void begin(Player player, Packets.UploadBegin begin) {
+        var camera = films.heldCamera(player);
+        if (camera == null) {
             sender.send(player, new Packets.UploadRejected("A tagged camera must be held"));
             return;
         }
         Instant now = Instant.now();
         var rateResult = rateLimiter.tryAcquire(player.getUniqueId(), now);
         if (!rateResult.allowed()) {
-            LOGGER.info("Rate limited capture intent for {} for {} ms.", player.getName(), rateResult.retryAfterMillis());
             sender.send(player, new Packets.RateLimited(rateResult.retryAfterMillis()));
             return;
         }
+        int maximum = films.maximumForFilm(camera, settings.maxGridSize());
+        if (begin.gridWidth() < 1 || begin.gridHeight() < 1
+                || begin.gridWidth() > maximum || begin.gridHeight() > maximum) {
+            sender.send(player, new Packets.UploadRejected("Camera does not have enough film for that print size"));
+            return;
+        }
+        int filmCost = Math.multiplyExact(begin.gridWidth(), begin.gridHeight());
+        if (!films.consume(camera, filmCost)) {
+            sender.send(player, new Packets.UploadRejected("Camera does not have enough film"));
+            return;
+        }
         UUID token = UUID.randomUUID();
-        grants.put(token, new UploadGrant(token, player.getUniqueId(), now, now.plusSeconds(settings.tokenTtlSeconds()), settings.maxGridSize()));
-        shutterSound.playFor(player);
-        LOGGER.info("Granted photo upload token to {} with grid size {}.", player.getName(), settings.maxGridSize());
-        sender.send(player, new Packets.UploadGranted(token, now.plusSeconds(settings.tokenTtlSeconds()).toEpochMilli(),
-                settings.maxGridSize(), UploadSession.TILE_BYTES));
-    }
-
-    private void begin(Player player, Packets.UploadBegin begin) {
-        UploadGrant grant = validGrantOrKick(player, begin.token());
-        if (grant == null) return;
-        if (sessions.containsKey(begin.token())) {
-            kick(player);
-            return;
-        }
-        if (!cameraValidator.isHoldingCamera(player)) {
-            sender.send(player, new Packets.UploadRejected("A tagged camera must still be held"));
-            return;
-        }
+        UploadGrant grant = new UploadGrant(token, player.getUniqueId(), now,
+                now.plusSeconds(settings.tokenTtlSeconds()), maximum);
         try {
-            sessions.put(begin.token(), new UploadSession(grant, begin.gridWidth(), begin.gridHeight()));
+            grants.put(token, grant);
+            sessions.put(token, new UploadSession(grant, begin.gridWidth(), begin.gridHeight()));
+            sender.send(player, new Packets.UploadGranted(token, grant.expiresAt().toEpochMilli(), UploadSession.TILE_BYTES));
         } catch (UploadFailure exception) {
+            grants.remove(token);
             sender.send(player, new Packets.UploadRejected(exception.getMessage()));
         }
     }

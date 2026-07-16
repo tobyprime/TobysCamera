@@ -1,19 +1,24 @@
 package dev.tobyscamera.fabric.viewfinder;
 
 import java.util.Objects;
+import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
 
 public final class ViewfinderInputController {
     private final ViewfinderSession session;
-    private final Runnable captureRequester;
+    private final IntSupplier maximumGridSize;
+    private final IntConsumer captureRequester;
 
-    public ViewfinderInputController(ViewfinderSession session, Runnable captureRequester) {
+    public ViewfinderInputController(ViewfinderSession session, IntSupplier maximumGridSize, IntConsumer captureRequester) {
         this.session = Objects.requireNonNull(session, "session");
+        this.maximumGridSize = Objects.requireNonNull(maximumGridSize, "maximumGridSize");
         this.captureRequester = Objects.requireNonNull(captureRequester, "captureRequester");
     }
 
     public boolean pressShutter() {
-        if (!session.pressShutter()) return false;
-        captureRequester.run();
+        int gridSize = maximumGridSize.getAsInt();
+        if (!session.pressShutter(gridSize)) return false;
+        captureRequester.accept(gridSize);
         return true;
     }
 

@@ -12,7 +12,7 @@ class ViewfinderInputControllerTest {
     void shutterRequestsCaptureOnlyFromTheOpenViewfinder() {
         ViewfinderSession session = new ViewfinderSession();
         AtomicInteger requests = new AtomicInteger();
-        ViewfinderInputController controls = new ViewfinderInputController(session, requests::incrementAndGet);
+        ViewfinderInputController controls = new ViewfinderInputController(session, () -> 1, ignored -> requests.incrementAndGet());
 
         assertFalse(controls.pressShutter());
         assertEquals(0, requests.get());
@@ -25,7 +25,7 @@ class ViewfinderInputControllerTest {
     @Test
     void escapeClosesAnOpenViewfinder() {
         ViewfinderSession session = new ViewfinderSession();
-        ViewfinderInputController controls = new ViewfinderInputController(session, () -> { });
+        ViewfinderInputController controls = new ViewfinderInputController(session, () -> 1, ignored -> { });
 
         assertFalse(controls.close());
         session.open();

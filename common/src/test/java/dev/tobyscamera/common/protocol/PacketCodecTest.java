@@ -18,9 +18,9 @@ class PacketCodecTest {
     void roundTripsEveryProtocolPacket() {
         List<CameraPacket> packets = List.of(
                 new Packets.CaptureIntent(),
-                new Packets.UploadGranted(TOKEN, 1_700_000_000_000L, 2, 16_384),
+                new Packets.UploadGranted(TOKEN, 1_700_000_000_000L, 16_384),
                 new Packets.RateLimited(1_000L),
-                new Packets.UploadBegin(TOKEN, 2, 2),
+                new Packets.UploadBegin(2, 2),
                 new Packets.UploadTileChunk(TOKEN, 1, 0, 8_192, new byte[8_192]),
                 new Packets.UploadFinish(TOKEN),
                 new Packets.PhotoCreated(PHOTO, List.of(10, 11, 12, 13), 2, 2),

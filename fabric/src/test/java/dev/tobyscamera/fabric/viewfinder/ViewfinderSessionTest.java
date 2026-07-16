@@ -10,14 +10,12 @@ import org.junit.jupiter.api.Test;
 
 class ViewfinderSessionTest {
     @Test
-    void transitionsFromViewfinderToGrantAndPreview() {
+    void transitionsFromViewfinderStraightToCaptureAndPreview() {
         ViewfinderSession session = new ViewfinderSession();
 
         assertTrue(session.open());
         assertEquals(ViewfinderState.VIEWFINDER, session.state());
-        assertTrue(session.pressShutter());
-        assertEquals(ViewfinderState.AWAITING_GRANT, session.state());
-        assertTrue(session.acceptGrant(2));
+        assertTrue(session.pressShutter(2));
         assertEquals(ViewfinderState.CAPTURING, session.state());
         assertTrue(session.captureComplete());
         assertEquals(ViewfinderState.PREVIEW, session.state());
@@ -38,13 +36,12 @@ class ViewfinderSessionTest {
     }
 
     @Test
-    void grantCanOnlyBeAcceptedWhileAwaiting() {
+    void shutterRejectsInvalidLocalGridSize() {
         ViewfinderSession session = new ViewfinderSession();
-        assertFalse(session.acceptGrant(1));
         session.open();
-        session.pressShutter();
-        assertTrue(session.acceptGrant(1));
-        assertFalse(session.acceptGrant(1));
+        assertFalse(session.pressShutter(0));
+        assertTrue(session.pressShutter(1));
+        assertFalse(session.pressShutter(1));
     }
 
     @Test
@@ -52,9 +49,8 @@ class ViewfinderSessionTest {
         ViewfinderSession session = new ViewfinderSession();
         session.open();
         assertTrue(session.zoomActive());
-        session.pressShutter();
+        session.pressShutter(1);
         assertTrue(session.zoomActive());
-        session.acceptGrant(1);
         assertTrue(session.zoomActive());
         session.captureComplete();
         assertFalse(session.zoomActive());

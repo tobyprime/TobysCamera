@@ -42,7 +42,8 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final ViewfinderSession VIEWFINDER = new ViewfinderSession();
     private static final ViewfinderOverlay OVERLAY = new ViewfinderOverlay(VIEWFINDER);
     private static final CaptureService CAPTURE = new CaptureService();
-    private static final ViewfinderInputController INPUTS = new ViewfinderInputController(VIEWFINDER, UPLOADS::requestCapture);
+    private static final ViewfinderInputController INPUTS = new ViewfinderInputController(
+            VIEWFINDER, TobysCameraClient::heldCameraGridSize, TobysCameraClient::startLocalCapture);
     private static final KeyMapping VIEWFINDER_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.viewfinder", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P,
             CameraKeyCategory.value()));
@@ -77,12 +78,8 @@ public final class TobysCameraClient implements ClientModInitializer {
     private void handleServerPacket(net.minecraft.client.Minecraft client, dev.tobyscamera.common.protocol.CameraPacket packet) {
         LOGGER.info("Received camera server packet {} while viewfinder is {}.", packet.getClass().getSimpleName(), VIEWFINDER.state());
         UPLOADS.handleServerPacket(packet);
-        if (packet instanceof Packets.UploadGranted grant && VIEWFINDER.acceptGrant(grant.gridSize())) {
-            OVERLAY.flashShutter();
-            CAPTURE.requestAfterNextFrame(grant.gridSize());
-        } else if (packet instanceof Packets.RateLimited || packet instanceof Packets.UploadRejected) {
-            VIEWFINDER.rejectGrant();
-        }
+        if (packet instanceof Packets.RateLimited || packet instanceof Packets.UploadRejected || packet instanceof Packets.PhotoCreated)
+            VIEWFINDER.finishUpload();
     }
 
     private void tick(net.minecraft.client.Minecraft client) {
@@ -119,6 +116,19 @@ public final class TobysCameraClient implements ClientModInitializer {
         if (client.screen instanceof CompositionScreen) client.setScreen(null); else client.setScreen(new CompositionScreen(VIEWFINDER));
     }
 
+    private static int heldCameraGridSize() {
+        var player = net.minecraft.client.Minecraft.getInstance().player;
+        if (player == null) return 0;
+        return Math.max(HeldCameraChecker.maximumGridSize(player.getMainHandItem()),
+                HeldCameraChecker.maximumGridSize(player.getOffhandItem()));
+    }
+
+    private static void startLocalCapture(int gridSize) {
+        UPLOADS.requestCapture();
+        OVERLAY.flashShutter();
+        CAPTURE.requestAfterNextFrame(gridSize);
+    }
+
     public static boolean handleShutterKey(KeyEvent event) {
         if (!SHUTTER_KEY.matches(event)) return false;
         ViewfinderState before = VIEWFINDER.state();
@@ -144,7 +154,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static void openPreview(net.minecraft.client.Minecraft client, CapturedFrame frame) {
         if (!VIEWFINDER.captureComplete()) return;
         client.setScreen(new PreviewScreen(frame,
-                printSize -> { if (VIEWFINDER.beginUpload()) { if (UPLOADS.confirm(frame, printSize)) VIEWFINDER.finishUpload(); else VIEWFINDER.retake(); } client.setScreen(null); },
+                printSize -> { if (VIEWFINDER.beginUpload() && !UPLOADS.confirm(frame, printSize)) VIEWFINDER.retake(); client.setScreen(null); },
                 () -> { VIEWFINDER.retake(); client.setScreen(null); }));
     }
 
