@@ -1,3 +1,6 @@
+import java.util.zip.ZipFile
+import org.gradle.api.tasks.SourceSetContainer
+
 plugins {
     id("fabric-loom")
 }
@@ -21,6 +24,22 @@ dependencies {
 }
 
 tasks.test { useJUnitPlatform() }
+
+tasks.register("verifyPublishedJar") {
+    dependsOn(tasks.named("remapJar"))
+    doLast {
+        val jar = layout.buildDirectory.file("libs/${project.name}-${project.version}.jar").get().asFile
+        ZipFile(jar).use {
+            check(it.getEntry("dev/tobyscamera/common/protocol/CameraPacket.class") != null) {
+                "Published Fabric JAR is missing the embedded common protocol classes"
+            }
+        }
+    }
+}
+
+tasks.jar {
+    from(project(":common").the<SourceSetContainer>()["main"].output)
+}
 
 // The root runServer task is reserved for the Paper plugin development server.
 // Fabric development for this client-only module uses runClient.
