@@ -40,7 +40,7 @@ public final class PreviewScreen extends Screen {
         int size = Math.min(width - 40, height - 80);
         int left = (width - size) / 2;
         int top = (height - size - 30) / 2;
-        graphics.blit(textureId, left, top, 0, 0, size, size, size, size);
+        graphics.blit(textureId, left, top, 0, 0, size, size, frame.image().getWidth(), frame.image().getHeight());
         graphics.drawCenteredString(font, "%d x %d maps".formatted(frame.gridSize(), frame.gridSize()), width / 2, top + size + 8, 0xFFFFFFFF);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
