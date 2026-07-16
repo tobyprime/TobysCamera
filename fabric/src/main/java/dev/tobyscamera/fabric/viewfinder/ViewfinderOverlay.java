@@ -4,6 +4,7 @@ import dev.tobyscamera.fabric.camera.AspectRatio;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.GuiGraphics;
+import java.util.function.IntSupplier;
 
 public final class ViewfinderOverlay {
     private static final int MASK_COLOR = 0xB0000000;
@@ -15,16 +16,18 @@ public final class ViewfinderOverlay {
     private final KeyMapping gridKey;
     private final KeyMapping compositionKey;
     private final KeyMapping shutterKey;
+    private final IntSupplier remainingFilm;
     private int shutterTicks;
 
     public ViewfinderOverlay(ViewfinderSession session, KeyMapping zoomIn, KeyMapping zoomOut, KeyMapping gridKey,
-            KeyMapping compositionKey, KeyMapping shutterKey) {
+            KeyMapping compositionKey, KeyMapping shutterKey, IntSupplier remainingFilm) {
         this.session = session;
         this.zoomIn = zoomIn;
         this.zoomOut = zoomOut;
         this.gridKey = gridKey;
         this.compositionKey = compositionKey;
         this.shutterKey = shutterKey;
+        this.remainingFilm = remainingFilm;
     }
 
     public void flashShutter() { shutterTicks = 3; }
@@ -46,6 +49,7 @@ public final class ViewfinderOverlay {
         graphics.fill(left + frameWidth, top, width, top + frameHeight, MASK_COLOR);
         drawBorder(graphics, left, top, frameWidth, frameHeight);
         drawGrid(graphics, left, top, frameWidth, frameHeight);
+        graphics.drawString(minecraft.font, filmLabel(remainingFilm.getAsInt()), left + 6, top + 6, BORDER_COLOR, true);
         graphics.drawString(minecraft.font, hintText(session.targetZoom(), session.composition().aspectRatio().toString(),
                 keyName(zoomIn), keyName(zoomOut), keyName(gridKey), keyName(compositionKey), keyName(shutterKey)),
                 left + 6, top + frameHeight - 14, BORDER_COLOR, true);
@@ -67,6 +71,8 @@ public final class ViewfinderOverlay {
         return "x%.2f  %s  [%s/%s] zoom  [%s] grid  [%s] composition  [%s] shutter  [Esc] close"
                 .formatted(zoom, aspectRatio, zoomIn, zoomOut, grid, composition, shutter);
     }
+
+    static String filmLabel(int remainingFilm) { return "Film: " + Math.max(0, remainingFilm); }
 
     private static String keyName(KeyMapping key) { return key.getTranslatedKeyMessage().getString(); }
 

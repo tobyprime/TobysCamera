@@ -26,4 +26,9 @@ public final class HeldCameraChecker {
         return Math.min(Math.max(1, componentMaximum), (int) Math.sqrt(remaining));
     }
 
+    public static int remainingFilm(ItemStack stack) {
+        if (!isCamera(stack)) return 0;
+        return Math.max(0, stack.get(DataComponents.CUSTOM_DATA).copyTag().getIntOr(FILM_REMAINING_KEY, 0));
+    }
+
 }

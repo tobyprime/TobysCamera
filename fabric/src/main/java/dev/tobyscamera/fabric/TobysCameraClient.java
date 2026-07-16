@@ -59,7 +59,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final KeyMapping COMPOSITION_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.composition", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, CameraKeyCategory.value()));
     private static final ViewfinderOverlay OVERLAY = new ViewfinderOverlay(VIEWFINDER, ZOOM_IN_KEY, ZOOM_OUT_KEY,
-            GRID_KEY, COMPOSITION_KEY, SHUTTER_KEY);
+            GRID_KEY, COMPOSITION_KEY, SHUTTER_KEY, TobysCameraClient::heldCameraFilm);
 
     @Override
     public void onInitializeClient() {
@@ -122,6 +122,14 @@ public final class TobysCameraClient implements ClientModInitializer {
         if (player == null) return 0;
         return Math.max(HeldCameraChecker.maximumGridSize(player.getMainHandItem()),
                 HeldCameraChecker.maximumGridSize(player.getOffhandItem()));
+    }
+
+    private static int heldCameraFilm() {
+        var player = net.minecraft.client.Minecraft.getInstance().player;
+        if (player == null) return 0;
+        return HeldCameraChecker.isCamera(player.getMainHandItem())
+                ? HeldCameraChecker.remainingFilm(player.getMainHandItem())
+                : HeldCameraChecker.remainingFilm(player.getOffhandItem());
     }
 
     private static void startLocalCapture(int gridSize) {
