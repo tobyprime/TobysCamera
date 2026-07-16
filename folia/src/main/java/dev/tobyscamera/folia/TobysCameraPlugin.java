@@ -42,6 +42,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     private MapVideoService videos;
     private MapDeliveryService deliveries;
     private io.papermc.paper.threadedregions.scheduler.ScheduledTask videoPlaybackTask;
+    private VideoPlaybackService videoPlayback;
     private PluginPayloadGateway gateway;
     private CameraFilmInventoryListener filmListener;
 
@@ -72,6 +73,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
 
     private void configureRuntime(PluginSettings settings) {
         if (videoPlaybackTask != null) videoPlaybackTask.cancel();
+        if (videoPlayback != null) HandlerList.unregisterAll(videoPlayback);
         if (filmListener != null) HandlerList.unregisterAll(filmListener);
         CameraFilmService films = new CameraFilmService(settings.cameraTagKey(), settings.filmTagKey(), settings.maxGridSize());
         coordinator = new UploadCoordinator(settings, films, this::send,
@@ -81,8 +83,10 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         if (gateway != null) gateway.setCoordinators(coordinator, videoCoordinator);
         filmListener = new CameraFilmInventoryListener(films);
         getServer().getPluginManager().registerEvents(filmListener, this);
-        VideoPlaybackService playback = new VideoPlaybackService(videos, settings.videoMaxActiveMapFrames(), System.currentTimeMillis());
-        videoPlaybackTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, ignored -> playback.tick(), 1L, 1L);
+        videoPlayback = new VideoPlaybackService(videos, settings.videoMaxActiveMapFrames(), System.currentTimeMillis());
+        videoPlayback.indexLoadedFrames();
+        getServer().getPluginManager().registerEvents(videoPlayback, this);
+        videoPlaybackTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, ignored -> videoPlayback.tick(), 1L, 1L);
     }
 
     @Override
