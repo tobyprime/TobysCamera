@@ -163,7 +163,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static void openPreview(net.minecraft.client.Minecraft client, CapturedFrame frame) {
         if (!VIEWFINDER.captureComplete()) return;
         client.setScreen(new PreviewScreen(frame,
-                (printSize, ditheringMode) -> { if (VIEWFINDER.beginUpload() && !UPLOADS.confirm(frame, printSize, ditheringMode)) VIEWFINDER.retake(); client.setScreen(null); },
+                photo -> { if (VIEWFINDER.beginUpload() && !UPLOADS.confirm(photo)) VIEWFINDER.retake(); client.setScreen(null); },
                 () -> { VIEWFINDER.retake(); client.setScreen(null); }));
     }
 

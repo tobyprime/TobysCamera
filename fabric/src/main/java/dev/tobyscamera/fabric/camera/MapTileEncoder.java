@@ -26,7 +26,10 @@ public final class MapTileEncoder {
     }
 
     public BufferedImage palettePreview(BufferedImage source, DitheringMode ditheringMode) {
-        EncodedPhoto photo = encode(source, ditheringMode);
+        return palettePreview(encode(source, ditheringMode));
+    }
+
+    public BufferedImage palettePreview(EncodedPhoto photo) {
         BufferedImage preview = new BufferedImage(photo.gridWidth() * 128, photo.gridHeight() * 128, BufferedImage.TYPE_INT_ARGB);
         for (int tileY = 0; tileY < photo.gridHeight(); tileY++) for (int tileX = 0; tileX < photo.gridWidth(); tileX++) {
             byte[] tile = photo.tiles().get(tileY * photo.gridWidth() + tileX);

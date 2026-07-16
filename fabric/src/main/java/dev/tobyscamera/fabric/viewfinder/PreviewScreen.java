@@ -9,7 +9,7 @@ import dev.tobyscamera.fabric.camera.PrintLayout;
 import java.awt.image.BufferedImage;
 import java.util.UUID;
 import java.util.List;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
@@ -21,7 +21,7 @@ import net.minecraft.resources.Identifier;
 
 public final class PreviewScreen extends Screen {
     private final CapturedFrame frame;
-    private final BiConsumer<Integer, MapTileEncoder.DitheringMode> usePhoto;
+    private final Consumer<MapTileEncoder.EncodedPhoto> usePhoto;
     private final Runnable retake;
     private final MapTileEncoder encoder = new MapTileEncoder();
     private Identifier textureId;
@@ -29,10 +29,11 @@ public final class PreviewScreen extends Screen {
 
     private int printSize;
     private MapTileEncoder.DitheringMode ditheringMode = MapTileEncoder.DitheringMode.OFF;
+    private MapTileEncoder.EncodedPhoto printPhoto;
     private int previewImageWidth;
     private int previewImageHeight;
 
-    public PreviewScreen(CapturedFrame frame, BiConsumer<Integer, MapTileEncoder.DitheringMode> usePhoto, Runnable retake) {
+    public PreviewScreen(CapturedFrame frame, Consumer<MapTileEncoder.EncodedPhoto> usePhoto, Runnable retake) {
         super(Component.literal("Camera Preview"));
         this.frame = frame;
         this.usePhoto = usePhoto;
@@ -42,7 +43,9 @@ public final class PreviewScreen extends Screen {
 
     @Override
     protected void init() {
+        releaseTexture();
         textureId = Identifier.fromNamespaceAndPath("tobyscamera", "preview/" + UUID.randomUUID());
+        released = false;
         refreshPreviewTexture();
         int buttonY = height - 32;
         List<Integer> sizes = java.util.stream.IntStream.rangeClosed(1, frame.gridSize()).boxed().toList();
@@ -87,13 +90,14 @@ public final class PreviewScreen extends Screen {
     @Override
     public void removed() { releaseTexture(); }
 
-    private void closeForUse() { releaseTexture(); usePhoto.accept(printSize, ditheringMode); }
+    private void closeForUse() { releaseTexture(); if (printPhoto != null) usePhoto.accept(printPhoto); }
     private void closeForRetake() { releaseTexture(); retake.run(); }
     private void releaseTexture() { if (!released && textureId != null) { minecraft.getTextureManager().release(textureId); released = true; } }
 
     private void refreshPreviewTexture() {
         BufferedImage canvas = new PrintCanvasProcessor().process(frame.image(), printLayout(frame, printSize));
-        BufferedImage image = encoder.palettePreview(canvas, ditheringMode);
+        printPhoto = encoder.encode(canvas, ditheringMode);
+        BufferedImage image = encoder.palettePreview(printPhoto);
         previewImageWidth = image.getWidth();
         previewImageHeight = image.getHeight();
         minecraft.getTextureManager().register(textureId, new DynamicTexture(() -> "tobyscamera-preview", nativeImage(image)));

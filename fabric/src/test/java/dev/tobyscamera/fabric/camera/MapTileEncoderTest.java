@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
+import net.minecraft.world.level.material.MapColor;
 import org.junit.jupiter.api.Test;
 
 class MapTileEncoderTest {
@@ -55,10 +56,28 @@ class MapTileEncoderTest {
         assertFalse(imagesEqual(plain, dithered));
     }
 
+    @Test
+    void palettePreviewReconstructsTheExactEncodedTilePixels() {
+        BufferedImage source = new BufferedImage(128, 128, BufferedImage.TYPE_INT_ARGB);
+        source.setRGB(0, 0, 0xffa13e72);
+        source.setRGB(127, 127, 0xff2fbb91);
+        var encoded = encoder.encode(source, MapTileEncoder.DitheringMode.FLOYD_STEINBERG);
+
+        BufferedImage preview = encoder.palettePreview(encoded);
+
+        byte[] tile = encoded.tiles().getFirst();
+        assertEquals(mapArgb(tile[0]), preview.getRGB(0, 0));
+        assertEquals(mapArgb(tile[16_383]), preview.getRGB(127, 127));
+    }
+
     private static boolean imagesEqual(BufferedImage left, BufferedImage right) {
         for (int y = 0; y < left.getHeight(); y++) for (int x = 0; x < left.getWidth(); x++) {
             if (left.getRGB(x, y) != right.getRGB(x, y)) return false;
         }
         return true;
+    }
+
+    private static int mapArgb(byte packedId) {
+        return 0xff000000 | MapColor.getColorFromPackedId(Byte.toUnsignedInt(packedId)) & 0x00ffffff;
     }
 }

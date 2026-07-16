@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 
 public final class PhotoUploadController {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private final MapTileEncoder encoder = new MapTileEncoder();
     private MapTileEncoder.EncodedPhoto pendingPhoto;
     private UUID token;
 
@@ -21,10 +20,8 @@ public final class PhotoUploadController {
         if (packet instanceof Packets.RateLimited || packet instanceof Packets.UploadRejected || packet instanceof Packets.PhotoCreated) clearPending();
     }
 
-    public boolean confirm(CapturedFrame frame, int printSize, MapTileEncoder.DitheringMode ditheringMode) {
-        if (pendingPhoto != null || printSize < 1 || printSize > frame.gridSize()) return false;
-        PrintLayout layout = PrintLayout.forMaximumSide(printSize, frame.composition().aspectRatio());
-        MapTileEncoder.EncodedPhoto photo = encoder.encode(new PrintCanvasProcessor().process(frame.image(), layout), ditheringMode);
+    public boolean confirm(MapTileEncoder.EncodedPhoto photo) {
+        if (pendingPhoto != null || photo == null || photo.gridWidth() < 1 || photo.gridHeight() < 1 || photo.tiles().size() != photo.gridWidth() * photo.gridHeight()) return false;
         pendingPhoto = photo;
         send(new Packets.UploadBegin(photo.gridWidth(), photo.gridHeight()));
         return true;
