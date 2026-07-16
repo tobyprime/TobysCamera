@@ -11,7 +11,7 @@ class SquareImageProcessorTest {
         BufferedImage source = new BufferedImage(300, 200, BufferedImage.TYPE_INT_ARGB);
         source.setRGB(50, 0, 0xff00ff00);
 
-        CapturedFrame cropped = new CenterSquareCropProcessor().process(new CapturedFrame(source, 2));
+        CapturedFrame cropped = new CompositionCropProcessor().process(new CapturedFrame(source, 2));
 
         assertEquals(200, cropped.image().getWidth());
         assertEquals(200, cropped.image().getHeight());
@@ -35,7 +35,7 @@ class SquareImageProcessorTest {
         CameraComposition composition = new CameraComposition(AspectRatio.of(4, 3), 0.0f);
         CapturedFrame frame = new CapturedFrame(new BufferedImage(300, 200, BufferedImage.TYPE_INT_ARGB), 4, composition);
 
-        CapturedFrame cropped = new CenterSquareCropProcessor().process(frame);
+        CapturedFrame cropped = new CompositionCropProcessor().process(frame);
         CapturedFrame resized = new ResizeToGridProcessor().process(cropped);
 
         assertEquals(267, cropped.image().getWidth());

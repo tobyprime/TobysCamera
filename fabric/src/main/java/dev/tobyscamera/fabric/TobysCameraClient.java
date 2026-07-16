@@ -5,7 +5,7 @@ import com.mojang.logging.LogUtils;
 import dev.tobyscamera.common.protocol.PacketCodec;
 import dev.tobyscamera.common.protocol.Packets;
 import dev.tobyscamera.fabric.camera.CapturedFrame;
-import dev.tobyscamera.fabric.camera.CenterSquareCropProcessor;
+import dev.tobyscamera.fabric.camera.CompositionCropProcessor;
 import dev.tobyscamera.fabric.camera.HeldCameraChecker;
 import dev.tobyscamera.fabric.camera.NativePixelFormat;
 import dev.tobyscamera.fabric.camera.PhotoUploadController;
@@ -153,7 +153,7 @@ public final class TobysCameraClient implements ClientModInitializer {
             BufferedImage image = new BufferedImage(nativeImage.getWidth(), nativeImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
             for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) image.setRGB(x, y, NativePixelFormat.toArgb(nativeImage.getPixel(x, y)));
             CapturedFrame captured = new CapturedFrame(image, gridSize, VIEWFINDER.composition());
-            return new ResizeToGridProcessor().process(new CenterSquareCropProcessor().process(captured));
+            return new ResizeToGridProcessor().process(new CompositionCropProcessor().process(captured));
         } finally { nativeImage.close(); }
     }
 }
