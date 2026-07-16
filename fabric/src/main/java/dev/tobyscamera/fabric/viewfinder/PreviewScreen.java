@@ -86,7 +86,7 @@ public final class PreviewScreen extends Screen {
     private void releaseTexture() { if (!released && textureId != null) { minecraft.getTextureManager().release(textureId); released = true; } }
 
     private void refreshPreviewTexture() {
-        BufferedImage image = new PrintCanvasProcessor().process(frame.image(), printLayout(frame, printSize));
+        BufferedImage image = new PrintCanvasProcessor().preview(frame.image(), frame.composition().aspectRatio());
         previewImageWidth = image.getWidth();
         previewImageHeight = image.getHeight();
         minecraft.getTextureManager().register(textureId, new DynamicTexture(() -> "tobyscamera-preview", nativeImage(image)));
