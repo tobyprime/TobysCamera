@@ -22,9 +22,10 @@ public final class PhotoUploadController {
         if (packet instanceof Packets.RateLimited || packet instanceof Packets.UploadRejected || packet instanceof Packets.PhotoCreated) clearGrant();
     }
 
-    public boolean confirm(CapturedFrame frame) {
-        if (token == null || System.currentTimeMillis() >= expiresAt || frame.gridSize() != gridSize) { clearGrant(); return false; }
-        MapTileEncoder.EncodedPhoto photo = encoder.encode(frame);
+    public boolean confirm(CapturedFrame frame, int printSize) {
+        if (token == null || System.currentTimeMillis() >= expiresAt || frame.gridSize() != gridSize || printSize < 1 || printSize > gridSize) { clearGrant(); return false; }
+        PrintLayout layout = PrintLayout.forMaximumSide(printSize, frame.composition().aspectRatio());
+        MapTileEncoder.EncodedPhoto photo = encoder.encode(new PrintCanvasProcessor().process(frame.image(), layout));
         send(new Packets.UploadBegin(token, photo.gridWidth(), photo.gridHeight()));
         for (int y = 0; y < photo.gridHeight(); y++) for (int x = 0; x < photo.gridWidth(); x++) {
             byte[] tile = photo.tiles().get(y * photo.gridWidth() + x);

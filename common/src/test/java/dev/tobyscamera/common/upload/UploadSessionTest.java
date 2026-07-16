@@ -1,6 +1,7 @@
 package dev.tobyscamera.common.upload;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -48,7 +49,17 @@ class UploadSessionTest {
     void rejectsUploadGridThatDoesNotExactlyMatchGrant() {
         UploadGrant grant = new UploadGrant(TOKEN, PLAYER, Instant.EPOCH, Instant.MAX, 2);
 
-        assertThrows(UploadFailure.class, () -> new UploadSession(grant, 1, 1));
-        assertThrows(UploadFailure.class, () -> new UploadSession(grant, 2, 1));
+        assertThrows(UploadFailure.class, () -> new UploadSession(grant, 1, 4));
+        assertThrows(UploadFailure.class, () -> new UploadSession(grant, 4, 1));
+    }
+
+    @Test
+    void acceptsRectangleWithinTheGrantedMaximum() {
+        UploadGrant grant = new UploadGrant(TOKEN, PLAYER, Instant.now(), Instant.now().plusSeconds(30), 4);
+
+        UploadSession session = new UploadSession(grant, 4, 2);
+
+        assertEquals(4, session.width());
+        assertEquals(2, session.height());
     }
 }

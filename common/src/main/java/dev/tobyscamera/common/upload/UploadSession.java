@@ -12,8 +12,8 @@ public final class UploadSession {
     private final int[] received;
 
     public UploadSession(UploadGrant grant, int width, int height) {
-        if (width != grant.gridSize() || height != grant.gridSize()) {
-            throw new UploadFailure("grid must match grant");
+        if (width < 1 || height < 1 || width > grant.gridSize() || height > grant.gridSize()) {
+            throw new UploadFailure("grid exceeds grant");
         }
         this.grant = grant;
         this.width = width;

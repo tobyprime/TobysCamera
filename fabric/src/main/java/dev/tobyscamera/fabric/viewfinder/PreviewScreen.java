@@ -4,8 +4,11 @@ import com.mojang.blaze3d.platform.NativeImage;
 import dev.tobyscamera.fabric.camera.CapturedFrame;
 import dev.tobyscamera.fabric.camera.NativePixelFormat;
 import java.util.UUID;
+import java.util.List;
+import java.util.function.IntConsumer;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -14,16 +17,19 @@ import net.minecraft.resources.Identifier;
 
 public final class PreviewScreen extends Screen {
     private final CapturedFrame frame;
-    private final Runnable usePhoto;
+    private final IntConsumer usePhoto;
     private final Runnable retake;
     private Identifier textureId;
     private boolean released;
 
-    public PreviewScreen(CapturedFrame frame, Runnable usePhoto, Runnable retake) {
+    private int printSize;
+
+    public PreviewScreen(CapturedFrame frame, IntConsumer usePhoto, Runnable retake) {
         super(Component.literal("Camera Preview"));
         this.frame = frame;
         this.usePhoto = usePhoto;
         this.retake = retake;
+        this.printSize = frame.gridSize();
     }
 
     @Override
@@ -31,6 +37,10 @@ public final class PreviewScreen extends Screen {
         textureId = Identifier.fromNamespaceAndPath("tobyscamera", "preview/" + UUID.randomUUID());
         minecraft.getTextureManager().register(textureId, new DynamicTexture(() -> "tobyscamera-preview", nativeImage(frame)));
         int buttonY = height - 32;
+        List<Integer> sizes = java.util.stream.IntStream.rangeClosed(1, frame.gridSize()).boxed().toList();
+        addRenderableWidget(CycleButton.builder(value -> Component.literal("Print: " + value + "x"), printSize)
+                .withValues(sizes)
+                .create(width / 2 - 75, buttonY - 24, 150, 20, Component.empty(), (button, value) -> printSize = value));
         addRenderableWidget(Button.builder(Component.literal("Retake"), button -> closeForRetake()).bounds(width / 2 - 155, buttonY, 150, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Use photo"), button -> closeForUse()).bounds(width / 2 + 5, buttonY, 150, 20).build());
     }
@@ -66,7 +76,7 @@ public final class PreviewScreen extends Screen {
     @Override
     public void removed() { releaseTexture(); }
 
-    private void closeForUse() { releaseTexture(); usePhoto.run(); }
+    private void closeForUse() { releaseTexture(); usePhoto.accept(printSize); }
     private void closeForRetake() { releaseTexture(); retake.run(); }
     private void releaseTexture() { if (!released && textureId != null) { minecraft.getTextureManager().release(textureId); released = true; } }
 

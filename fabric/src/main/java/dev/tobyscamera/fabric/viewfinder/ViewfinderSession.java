@@ -1,11 +1,15 @@
 package dev.tobyscamera.fabric.viewfinder;
 
+import dev.tobyscamera.fabric.camera.AspectRatio;
+import dev.tobyscamera.fabric.camera.CameraComposition;
+
 public final class ViewfinderSession {
     private static final float MIN_ZOOM = 1.0f;
     private static final float MAX_ZOOM = 4.0f;
     private ViewfinderState state = ViewfinderState.CLOSED;
     private CompositionGrid grid = CompositionGrid.NONE;
     private float targetZoom = MIN_ZOOM;
+    private CameraComposition composition = CameraComposition.DEFAULT;
     private int gridSize;
 
     public boolean open() {
@@ -56,9 +60,12 @@ public final class ViewfinderSession {
     public void finishUpload() { if (state == ViewfinderState.UPLOADING) state = ViewfinderState.VIEWFINDER; }
     public CompositionGrid cycleGrid() { grid = grid.next(); return grid; }
     public void adjustZoom(double scrollDelta) { targetZoom = Math.clamp(targetZoom + (float) scrollDelta * 0.25f, MIN_ZOOM, MAX_ZOOM); }
+    public void setRollDegrees(float value) { composition = composition.withRollDegrees(value); }
+    public void setAspectRatio(AspectRatio value) { composition = composition.withAspectRatio(value); }
     public ViewfinderState state() { return state; }
     public CompositionGrid grid() { return grid; }
     public float targetZoom() { return targetZoom; }
+    public CameraComposition composition() { return composition; }
     public int gridSize() { return gridSize; }
     public boolean captureHidden() { return state == ViewfinderState.CAPTURING; }
     public boolean zoomActive() { return state == ViewfinderState.VIEWFINDER || state == ViewfinderState.AWAITING_GRANT || state == ViewfinderState.CAPTURING; }

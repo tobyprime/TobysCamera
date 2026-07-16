@@ -14,6 +14,7 @@ import dev.tobyscamera.fabric.input.CameraKeyCategory;
 import dev.tobyscamera.fabric.input.CameraKeyBindings;
 import dev.tobyscamera.fabric.net.CameraPayload;
 import dev.tobyscamera.fabric.viewfinder.CaptureService;
+import dev.tobyscamera.fabric.viewfinder.CompositionScreen;
 import dev.tobyscamera.fabric.viewfinder.PreviewScreen;
 import dev.tobyscamera.fabric.viewfinder.ViewfinderOverlay;
 import dev.tobyscamera.fabric.viewfinder.ViewfinderInputController;
@@ -55,6 +56,8 @@ public final class TobysCameraClient implements ClientModInitializer {
             "key.tobyscamera.zoom_out", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_BRACKET,
             CameraKeyCategory.value()));
     private static final KeyMapping SHUTTER_KEY = KeyBindingHelper.registerKeyBinding(CameraKeyBindings.shutter());
+    private static final KeyMapping COMPOSITION_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+            "key.tobyscamera.composition", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, CameraKeyCategory.value()));
 
     @Override
     public void onInitializeClient() {
@@ -93,6 +96,7 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (GRID_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.cycleGrid();
         while (ZOOM_IN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(1.0);
         while (ZOOM_OUT_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(-1.0);
+        while (COMPOSITION_KEY.consumeClick()) toggleCompositionEditor(client);
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING) CAPTURE.tick();
     }
 
@@ -103,7 +107,16 @@ public final class TobysCameraClient implements ClientModInitializer {
     }
 
     public static boolean closeViewfinder() {
+        if (net.minecraft.client.Minecraft.getInstance().screen instanceof CompositionScreen) {
+            net.minecraft.client.Minecraft.getInstance().setScreen(null);
+            return true;
+        }
         return INPUTS.close();
+    }
+
+    private static void toggleCompositionEditor(net.minecraft.client.Minecraft client) {
+        if (VIEWFINDER.state() != ViewfinderState.VIEWFINDER) return;
+        if (client.screen instanceof CompositionScreen) client.setScreen(null); else client.setScreen(new CompositionScreen(VIEWFINDER));
     }
 
     public static boolean handleShutterKey(KeyEvent event) {
@@ -124,10 +137,14 @@ public final class TobysCameraClient implements ClientModInitializer {
         return VIEWFINDER.zoomActive() ? VIEWFINDER.targetZoom() : 1.0f;
     }
 
+    public static float viewfinderRollRadians() {
+        return VIEWFINDER.zoomActive() ? (float) Math.toRadians(VIEWFINDER.composition().rollDegrees()) : 0.0f;
+    }
+
     private static void openPreview(net.minecraft.client.Minecraft client, CapturedFrame frame) {
         if (!VIEWFINDER.captureComplete()) return;
         client.setScreen(new PreviewScreen(frame,
-                () -> { if (VIEWFINDER.beginUpload()) { if (UPLOADS.confirm(frame)) VIEWFINDER.finishUpload(); else VIEWFINDER.retake(); } client.setScreen(null); },
+                printSize -> { if (VIEWFINDER.beginUpload()) { if (UPLOADS.confirm(frame, printSize)) VIEWFINDER.finishUpload(); else VIEWFINDER.retake(); } client.setScreen(null); },
                 () -> { VIEWFINDER.retake(); client.setScreen(null); }));
     }
 
@@ -135,7 +152,7 @@ public final class TobysCameraClient implements ClientModInitializer {
         try {
             BufferedImage image = new BufferedImage(nativeImage.getWidth(), nativeImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
             for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) image.setRGB(x, y, NativePixelFormat.toArgb(nativeImage.getPixel(x, y)));
-            CapturedFrame captured = new CapturedFrame(image, gridSize);
+            CapturedFrame captured = new CapturedFrame(image, gridSize, VIEWFINDER.composition());
             return new ResizeToGridProcessor().process(new CenterSquareCropProcessor().process(captured));
         } finally { nativeImage.close(); }
     }
