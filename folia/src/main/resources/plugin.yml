@@ -4,3 +4,11 @@ main: dev.tobyscamera.folia.TobysCameraPlugin
 api-version: '1.21'
 folia-supported: true
 description: Receives client-rendered camera tiles and turns them into persistent maps.
+commands:
+  tobyscamera:
+    description: Reload TobysCamera configuration.
+    usage: /tobyscamera reload
+    permission: tobyscamera.reload
+permissions:
+  tobyscamera.reload:
+    default: op

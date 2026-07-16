@@ -27,8 +27,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.event.HandlerList;
+import net.kyori.adventure.text.Component;
 
-public final class TobysCameraPlugin extends JavaPlugin implements Listener {
+public final class TobysCameraPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private UploadCoordinator coordinator;
     private VideoUploadCoordinator videoCoordinator;
     private PhotoRepository repository;
@@ -37,11 +42,12 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
     private MapVideoService videos;
     private MapDeliveryService deliveries;
     private io.papermc.paper.threadedregions.scheduler.ScheduledTask videoPlaybackTask;
+    private PluginPayloadGateway gateway;
+    private CameraFilmInventoryListener filmListener;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        PluginSettings settings = PluginSettings.from(flatten(getConfig()));
         try {
             repository = new SqlitePhotoRepository(getDataFolder().toPath());
             videoRepository = new SqliteVideoRepository(getDataFolder().toPath());
@@ -56,16 +62,25 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
             try { photos.restore(); } catch (IOException exception) { getLogger().severe("Could not restore saved photo maps: " + exception.getMessage()); }
             try { videos.restore(); } catch (IOException exception) { getLogger().severe("Could not restore saved video maps: " + exception.getMessage()); }
         });
+        configureRuntime(PluginSettings.from(flatten(getConfig())));
+        gateway = new PluginPayloadGateway(this, coordinator, videoCoordinator);
+        getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
+        getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);
+        getServer().getPluginManager().registerEvents(this, this);
+        getCommand("tobyscamera").setExecutor(this);
+    }
+
+    private void configureRuntime(PluginSettings settings) {
+        if (videoPlaybackTask != null) videoPlaybackTask.cancel();
+        if (filmListener != null) HandlerList.unregisterAll(filmListener);
         CameraFilmService films = new CameraFilmService(settings.cameraTagKey(), settings.filmTagKey(), settings.maxGridSize());
         coordinator = new UploadCoordinator(settings, films, this::send,
                 (player, session, metadata) -> createAndDeliver(player, session, metadata),
                 player -> player.playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.3f));
         videoCoordinator = new VideoUploadCoordinator(settings, films, this::send, this::createAndDeliverVideo, coordinator::discardCaptureIntent);
-        PluginPayloadGateway gateway = new PluginPayloadGateway(this, coordinator, videoCoordinator);
-        getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
-        getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);
-        getServer().getPluginManager().registerEvents(this, this);
-        getServer().getPluginManager().registerEvents(new CameraFilmInventoryListener(films), this);
+        if (gateway != null) gateway.setCoordinators(coordinator, videoCoordinator);
+        filmListener = new CameraFilmInventoryListener(films);
+        getServer().getPluginManager().registerEvents(filmListener, this);
         VideoPlaybackService playback = new VideoPlaybackService(videos, settings.videoMaxActiveMapFrames(), System.currentTimeMillis());
         videoPlaybackTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, ignored -> playback.tick(), 1L, 1L);
     }
@@ -77,6 +92,21 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
         if (videoPlaybackTask != null) videoPlaybackTask.cancel();
         if (repository != null) try { repository.close(); } catch (IOException exception) { getLogger().warning("Could not close photo storage: " + exception.getMessage()); }
         if (videoRepository != null) try { videoRepository.close(); } catch (IOException exception) { getLogger().warning("Could not close video storage: " + exception.getMessage()); }
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length != 1 || !args[0].equalsIgnoreCase("reload")) return false;
+        if (!sender.hasPermission("tobyscamera.reload")) { sender.sendMessage(Component.text("You do not have permission to reload TobysCamera.")); return true; }
+        try {
+            reloadConfig();
+            configureRuntime(PluginSettings.from(flatten(getConfig())));
+            sender.sendMessage(Component.text("TobysCamera configuration reloaded."));
+        } catch (RuntimeException exception) {
+            getLogger().warning("Could not reload TobysCamera configuration: " + exception.getMessage());
+            sender.sendMessage(Component.text("TobysCamera configuration reload failed; keeping the previous configuration."));
+        }
+        return true;
     }
 
     private void createAndDeliverVideo(Player player, dev.tobyscamera.common.upload.VideoUploadSession session, dev.tobyscamera.folia.upload.PhotoMetadata metadata) {

@@ -52,6 +52,8 @@ video:
   max-active-map-frames: 128
 ```
 
+After editing `plugins/TobysCamera/config.yml`, run `/tobyscamera reload` (permission `tobyscamera.reload`, default OP). Existing maps and database connections remain active; new upload grants and the playback budget use the new values.
+
 Each retained frame costs one film for every final map tile: a 12-frame 2×3 video costs 72 film. Cameras marked `tobyscamera:no_film_required` remain free. Placed video maps loop independently at their own FPS; each server pass updates at most the nearest 128 individual item-frame maps.
 
 ## Scope

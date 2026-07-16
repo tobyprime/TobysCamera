@@ -13,11 +13,16 @@ public final class PluginPayloadGateway implements PluginMessageListener {
     public static final String CHANNEL = "tobyscamera:main";
     private static final int MAX_PAYLOAD_BYTES = PacketCodec.MAX_CHUNK_BYTES + 64;
     private final Plugin plugin;
-    private final UploadCoordinator coordinator;
-    private final VideoUploadCoordinator videoCoordinator;
+    private volatile UploadCoordinator coordinator;
+    private volatile VideoUploadCoordinator videoCoordinator;
 
     public PluginPayloadGateway(Plugin plugin, UploadCoordinator coordinator, VideoUploadCoordinator videoCoordinator) {
         this.plugin = plugin;
+        this.coordinator = coordinator;
+        this.videoCoordinator = videoCoordinator;
+    }
+
+    public void setCoordinators(UploadCoordinator coordinator, VideoUploadCoordinator videoCoordinator) {
         this.coordinator = coordinator;
         this.videoCoordinator = videoCoordinator;
     }
