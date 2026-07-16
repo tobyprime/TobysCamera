@@ -25,16 +25,16 @@ class UploadCoordinatorTest {
         CameraFilmService films = mock(CameraFilmService.class);
         ItemStack camera = mock(ItemStack.class);
         when(films.heldCamera(player)).thenReturn(camera);
-        when(films.maximumForFilm(camera, 4)).thenReturn(2);
-        when(films.consume(camera, 4)).thenReturn(true);
+        when(films.maximumForFilm(camera, 4)).thenReturn(3);
+        when(films.consume(camera, 9)).thenReturn(true);
         UploadCoordinator coordinator = coordinator(sent, films, (ignored, session) -> { });
 
-        coordinator.handle(player, new Packets.UploadBegin(2, 2));
+        coordinator.handle(player, new Packets.UploadBegin(3, 3));
         coordinator.handle(player, new Packets.UploadBegin(1, 1));
 
         assertEquals(Packets.UploadGranted.class, sent.getFirst().getClass());
         assertEquals(Packets.RateLimited.class, sent.get(1).getClass());
-        verify(films).consume(camera, 4);
+        verify(films).consume(camera, 9);
     }
 
     @Test
