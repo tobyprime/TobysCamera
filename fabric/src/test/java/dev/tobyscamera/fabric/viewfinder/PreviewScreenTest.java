@@ -13,6 +13,8 @@ final class PreviewScreenTest {
         assertEquals(180, blit.top());
         assertEquals(400, blit.width());
         assertEquals(400, blit.height());
+        assertEquals(512, blit.sourceWidth());
+        assertEquals(512, blit.sourceHeight());
         assertEquals(512, blit.textureWidth());
         assertEquals(512, blit.textureHeight());
     }

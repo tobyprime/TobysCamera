@@ -51,6 +51,8 @@ public final class PreviewScreen extends Screen {
             0.0f,
             blit.width(),
             blit.height(),
+            blit.sourceWidth(),
+            blit.sourceHeight(),
             blit.textureWidth(),
             blit.textureHeight()
         );
@@ -78,8 +80,8 @@ public final class PreviewScreen extends Screen {
     }
 
     static TextureBlit textureBlit(int left, int top, int textureWidth, int textureHeight, int size) {
-        return new TextureBlit(left, top, size, size, textureWidth, textureHeight);
+        return new TextureBlit(left, top, size, size, textureWidth, textureHeight, textureWidth, textureHeight);
     }
 
-    record TextureBlit(int left, int top, int width, int height, int textureWidth, int textureHeight) { }
+    record TextureBlit(int left, int top, int width, int height, int sourceWidth, int sourceHeight, int textureWidth, int textureHeight) { }
 }
