@@ -16,6 +16,9 @@ public final class ViewfinderInputController {
     }
 
     public boolean pressShutter() {
+        if (session.state() == ViewfinderState.CAPTURING && session.mode() == CaptureMode.VIDEO) {
+            return session.pressShutter(maximumGridSize.getAsInt());
+        }
         int gridSize = maximumGridSize.getAsInt();
         if (!session.pressShutter(gridSize)) return false;
         captureRequester.accept(gridSize);
