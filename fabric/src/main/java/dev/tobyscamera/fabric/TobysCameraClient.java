@@ -81,6 +81,8 @@ public final class TobysCameraClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        try { TemporaryVideoRecording.cleanupAbandoned(videoDirectory()); }
+        catch (IOException exception) { LOGGER.warn("Could not clear abandoned camera video recordings", exception); }
         PayloadTypeRegistry.playC2S().register(CameraPayload.TYPE, CameraPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(CameraPayload.TYPE, CameraPayload.CODEC);
         HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("tobyscamera", "viewfinder"), (graphics, delta) -> OVERLAY.render(graphics));

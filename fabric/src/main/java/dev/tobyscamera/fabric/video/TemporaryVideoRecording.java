@@ -19,6 +19,13 @@ public final class TemporaryVideoRecording implements AutoCloseable {
         return new TemporaryVideoRecording(Files.createDirectories(root).resolve(UUID.randomUUID().toString()));
     }
 
+    public static void cleanupAbandoned(Path root) throws IOException {
+        if (!Files.isDirectory(root)) return;
+        try (var entries = Files.list(root)) {
+            for (Path entry : entries.toList()) if (Files.isDirectory(entry)) deleteTree(entry);
+        }
+    }
+
     public void append(BufferedImage image) throws IOException {
         if (!Files.exists(directory)) Files.createDirectories(directory);
         if (!ImageIO.write(image, "png", framePath(frameCount).toFile())) throw new IOException("PNG encoder unavailable");
@@ -38,6 +45,10 @@ public final class TemporaryVideoRecording implements AutoCloseable {
     private Path framePath(int index) { return directory.resolve("frame-%06d.png".formatted(index)); }
 
     @Override public void close() throws IOException {
+        deleteTree(directory);
+    }
+
+    private static void deleteTree(Path directory) throws IOException {
         if (!Files.exists(directory)) return;
         try (var paths = Files.walk(directory)) { paths.sorted(Comparator.reverseOrder()).forEach(path -> {
             try { Files.deleteIfExists(path); } catch (IOException exception) { throw new VideoCleanupException(exception); }

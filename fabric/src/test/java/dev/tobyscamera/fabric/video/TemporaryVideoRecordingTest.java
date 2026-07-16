@@ -18,4 +18,12 @@ class TemporaryVideoRecordingTest {
         }
         assertEquals(0L, Files.list(directory).count());
     }
+
+    @Test
+    void removesAbandonedRecordingsAtClientStartup() throws Exception {
+        var directory = Files.createTempDirectory("camera-video");
+        Files.createDirectory(directory.resolve("abandoned"));
+        TemporaryVideoRecording.cleanupAbandoned(directory);
+        assertEquals(0L, Files.list(directory).count());
+    }
 }
