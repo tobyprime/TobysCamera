@@ -20,6 +20,7 @@ abstract class KeyboardHandlerMixin {
 
     @Inject(method = "keyPress", at = @At("HEAD"), cancellable = true)
     private void tobyscamera$takePhotoOnConfiguredKey(long handle, int action, KeyEvent event, CallbackInfo callback) {
+        TobysCameraClient.logViewfinderKeyEvent(action, event);
         if (action == GLFW.GLFW_PRESS && TobysCameraClient.handleShutterKey(event)) {
             callback.cancel();
         }

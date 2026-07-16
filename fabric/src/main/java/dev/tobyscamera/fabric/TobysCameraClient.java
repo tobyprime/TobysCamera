@@ -111,6 +111,12 @@ public final class TobysCameraClient implements ClientModInitializer {
         return accepted;
     }
 
+    public static void logViewfinderKeyEvent(int action, KeyEvent event) {
+        if (action != GLFW.GLFW_PRESS || VIEWFINDER.state() == ViewfinderState.CLOSED) return;
+        LOGGER.info("Viewfinder keyboard event key={} scancode={} shutterBinding={}; matches={}",
+                event.key(), event.scancode(), SHUTTER_KEY.saveString(), SHUTTER_KEY.matches(event));
+    }
+
     public static float viewfinderZoom() {
         return VIEWFINDER.zoomActive() ? VIEWFINDER.targetZoom() : 1.0f;
     }
