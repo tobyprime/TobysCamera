@@ -5,6 +5,7 @@ import java.util.List;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import dev.tobyscamera.folia.item.RootCustomData;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -27,16 +28,16 @@ public final class CameraFilmService {
         this.configuredMaximum = Math.max(1, configuredMaximum);
     }
 
-    public boolean isCamera(ItemStack item) { return !item.isEmpty() && item.getPersistentDataContainer().has(cameraKey); }
-    public boolean isFilm(ItemStack item) { return !item.isEmpty() && item.getPersistentDataContainer().has(filmKey); }
+    public boolean isCamera(ItemStack item) { return !item.isEmpty() && (RootCustomData.contains(item, cameraKey) || item.getPersistentDataContainer().has(cameraKey)); }
+    public boolean isFilm(ItemStack item) { return !item.isEmpty() && (RootCustomData.contains(item, filmKey) || item.getPersistentDataContainer().has(filmKey)); }
     public ItemStack heldCamera(Player player) {
         ItemStack mainHand = player.getInventory().getItemInMainHand();
         return isCamera(mainHand) ? mainHand : isCamera(player.getInventory().getItemInOffHand())
                 ? player.getInventory().getItemInOffHand() : null;
     }
-    public int remaining(ItemStack camera) { return camera.getPersistentDataContainer().getOrDefault(remainingKey, PersistentDataType.INTEGER, 0); }
+    public int remaining(ItemStack camera) { return readInt(camera, remainingKey, 0); }
     public int maximum(ItemStack camera, int configuredMaximum) {
-        int componentMaximum = camera.getPersistentDataContainer().getOrDefault(maximumKey, PersistentDataType.INTEGER, configuredMaximum);
+        int componentMaximum = readInt(camera, maximumKey, configuredMaximum);
         return Math.clamp(componentMaximum, 1, configuredMaximum);
     }
     public int maximumForFilm(ItemStack camera, int configuredMaximum) {
@@ -46,16 +47,22 @@ public final class CameraFilmService {
         if (filmCount < 1) return;
         int loaded = Math.addExact(remaining(camera), filmCount);
         int effectiveMaximum = maximum(camera, configuredMaximum);
-        camera.editPersistentDataContainer(container -> {
-            container.set(remainingKey, PersistentDataType.INTEGER, loaded);
-            container.set(maximumKey, PersistentDataType.INTEGER, effectiveMaximum);
+        RootCustomData.update(camera, tag -> {
+            tag.putBoolean(cameraKey.toString(), true);
+            tag.putInt(remainingKey.toString(), loaded);
+            tag.putInt(maximumKey.toString(), effectiveMaximum);
         });
+        clearLegacy(camera);
         updateLore(camera, loaded);
     }
     public boolean consume(ItemStack camera, int maps) {
         int remaining = remaining(camera);
         if (maps < 1 || remaining < maps) return false;
-        camera.editPersistentDataContainer(container -> container.set(remainingKey, PersistentDataType.INTEGER, remaining - maps));
+        RootCustomData.update(camera, tag -> {
+            tag.putBoolean(cameraKey.toString(), true);
+            tag.putInt(remainingKey.toString(), remaining - maps);
+        });
+        clearLegacy(camera);
         updateLore(camera, remaining - maps);
         return true;
     }
@@ -76,5 +83,17 @@ public final class CameraFilmService {
         lines.addAll(lore(remaining, maximum(camera, configuredMaximum)));
         meta.lore(lines);
         camera.setItemMeta(meta);
+    }
+
+    private int readInt(ItemStack item, NamespacedKey key, int fallback) {
+        return RootCustomData.contains(item, key) ? RootCustomData.intOr(item, key, fallback)
+                : item.getPersistentDataContainer().getOrDefault(key, PersistentDataType.INTEGER, fallback);
+    }
+
+    private void clearLegacy(ItemStack camera) {
+        camera.editPersistentDataContainer(container -> {
+            container.remove(cameraKey); container.remove(filmKey);
+            container.remove(remainingKey); container.remove(maximumKey);
+        });
     }
 }

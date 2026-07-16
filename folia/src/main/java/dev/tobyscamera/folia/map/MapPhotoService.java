@@ -3,6 +3,7 @@ package dev.tobyscamera.folia.map;
 import dev.tobyscamera.common.upload.UploadSession;
 import dev.tobyscamera.folia.storage.PhotoRecord;
 import dev.tobyscamera.folia.upload.PhotoMetadata;
+import dev.tobyscamera.folia.item.RootCustomData;
 import dev.tobyscamera.folia.storage.PhotoRepository;
 import dev.tobyscamera.folia.storage.TileCoordinate;
 import java.io.IOException;
@@ -15,7 +16,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
 import org.bukkit.plugin.Plugin;
@@ -79,12 +79,12 @@ public final class MapPhotoService {
         }
         meta.lore(lore);
         item.setItemMeta(meta);
-        item.editPersistentDataContainer(container -> {
-            container.set(new NamespacedKey("tobyscamera", "photo_id"), PersistentDataType.STRING, record.photoId().toString());
-            container.set(new NamespacedKey("tobyscamera", "tile_x"), PersistentDataType.INTEGER, coordinate.x());
-            container.set(new NamespacedKey("tobyscamera", "tile_y"), PersistentDataType.INTEGER, coordinate.y());
-            container.set(new NamespacedKey("tobyscamera", "grid_width"), PersistentDataType.INTEGER, record.gridWidth());
-            container.set(new NamespacedKey("tobyscamera", "grid_height"), PersistentDataType.INTEGER, record.gridHeight());
+        RootCustomData.update(item, tag -> {
+            tag.putString("tobyscamera:photo_id", record.photoId().toString());
+            tag.putInt("tobyscamera:tile_x", coordinate.x());
+            tag.putInt("tobyscamera:tile_y", coordinate.y());
+            tag.putInt("tobyscamera:grid_width", record.gridWidth());
+            tag.putInt("tobyscamera:grid_height", record.gridHeight());
         });
         return item;
     }
