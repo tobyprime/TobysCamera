@@ -1,4 +1,5 @@
 camera-tag-key: "tobyscamera:camera"
+film-tag-key: "tobyscamera:film"
 token-ttl-seconds: 60
 rate-limit:
   per-second: 1

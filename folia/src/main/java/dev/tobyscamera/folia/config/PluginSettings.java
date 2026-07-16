@@ -4,6 +4,7 @@ import java.util.Map;
 
 public record PluginSettings(
         String cameraTagKey,
+        String filmTagKey,
         int tokenTtlSeconds,
         int perSecond,
         int perMinute,
@@ -15,6 +16,7 @@ public record PluginSettings(
     public static PluginSettings from(Map<String, ?> values) {
         PluginSettings settings = new PluginSettings(
                 string(values, "camera-tag-key", "tobyscamera:camera"),
+                string(values, "film-tag-key", "tobyscamera:film"),
                 integer(values, "token-ttl-seconds", 60),
                 integer(values, "rate-limit.per-second", 1),
                 integer(values, "rate-limit.per-minute", 12),
@@ -28,6 +30,7 @@ public record PluginSettings(
 
     private void validate() {
         if (!cameraTagKey.contains(":")) throw new IllegalArgumentException("camera-tag-key must be namespaced");
+        if (!filmTagKey.contains(":")) throw new IllegalArgumentException("film-tag-key must be namespaced");
         if (tokenTtlSeconds < 1 || perSecond < 1 || perMinute < 1 || uploadTimeoutSeconds < 1) {
             throw new IllegalArgumentException("durations and rate limits must be positive");
         }

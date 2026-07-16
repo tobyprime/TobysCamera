@@ -3,6 +3,8 @@ package dev.tobyscamera.folia;
 import dev.tobyscamera.common.protocol.PacketCodec;
 import dev.tobyscamera.common.protocol.Packets;
 import dev.tobyscamera.folia.camera.CameraItemValidator;
+import dev.tobyscamera.folia.camera.CameraFilmService;
+import dev.tobyscamera.folia.camera.CameraFilmInventoryListener;
 import dev.tobyscamera.folia.config.PluginSettings;
 import dev.tobyscamera.folia.net.PluginPayloadGateway;
 import dev.tobyscamera.folia.map.MapPhotoService;
@@ -44,6 +46,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
         getServer().getGlobalRegionScheduler().run(this, ignored -> {
             try { photos.restore(); } catch (IOException exception) { getLogger().severe("Could not restore saved photo maps: " + exception.getMessage()); }
         });
+        CameraFilmService films = new CameraFilmService(settings.cameraTagKey(), settings.filmTagKey());
         coordinator = new UploadCoordinator(settings, new CameraItemValidator(settings.cameraTagKey()), this::send,
                 (player, session) -> createAndDeliver(player, session),
                 player -> player.playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.3f));
@@ -51,6 +54,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
         getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(new CameraFilmInventoryListener(films), this);
     }
 
     @Override
