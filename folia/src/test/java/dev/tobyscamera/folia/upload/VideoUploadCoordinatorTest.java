@@ -45,4 +45,21 @@ class VideoUploadCoordinatorTest {
         coordinator.handle(player, new Packets.VideoTileChunk(token, 0, 0, 0, 8_192, new byte[8_192]));
         assertEquals(Packets.UploadRejected.class, sent.getLast().getClass());
     }
+
+    @Test
+    void clearsTheVideoSessionAfterChunkRateLimitIsExceeded() {
+        Player player = mock(Player.class); when(player.getUniqueId()).thenReturn(UUID.randomUUID());
+        ItemStack camera = mock(ItemStack.class); CameraFilmService films = mock(CameraFilmService.class);
+        when(films.heldCamera(player)).thenReturn(camera); when(films.maximumForFilm(camera, 4)).thenReturn(1); when(films.consume(camera, 1)).thenReturn(true);
+        List<CameraPacket> sent = new ArrayList<>();
+        VideoUploadCoordinator coordinator = new VideoUploadCoordinator(PluginSettings.from(Map.of("video.max-upload-chunks-per-second", 1)), films, (ignored, packet) -> sent.add(packet), (ignored, session) -> { });
+        coordinator.handle(player, new Packets.VideoBegin(1, 1, 1, 1));
+        UUID token = ((Packets.VideoGranted) sent.getFirst()).token();
+        coordinator.handle(player, new Packets.VideoTileChunk(token, 0, 0, 0, 0, new byte[8_192]));
+        coordinator.handle(player, new Packets.VideoTileChunk(token, 0, 0, 0, 8_192, new byte[8_192]));
+
+        coordinator.handle(player, new Packets.VideoFinish(token));
+
+        verify(player).kick(org.mockito.ArgumentMatchers.any());
+    }
 }

@@ -60,14 +60,19 @@ public final class VideoUploadCoordinator {
 
     private void append(Player player, Packets.VideoTileChunk chunk) {
         VideoUploadSession session = valid(player, chunk.token()); if (session == null) return;
-        if (!chunkLimiters.get(chunk.token()).tryAcquire(player.getUniqueId(), Instant.now()).allowed()) { sender.send(player, new Packets.UploadRejected("Video upload chunk rate exceeded")); return; }
+        if (!chunkLimiters.get(chunk.token()).tryAcquire(player.getUniqueId(), Instant.now()).allowed()) {
+            clear(chunk.token());
+            sender.send(player, new Packets.UploadRejected("Video upload chunk rate exceeded"));
+            return;
+        }
         try { session.append(player.getUniqueId(), chunk.frameIndex(), chunk.tileX(), chunk.tileY(), chunk.offset(), chunk.data()); }
         catch (UploadFailure exception) { sender.send(player, new Packets.UploadRejected(exception.getMessage())); }
     }
     private void finish(Player player, Packets.VideoFinish finish) {
         VideoUploadSession session = valid(player, finish.token()); if (session == null) return;
         if (!session.isComplete()) { sender.send(player, new Packets.UploadRejected("Every video tile must be complete")); return; }
-        grants.remove(finish.token()); sessions.remove(finish.token()); chunkLimiters.remove(finish.token()); completion.accept(player, session);
+        clear(finish.token());
+        completion.accept(player, session);
     }
     private VideoUploadSession valid(Player player, UUID token) {
         UploadGrant grant = grants.get(token);
@@ -75,6 +80,12 @@ public final class VideoUploadCoordinator {
         VideoUploadSession session = sessions.get(token);
         if (session == null) { player.kick(net.kyori.adventure.text.Component.text(settings.invalidTokenKickMessage())); }
         return session;
+    }
+
+    private void clear(UUID token) {
+        grants.remove(token);
+        sessions.remove(token);
+        chunkLimiters.remove(token);
     }
     @FunctionalInterface public interface CompletedVideoUploadHandler { void accept(Player player, VideoUploadSession session); }
 }
