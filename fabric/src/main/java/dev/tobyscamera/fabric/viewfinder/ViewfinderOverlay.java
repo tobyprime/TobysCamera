@@ -2,6 +2,7 @@ package dev.tobyscamera.fabric.viewfinder;
 
 import dev.tobyscamera.fabric.camera.AspectRatio;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.GuiGraphics;
 
 public final class ViewfinderOverlay {
@@ -9,9 +10,22 @@ public final class ViewfinderOverlay {
     private static final int BORDER_COLOR = 0xE0FFFFFF;
     private static final int GRID_COLOR = 0x80FFFFFF;
     private final ViewfinderSession session;
+    private final KeyMapping zoomIn;
+    private final KeyMapping zoomOut;
+    private final KeyMapping gridKey;
+    private final KeyMapping compositionKey;
+    private final KeyMapping shutterKey;
     private int shutterTicks;
 
-    public ViewfinderOverlay(ViewfinderSession session) { this.session = session; }
+    public ViewfinderOverlay(ViewfinderSession session, KeyMapping zoomIn, KeyMapping zoomOut, KeyMapping gridKey,
+            KeyMapping compositionKey, KeyMapping shutterKey) {
+        this.session = session;
+        this.zoomIn = zoomIn;
+        this.zoomOut = zoomOut;
+        this.gridKey = gridKey;
+        this.compositionKey = compositionKey;
+        this.shutterKey = shutterKey;
+    }
 
     public void flashShutter() { shutterTicks = 3; }
     public void tick() { if (shutterTicks > 0) shutterTicks--; }
@@ -32,7 +46,9 @@ public final class ViewfinderOverlay {
         graphics.fill(left + frameWidth, top, width, top + frameHeight, MASK_COLOR);
         drawBorder(graphics, left, top, frameWidth, frameHeight);
         drawGrid(graphics, left, top, frameWidth, frameHeight);
-        graphics.drawString(minecraft.font, "x%.2f  %s  [/] zoom  G: %s  Enter: shutter  Esc: close".formatted(session.targetZoom(), session.composition().aspectRatio(), session.grid().name().toLowerCase()), left + 6, top + frameHeight - 14, BORDER_COLOR, true);
+        graphics.drawString(minecraft.font, hintText(session.targetZoom(), session.composition().aspectRatio().toString(),
+                keyName(zoomIn), keyName(zoomOut), keyName(gridKey), keyName(compositionKey), keyName(shutterKey)),
+                left + 6, top + frameHeight - 14, BORDER_COLOR, true);
         if (shutterTicks > 0) graphics.fill(left, top, left + frameWidth, top + frameHeight, 0xDD000000);
     }
 
@@ -45,6 +61,14 @@ public final class ViewfinderOverlay {
         }
         return new Frame((screenWidth - width) / 2, (screenHeight - height) / 2, width, height);
     }
+
+    static String hintText(float zoom, String aspectRatio, String zoomIn, String zoomOut, String grid,
+            String composition, String shutter) {
+        return "x%.2f  %s  [%s/%s] zoom  [%s] grid  [%s] composition  [%s] shutter  [Esc] close"
+                .formatted(zoom, aspectRatio, zoomIn, zoomOut, grid, composition, shutter);
+    }
+
+    private static String keyName(KeyMapping key) { return key.getTranslatedKeyMessage().getString(); }
 
     private static void drawBorder(GuiGraphics graphics, int left, int top, int width, int height) {
         int stroke = 2;

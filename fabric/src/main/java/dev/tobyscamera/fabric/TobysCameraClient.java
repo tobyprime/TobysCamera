@@ -40,7 +40,6 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final PhotoUploadController UPLOADS = new PhotoUploadController();
     private static final ViewfinderSession VIEWFINDER = new ViewfinderSession();
-    private static final ViewfinderOverlay OVERLAY = new ViewfinderOverlay(VIEWFINDER);
     private static final CaptureService CAPTURE = new CaptureService();
     private static final ViewfinderInputController INPUTS = new ViewfinderInputController(
             VIEWFINDER, TobysCameraClient::heldCameraGridSize, TobysCameraClient::startLocalCapture);
@@ -59,6 +58,8 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final KeyMapping SHUTTER_KEY = KeyBindingHelper.registerKeyBinding(CameraKeyBindings.shutter());
     private static final KeyMapping COMPOSITION_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.composition", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, CameraKeyCategory.value()));
+    private static final ViewfinderOverlay OVERLAY = new ViewfinderOverlay(VIEWFINDER, ZOOM_IN_KEY, ZOOM_OUT_KEY,
+            GRID_KEY, COMPOSITION_KEY, SHUTTER_KEY);
 
     @Override
     public void onInitializeClient() {
