@@ -25,6 +25,7 @@ import dev.tobyscamera.fabric.viewfinder.CaptureMode;
 import dev.tobyscamera.fabric.viewfinder.VideoPreviewScreen;
 import dev.tobyscamera.fabric.video.TemporaryVideoRecording;
 import dev.tobyscamera.fabric.video.VideoCaptureService;
+import dev.tobyscamera.fabric.video.VideoCaptureFormat;
 import dev.tobyscamera.fabric.video.VideoUploadController;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -61,6 +62,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static boolean videoReadbackPending;
     private static boolean videoPreviewRequested;
     private static boolean videoCaptureRequested;
+    private static VideoCaptureFormat videoCaptureFormat;
     private static final ViewfinderInputController INPUTS = new ViewfinderInputController(
             VIEWFINDER, TobysCameraClient::heldCameraGridSize, TobysCameraClient::startLocalCapture);
     private static final KeyMapping VIEWFINDER_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
@@ -143,9 +145,11 @@ public final class TobysCameraClient implements ClientModInitializer {
             if (videoRecording == null || videoReadbackPending || !videoCaptureRequested) return;
             videoCaptureRequested = false;
             videoReadbackPending = true;
-            Screenshot.takeScreenshot(client.getMainRenderTarget(), nativeImage -> {
-                com.mojang.blaze3d.platform.NativeImage copy = new com.mojang.blaze3d.platform.NativeImage(nativeImage.getWidth(), nativeImage.getHeight(), false);
-                copy.copyFrom(nativeImage);
+            VideoCaptureFormat format = videoCaptureFormat;
+            if (format == null) { videoReadbackPending = false; return; }
+            Screenshot.takeScreenshot(client.getMainRenderTarget(), format.screenshotDownscale(), nativeImage -> {
+                com.mojang.blaze3d.platform.NativeImage copy = new com.mojang.blaze3d.platform.NativeImage(format.outputWidth(), format.outputHeight(), false);
+                nativeImage.resizeSubRectTo(format.cropLeft(), format.cropTop(), format.cropWidth(), format.cropHeight(), copy);
                 nativeImage.close();
                 TemporaryVideoRecording recording = videoRecording;
                 if (recording == null || !VIDEO_FRAME_WRITES.submit(() -> {
@@ -198,6 +202,8 @@ public final class TobysCameraClient implements ClientModInitializer {
                 videoRecording = TemporaryVideoRecording.create(videoDirectory());
                 videoPreviewRequested = false;
                 videoCaptureRequested = false;
+                var target = net.minecraft.client.Minecraft.getInstance().getMainRenderTarget();
+                videoCaptureFormat = VideoCaptureFormat.forCamera(gridSize, VIEWFINDER.composition().aspectRatio(), target.width, target.height);
                 VIEWFINDER.capVideoFps(heldCameraVideoFps());
                 VIDEO_CAPTURE.start(VIEWFINDER.videoFps(), System.currentTimeMillis());
             } catch (IOException exception) {
@@ -266,12 +272,13 @@ public final class TobysCameraClient implements ClientModInitializer {
         if (recording == null || recording.frameCount() < 1) { discardVideoRecording(); VIEWFINDER.retake(); return; }
         int maximum = heldCameraGridSize();
         if (maximum < 1) { discardVideoRecording(); VIEWFINDER.retake(); return; }
-        client.setScreen(new VideoPreviewScreen(recording, VIEWFINDER.videoFps(), maximum, VIEWFINDER.composition().aspectRatio(),
+        var aspectRatio = videoCaptureFormat == null ? VIEWFINDER.composition().aspectRatio() : videoCaptureFormat.aspectRatio();
+        client.setScreen(new VideoPreviewScreen(recording, VIEWFINDER.videoFps(), maximum, aspectRatio,
                 encoder -> { if (VIEWFINDER.beginUpload() && VIDEO_UPLOADS.begin(encoder, recording, VIEWFINDER.videoFps())) { videoRecording = null; } else VIEWFINDER.retake(); client.setScreen(null); },
                 () -> { discardVideoRecording(); VIEWFINDER.retake(); client.setScreen(null); }));
     }
 
-    private static void discardVideoRecording() { if (videoRecording != null) try { videoRecording.close(); } catch (IOException ignored) { } finally { videoRecording = null; } }
+    private static void discardVideoRecording() { if (videoRecording != null) try { videoRecording.close(); } catch (IOException ignored) { } finally { videoRecording = null; videoCaptureFormat = null; } }
     private static Path videoDirectory() { return net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath().resolve("tobyscamera").resolve("videos"); }
     private static BufferedImage toImage(com.mojang.blaze3d.platform.NativeImage nativeImage) {
         BufferedImage image = new BufferedImage(nativeImage.getWidth(), nativeImage.getHeight(), BufferedImage.TYPE_INT_ARGB);

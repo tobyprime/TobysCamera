@@ -1,6 +1,9 @@
 package dev.tobyscamera.fabric.video;
 
 import dev.tobyscamera.fabric.camera.MapTileEncoder;
+import dev.tobyscamera.fabric.camera.CameraComposition;
+import dev.tobyscamera.fabric.camera.CapturedFrame;
+import dev.tobyscamera.fabric.camera.CompositionCropProcessor;
 import dev.tobyscamera.fabric.camera.PrintCanvasProcessor;
 import dev.tobyscamera.fabric.camera.PrintLayout;
 import java.io.IOException;
@@ -16,6 +19,7 @@ public final class VideoEncoder {
     private final Map<Integer, MapTileEncoder.EncodedPhoto> encoded = new HashMap<>();
     private final MapTileEncoder tileEncoder = new MapTileEncoder();
     private final PrintCanvasProcessor canvasProcessor = new PrintCanvasProcessor();
+    private final CompositionCropProcessor cropProcessor = new CompositionCropProcessor();
 
     public VideoEncoder(TemporaryVideoRecording recording, VideoFrameRange range, PrintLayout layout, MapTileEncoder.DitheringMode dithering) {
         this.recording = recording; this.range = range; this.layout = layout; this.dithering = dithering;
@@ -29,7 +33,10 @@ public final class VideoEncoder {
         if (retainedIndex < 0 || retainedIndex >= frameCount()) throw new IndexOutOfBoundsException(retainedIndex);
         MapTileEncoder.EncodedPhoto existing = encoded.get(retainedIndex);
         if (existing != null) return existing;
-        var processed = canvasProcessor.process(recording.read(range.startInclusive() + retainedIndex), layout);
+        var captured = new CapturedFrame(recording.read(range.startInclusive() + retainedIndex), 1,
+                new CameraComposition(layout.aspectRatio(), 0.0f));
+        var cropped = cropProcessor.process(captured).image();
+        var processed = canvasProcessor.process(cropped, layout);
         var result = tileEncoder.encode(processed, dithering);
         encoded.put(retainedIndex, result);
         return result;

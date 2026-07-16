@@ -1,6 +1,7 @@
 package dev.tobyscamera.fabric.video;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import dev.tobyscamera.fabric.camera.AspectRatio;
 import dev.tobyscamera.fabric.camera.MapTileEncoder;
@@ -21,6 +22,22 @@ class VideoEncoderTest {
             assertEquals(2, encoder.gridWidth());
             assertEquals(1, encoder.gridHeight());
             assertEquals(2, encoder.frame(1).tiles().size());
+        }
+    }
+
+    @Test
+    void cropsRecordedFramesToTheSelectedViewfinderAspectRatio() throws Exception {
+        BufferedImage raw = new BufferedImage(400, 300, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < raw.getHeight(); y++) for (int x = 0; x < raw.getWidth(); x++)
+            raw.setRGB(x, y, x < 50 || x >= 350 ? 0xFFFF0000 : 0xFF00FF00);
+        try (TemporaryVideoRecording recording = TemporaryVideoRecording.create(Files.createTempDirectory("camera-video"))) {
+            recording.append(raw);
+            VideoEncoder encoder = new VideoEncoder(recording, new VideoFrameRange(0, 0, 1),
+                    new PrintLayout(1, 1, new AspectRatio(1, 1)), MapTileEncoder.DitheringMode.OFF);
+
+            BufferedImage preview = new MapTileEncoder().palettePreview(encoder.frame(0));
+            assertNotEquals(0xFFFF0000, preview.getRGB(0, 64));
+            assertNotEquals(0xFFFF0000, preview.getRGB(127, 64));
         }
     }
 }

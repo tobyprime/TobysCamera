@@ -74,6 +74,7 @@ public final class VideoPlaybackService implements Listener {
         for (var candidate : selector.select(candidates, points, activeLimit)) {
             var tile = videos.tileForMap(candidate.mapId()); if (tile == null) continue;
             var record = videos.record(tile.videoId()); if (record == null) continue;
+            if (!clock.shouldUpdateAtTick(record.fps(), tick)) continue;
             int frameIndex = clock.frameAtTick(record.frameCount(), record.fps(), tick);
             if (Integer.valueOf(frameIndex).equals(lastSentFrame.put(candidate.mapId(), frameIndex))) continue;
             try {
