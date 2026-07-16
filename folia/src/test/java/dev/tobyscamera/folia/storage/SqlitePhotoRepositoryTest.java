@@ -25,9 +25,7 @@ class SqlitePhotoRepositoryTest {
             byte[] tile = new byte[16_384]; tile[0] = (byte) (x + y * 2);
             pixels.put(coordinate, tile);
         }
-        PhotoCoordinates coordinates = new PhotoCoordinates("minecraft:overworld", 12, 64, -30);
-        PhotoRecord record = new PhotoRecord(photoId, UUID.randomUUID(), Instant.parse("2026-07-16T00:00:00Z"),
-                coordinates, 2, 2, maps);
+        PhotoRecord record = new PhotoRecord(photoId, UUID.randomUUID(), Instant.parse("2026-07-16T00:00:00Z"), 2, 2, maps);
 
         try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
             repository.save(record, pixels);
@@ -35,7 +33,6 @@ class SqlitePhotoRepositoryTest {
         try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
             PhotoRecord restored = repository.loadAll().getFirst();
             assertEquals(record, restored);
-            assertEquals(coordinates, restored.coordinates());
             assertArrayEquals(pixels.get(new TileCoordinate(1, 1)), repository.readTile(photoId, new TileCoordinate(1, 1)));
         }
     }

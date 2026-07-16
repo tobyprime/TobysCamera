@@ -6,7 +6,7 @@ public final class CaptureService {
     private boolean captureReady;
 
     public void requestAfterNextFrame(int gridSize) {
-        if (gridSize < 1 || gridSize > 4) throw new IllegalArgumentException("grid size must be 1..4");
+        if (gridSize < 1) throw new IllegalArgumentException("grid size must be positive");
         this.gridSize = gridSize;
         captureReady = false;
         delayedFrames = 1;

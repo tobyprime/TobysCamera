@@ -62,4 +62,11 @@ class UploadSessionTest {
         assertEquals(4, session.width());
         assertEquals(2, session.height());
     }
+
+    @Test
+    void permitsGrantSizesLargerThanFour() {
+        UploadGrant grant = new UploadGrant(TOKEN, PLAYER, Instant.now(), Instant.now().plusSeconds(30), 8);
+
+        assertEquals(8, grant.gridSize());
+    }
 }

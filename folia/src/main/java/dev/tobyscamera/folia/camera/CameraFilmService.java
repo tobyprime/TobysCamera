@@ -24,7 +24,7 @@ public final class CameraFilmService {
         if (cameraKey == null || filmKey == null) throw new IllegalArgumentException("invalid item tag key");
         remainingKey = new NamespacedKey(cameraKey.getNamespace(), "film_remaining");
         maximumKey = new NamespacedKey(cameraKey.getNamespace(), "max_grid_size");
-        this.configuredMaximum = Math.clamp(configuredMaximum, 1, 4);
+        this.configuredMaximum = Math.max(1, configuredMaximum);
     }
 
     public boolean isCamera(ItemStack item) { return !item.isEmpty() && item.getPersistentDataContainer().has(cameraKey); }

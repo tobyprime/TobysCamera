@@ -15,8 +15,8 @@ class MapTileEncoderTest {
     }
 
     @Test
-    void encodesMinimumRequiredGridUpToFourByFour() {
+    void encodesMinimumRequiredGridWithoutFourByFourCap() {
         var result = encoder.encode(new BufferedImage(600, 600, BufferedImage.TYPE_INT_ARGB));
-        assertEquals(4, result.gridWidth()); assertEquals(4, result.gridHeight()); assertEquals(16, result.tiles().size());
+        assertEquals(5, result.gridWidth()); assertEquals(5, result.gridHeight()); assertEquals(25, result.tiles().size());
     }
 }

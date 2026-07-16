@@ -2,7 +2,7 @@ package dev.tobyscamera.folia.map;
 
 import dev.tobyscamera.common.upload.UploadSession;
 import dev.tobyscamera.folia.storage.PhotoRecord;
-import dev.tobyscamera.folia.storage.PhotoCoordinates;
+import dev.tobyscamera.folia.upload.PhotoMetadata;
 import dev.tobyscamera.folia.storage.PhotoRepository;
 import dev.tobyscamera.folia.storage.TileCoordinate;
 import java.io.IOException;
@@ -30,7 +30,7 @@ public final class MapPhotoService {
         this.repository = repository;
     }
 
-    public PhotoRecord createMaps(UUID ownerId, World world, PhotoCoordinates coordinates, UploadSession session) {
+    public PhotoRecord createMaps(UUID ownerId, World world, UploadSession session) {
         UUID photoId = UUID.randomUUID();
         Map<TileCoordinate, Integer> mapIds = new LinkedHashMap<>();
         Map<TileCoordinate, byte[]> tiles = new LinkedHashMap<>();
@@ -43,7 +43,7 @@ public final class MapPhotoService {
             view.addRenderer(new TileMapRenderer(pixels));
             mapIds.put(coordinate, view.getId()); tiles.put(coordinate, pixels);
         }
-        PhotoRecord record = new PhotoRecord(photoId, ownerId, Instant.now(), coordinates, session.width(), session.height(), mapIds);
+        PhotoRecord record = new PhotoRecord(photoId, ownerId, Instant.now(), session.width(), session.height(), mapIds);
         return record;
     }
 
@@ -64,13 +64,15 @@ public final class MapPhotoService {
         }
     }
 
-    public ItemStack mapItem(PhotoRecord record, TileCoordinate coordinate) {
+    public ItemStack mapItem(PhotoRecord record, TileCoordinate coordinate, PhotoMetadata metadata) {
         MapView view = Bukkit.getMap(record.mapIds().get(coordinate));
         if (view == null) throw new IllegalStateException("map no longer exists");
         ItemStack item = new ItemStack(org.bukkit.Material.FILLED_MAP);
         var meta = (org.bukkit.inventory.meta.MapMeta) item.getItemMeta();
         meta.setMapView(view);
-        meta.lore(java.util.List.of(Component.text("拍摄坐标: " + record.coordinates().display(), NamedTextColor.GRAY)));
+        if (metadata != null) meta.lore(java.util.List.of(
+                Component.text("拍摄者: " + metadata.photographer(), NamedTextColor.GRAY),
+                Component.text("拍摄坐标: " + metadata.coordinates(), NamedTextColor.GRAY)));
         item.setItemMeta(meta);
         item.editPersistentDataContainer(container -> {
             container.set(new NamespacedKey("tobyscamera", "photo_id"), PersistentDataType.STRING, record.photoId().toString());

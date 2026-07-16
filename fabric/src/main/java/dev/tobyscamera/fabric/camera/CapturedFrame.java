@@ -6,7 +6,7 @@ public record CapturedFrame(BufferedImage image, int gridSize, CameraComposition
     public CapturedFrame(BufferedImage image, int gridSize) { this(image, gridSize, CameraComposition.DEFAULT); }
     public CapturedFrame {
         if (image == null) throw new IllegalArgumentException("image is required");
-        if (gridSize < 1 || gridSize > 4) throw new IllegalArgumentException("grid size must be 1..4");
+        if (gridSize < 1) throw new IllegalArgumentException("grid size must be positive");
         if (composition == null) throw new IllegalArgumentException("composition is required");
     }
 }

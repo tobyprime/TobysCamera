@@ -14,7 +14,6 @@ public final class PacketCodec {
     public static final byte VERSION = 1;
     public static final int MAX_CHUNK_BYTES = 8_192;
     private static final int MAX_STRING_BYTES = 512;
-    private static final int MAX_MAP_IDS = 16;
 
     private PacketCodec() {
     }
@@ -45,7 +44,6 @@ public final class PacketCodec {
                 }
                 case Packets.UploadFinish value -> writeUuid(out, value.token());
                 case Packets.PhotoCreated value -> {
-                    if (value.mapIds().size() > MAX_MAP_IDS) throw new ProtocolException("too many map ids");
                     writeUuid(out, value.photoId()); out.writeInt(value.gridWidth()); out.writeInt(value.gridHeight());
                     out.writeInt(value.mapIds().size());
                     for (int id : value.mapIds()) out.writeInt(id);
@@ -93,7 +91,7 @@ public final class PacketCodec {
 
     private static Packets.PhotoCreated readPhotoCreated(ByteBuffer in) {
         UUID photoId = readUuid(in); int width = in.getInt(); int height = in.getInt(); int count = in.getInt();
-        if (count < 0 || count > MAX_MAP_IDS || count > in.remaining() / Integer.BYTES) throw new ProtocolException("invalid map id count");
+        if (count < 0 || count > in.remaining() / Integer.BYTES) throw new ProtocolException("invalid map id count");
         List<Integer> mapIds = new ArrayList<>(count);
         for (int index = 0; index < count; index++) mapIds.add(in.getInt());
         return new Packets.PhotoCreated(photoId, mapIds, width, height);

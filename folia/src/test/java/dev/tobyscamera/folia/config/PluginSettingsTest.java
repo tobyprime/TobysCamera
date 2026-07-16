@@ -21,8 +21,7 @@ class PluginSettingsTest {
     }
 
     @Test
-    void rejectsGridLargerThanProtocolMaximum() {
-        assertThrows(IllegalArgumentException.class,
-                () -> PluginSettings.from(Map.of("upload.max-grid-size", 5)));
+    void permitsConfiguredGridLargerThanFour() {
+        assertEquals(8, PluginSettings.from(Map.of("upload.max-grid-size", 8)).maxGridSize());
     }
 }

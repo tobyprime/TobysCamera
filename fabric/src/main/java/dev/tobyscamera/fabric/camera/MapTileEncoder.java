@@ -11,8 +11,8 @@ public final class MapTileEncoder {
     }
 
     public EncodedPhoto encode(BufferedImage source) {
-        int gridWidth = Math.min(4, Math.max(1, (source.getWidth() + 127) / 128));
-        int gridHeight = Math.min(4, Math.max(1, (source.getHeight() + 127) / 128));
+        int gridWidth = Math.max(1, (source.getWidth() + 127) / 128);
+        int gridHeight = Math.max(1, (source.getHeight() + 127) / 128);
         int targetWidth = gridWidth * 128;
         int targetHeight = gridHeight * 128;
         List<byte[]> tiles = new ArrayList<>(gridWidth * gridHeight);

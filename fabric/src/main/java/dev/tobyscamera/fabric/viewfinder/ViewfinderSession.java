@@ -21,7 +21,7 @@ public final class ViewfinderSession {
     public void close() { state = ViewfinderState.CLOSED; gridSize = 0; }
 
     public boolean pressShutter(int gridSize) {
-        if (state != ViewfinderState.VIEWFINDER || gridSize < 1 || gridSize > 4) return false;
+        if (state != ViewfinderState.VIEWFINDER || gridSize < 1) return false;
         this.gridSize = gridSize;
         state = ViewfinderState.CAPTURING;
         return true;

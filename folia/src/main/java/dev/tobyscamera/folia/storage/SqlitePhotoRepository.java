@@ -50,12 +50,10 @@ public final class SqlitePhotoRepository implements PhotoRepository {
             }
             Files.move(staging, destination, StandardCopyOption.ATOMIC_MOVE);
             connection.setAutoCommit(false);
-            try (PreparedStatement photo = connection.prepareStatement("insert into photos(id, owner, created, world, x, y, z, width, height) values(?,?,?,?,?,?,?,?,?)");
+            try (PreparedStatement photo = connection.prepareStatement("insert into photos(id, owner, created, width, height) values(?,?,?,?,?)");
                  PreparedStatement tile = connection.prepareStatement("insert into tiles(photo_id, x, y, map_id) values(?,?,?,?)")) {
                 photo.setString(1, record.photoId().toString()); photo.setString(2, record.ownerId().toString());
-                photo.setLong(3, record.createdAt().toEpochMilli()); photo.setString(4, record.coordinates().world());
-                photo.setInt(5, record.coordinates().x()); photo.setInt(6, record.coordinates().y()); photo.setInt(7, record.coordinates().z());
-                photo.setInt(8, record.gridWidth()); photo.setInt(9, record.gridHeight()); photo.executeUpdate();
+                photo.setLong(3, record.createdAt().toEpochMilli()); photo.setInt(4, record.gridWidth()); photo.setInt(5, record.gridHeight()); photo.executeUpdate();
                 for (var entry : record.mapIds().entrySet()) {
                     tile.setString(1, record.photoId().toString()); tile.setInt(2, entry.getKey().x()); tile.setInt(3, entry.getKey().y()); tile.setInt(4, entry.getValue()); tile.addBatch();
                 }
@@ -68,7 +66,7 @@ public final class SqlitePhotoRepository implements PhotoRepository {
 
     @Override
     public synchronized List<PhotoRecord> loadAll() throws IOException {
-        try (Statement statement = connection.createStatement(); ResultSet photos = statement.executeQuery("select id, owner, created, world, x, y, z, width, height from photos order by created")) {
+        try (Statement statement = connection.createStatement(); ResultSet photos = statement.executeQuery("select id, owner, created, width, height from photos order by created")) {
             List<PhotoRecord> result = new ArrayList<>();
             while (photos.next()) {
                 UUID id = UUID.fromString(photos.getString(1));
@@ -77,8 +75,7 @@ public final class SqlitePhotoRepository implements PhotoRepository {
                     tiles.setString(1, id.toString()); try (ResultSet rows = tiles.executeQuery()) { while (rows.next()) maps.put(new TileCoordinate(rows.getInt(1), rows.getInt(2)), rows.getInt(3)); }
                 }
                 result.add(new PhotoRecord(id, UUID.fromString(photos.getString(2)), Instant.ofEpochMilli(photos.getLong(3)),
-                        new PhotoCoordinates(photos.getString(4), photos.getInt(5), photos.getInt(6), photos.getInt(7)),
-                        photos.getInt(8), photos.getInt(9), maps));
+                        photos.getInt(4), photos.getInt(5), maps));
             }
             return result;
         } catch (SQLException exception) { throw new IOException("could not load photos", exception); }
@@ -99,20 +96,21 @@ public final class SqlitePhotoRepository implements PhotoRepository {
 
     private void initialize() throws SQLException {
         try (Statement statement = connection.createStatement()) {
-            statement.executeUpdate("create table if not exists photos (id text primary key, owner text not null, created integer not null, world text not null default 'unknown', x integer not null default 0, y integer not null default 0, z integer not null default 0, width integer not null, height integer not null)");
+            statement.executeUpdate("create table if not exists photos (id text primary key, owner text not null, created integer not null, width integer not null, height integer not null)");
             statement.executeUpdate("create table if not exists tiles (photo_id text not null, x integer not null, y integer not null, map_id integer not null, primary key(photo_id,x,y))");
-            ensureColumn(statement, "world", "text not null default 'unknown'");
-            ensureColumn(statement, "x", "integer not null default 0");
-            ensureColumn(statement, "y", "integer not null default 0");
-            ensureColumn(statement, "z", "integer not null default 0");
+            dropColumnIfPresent(statement, "world");
+            dropColumnIfPresent(statement, "x");
+            dropColumnIfPresent(statement, "y");
+            dropColumnIfPresent(statement, "z");
         }
     }
 
-    private static void ensureColumn(Statement statement, String name, String definition) throws SQLException {
+    private static void dropColumnIfPresent(Statement statement, String name) throws SQLException {
+        boolean exists = false;
         try (ResultSet columns = statement.executeQuery("pragma table_info(photos)")) {
-            while (columns.next()) if (name.equals(columns.getString("name"))) return;
+            while (columns.next()) if (name.equals(columns.getString("name"))) { exists = true; break; }
         }
-        statement.executeUpdate("alter table photos add column " + name + " " + definition);
+        if (exists) statement.executeUpdate("alter table photos drop column " + name);
     }
 
     private static void validateTiles(PhotoRecord record, Map<TileCoordinate, byte[]> tiles) {

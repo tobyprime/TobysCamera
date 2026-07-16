@@ -6,7 +6,7 @@ public record PrintLayout(int gridWidth, int gridHeight, AspectRatio aspectRatio
     }
 
     public static PrintLayout forMaximumSide(int maximumSide, AspectRatio aspectRatio) {
-        if (maximumSide < 1 || maximumSide > 4) throw new IllegalArgumentException("print size must be 1..4");
+        if (maximumSide < 1) throw new IllegalArgumentException("print size must be positive");
         int bestWidth = 1;
         int bestHeight = 1;
         double bestDistance = Double.POSITIVE_INFINITY;

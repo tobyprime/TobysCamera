@@ -34,7 +34,7 @@ public record PluginSettings(
         if (tokenTtlSeconds < 1 || perSecond < 1 || perMinute < 1 || uploadTimeoutSeconds < 1) {
             throw new IllegalArgumentException("durations and rate limits must be positive");
         }
-        if (maxGridSize < 1 || maxGridSize > 4) throw new IllegalArgumentException("max-grid-size must be 1..4");
+        if (maxGridSize < 1) throw new IllegalArgumentException("max-grid-size must be positive");
         if (chunkBytes < 1 || chunkBytes > 8_192) throw new IllegalArgumentException("chunk-bytes must be 1..8192");
     }
 

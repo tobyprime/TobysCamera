@@ -24,7 +24,7 @@ public final class HeldCameraChecker {
         var values = tag.getCompoundOrEmpty("PublicBukkitValues");
         int componentMaximum = readInt(tag, values, MAX_GRID_SIZE_KEY, 4);
         int remaining = Math.max(0, readInt(tag, values, FILM_REMAINING_KEY, 0));
-        return Math.min(Math.clamp(componentMaximum, 1, 4), (int) Math.sqrt(remaining));
+        return Math.min(Math.max(1, componentMaximum), (int) Math.sqrt(remaining));
     }
 
     private static int readInt(net.minecraft.nbt.CompoundTag root, net.minecraft.nbt.CompoundTag publicValues,
