@@ -37,7 +37,7 @@ public final class CameraFilmService {
     public int remaining(ItemStack camera) { return readInt(camera, remainingKey, 0); }
     public int maximum(ItemStack camera, int configuredMaximum) {
         int componentMaximum = readInt(camera, maximumKey, configuredMaximum);
-        return Math.clamp(componentMaximum, 1, configuredMaximum);
+        return Math.max(1, componentMaximum);
     }
     public int maximumForFilm(ItemStack camera, int configuredMaximum) {
         return Math.min(maximum(camera, configuredMaximum), (int) Math.sqrt(remaining(camera)));
