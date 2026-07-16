@@ -60,6 +60,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static TemporaryVideoRecording videoRecording;
     private static boolean videoReadbackPending;
     private static boolean videoPreviewRequested;
+    private static boolean videoCaptureRequested;
     private static final ViewfinderInputController INPUTS = new ViewfinderInputController(
             VIEWFINDER, TobysCameraClient::heldCameraGridSize, TobysCameraClient::startLocalCapture);
     private static final KeyMapping VIEWFINDER_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
@@ -127,6 +128,8 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (FPS_UP_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.adjustVideoFps(1, heldCameraVideoFps());
         while (FPS_DOWN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.adjustVideoFps(-1, heldCameraVideoFps());
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING) CAPTURE.tick();
+        if (VIEWFINDER.state() == ViewfinderState.CAPTURING && VIEWFINDER.mode() == CaptureMode.VIDEO
+                && !videoReadbackPending && VIDEO_CAPTURE.captureDue(System.currentTimeMillis())) videoCaptureRequested = true;
         if (videoPreviewRequested && !videoReadbackPending) {
             videoPreviewRequested = false;
             VIDEO_FRAME_WRITES.flush(() -> net.minecraft.client.Minecraft.getInstance().execute(() -> openVideoPreview(net.minecraft.client.Minecraft.getInstance())));
@@ -137,7 +140,8 @@ public final class TobysCameraClient implements ClientModInitializer {
     public static void captureWorldBeforeHand(net.minecraft.client.Minecraft client) {
         if (VIEWFINDER.state() != ViewfinderState.CAPTURING) return;
         if (VIEWFINDER.mode() == CaptureMode.VIDEO) {
-            if (videoRecording == null || videoReadbackPending || !VIDEO_CAPTURE.captureDue(System.currentTimeMillis())) return;
+            if (videoRecording == null || videoReadbackPending || !videoCaptureRequested) return;
+            videoCaptureRequested = false;
             videoReadbackPending = true;
             Screenshot.takeScreenshot(client.getMainRenderTarget(), nativeImage -> {
                 com.mojang.blaze3d.platform.NativeImage copy = new com.mojang.blaze3d.platform.NativeImage(nativeImage.getWidth(), nativeImage.getHeight(), false);
@@ -193,6 +197,7 @@ public final class TobysCameraClient implements ClientModInitializer {
             try {
                 videoRecording = TemporaryVideoRecording.create(videoDirectory());
                 videoPreviewRequested = false;
+                videoCaptureRequested = false;
                 VIDEO_CAPTURE.start(VIEWFINDER.videoFps(), System.currentTimeMillis());
             } catch (IOException exception) {
                 LOGGER.error("Could not initialize temporary video recording", exception);
@@ -209,6 +214,7 @@ public final class TobysCameraClient implements ClientModInitializer {
         boolean accepted = INPUTS.pressShutter();
         if (accepted && before == ViewfinderState.CAPTURING && VIEWFINDER.mode() == CaptureMode.VIDEO && VIEWFINDER.state() == ViewfinderState.PREVIEW) {
             VIDEO_CAPTURE.stop();
+            videoCaptureRequested = false;
             videoPreviewRequested = true;
         }
         LOGGER.info("Camera shutter key event matched while viewfinder is {}; capture request accepted={}.", before, accepted);
@@ -230,7 +236,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     }
 
     public static boolean hideNameTagsForPhoto() {
-        return PhotoRenderPolicy.hideNameTags(VIEWFINDER.state(), CAPTURE.captureReady());
+        return VIEWFINDER.mode() == CaptureMode.VIDEO ? videoCaptureRequested : PhotoRenderPolicy.hideNameTags(VIEWFINDER.state(), CAPTURE.captureReady());
     }
 
     private static void openPreview(net.minecraft.client.Minecraft client, CapturedFrame frame) {

@@ -16,6 +16,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.MapMeta;
+import org.bukkit.plugin.Plugin;
 
 /** Indexes loaded video item frames and refreshes only the distance-budgeted map IDs. */
 public final class VideoPlaybackService implements Listener {
@@ -23,11 +24,11 @@ public final class VideoPlaybackService implements Listener {
     private final int activeLimit;
     private final VideoPlaybackClock clock;
     private final ActiveVideoMapSelector selector = new ActiveVideoMapSelector();
-    private final MapUpdateDispatcher mapUpdates = new MapUpdateDispatcher();
+    private final MapUpdateDispatcher mapUpdates;
     private final Map<UUID, IndexedFrame> frames = new ConcurrentHashMap<>();
 
-    public VideoPlaybackService(MapVideoService videos, int activeLimit, long startedAtMillis) {
-        this.videos = videos; this.activeLimit = activeLimit; this.clock = new VideoPlaybackClock(startedAtMillis);
+    public VideoPlaybackService(Plugin plugin, MapVideoService videos, int activeLimit, long startedAtMillis) {
+        this.videos = videos; this.activeLimit = activeLimit; this.clock = new VideoPlaybackClock(startedAtMillis); this.mapUpdates = new MapUpdateDispatcher(plugin);
     }
 
     /** One initial scan covers frames already loaded before plugin enable; updates are event driven afterwards. */
