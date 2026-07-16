@@ -38,6 +38,22 @@ settings.
 7. Restart the server and verify the same maps still render. Fill the photographer's inventory to verify overflow drops at their feet; disconnect during delivery to verify the pending delivery is retried on join.
 8. Press `P` twice quickly to verify the rate-limit response. Use a packet-debug client to submit an unknown, expired, reused, or foreign Token and verify the player is disconnected.
 
+## Video maps
+
+While the viewfinder is open, `V` (rebindable in **TobysCamera** controls) switches between photo and video modes. In video mode, `-` / `=` adjust FPS within the held camera's `tobyscamera:max_video_fps` component. Press the shutter once to start and again to stop. The confirmation screen trims the retained frame range, chooses the final rectangular map layout and dithering, then uploads exactly the palette bytes that it previews.
+
+The plugin's reloadable `video:` configuration has these defaults:
+
+```yaml
+video:
+  max-fps: 10                    # Hard ceiling: 20
+  max-frames: 100
+  max-upload-chunks-per-second: 120
+  max-active-map-frames: 128
+```
+
+Each retained frame costs one film for every final map tile: a 12-frame 2×3 video costs 72 film. Cameras marked `tobyscamera:no_film_required` remain free. Placed video maps loop independently at their own FPS; each server pass updates at most the nearest 128 individual item-frame maps.
+
 ## Scope
 
 This core release deliberately excludes camera settings, selectable resolution and film consumption. The protocol is versioned and reserves room for those later additions.

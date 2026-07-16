@@ -65,4 +65,26 @@ class ViewfinderSessionTest {
         assertEquals(133, frame.left());
         assertEquals(0, frame.top());
     }
+
+    @Test
+    void switchesToVideoModeAndCapsSelectedFps() {
+        ViewfinderSession session = new ViewfinderSession();
+        session.open();
+        assertEquals(CaptureMode.VIDEO, session.toggleMode());
+        assertEquals(10, session.adjustVideoFps(20, 10));
+        assertEquals(1, session.adjustVideoFps(-20, 10));
+    }
+
+    @Test
+    void secondShutterStopsVideoRecordingAndOpensConfirmation() {
+        ViewfinderSession session = new ViewfinderSession();
+        session.open();
+        session.toggleMode();
+        assertTrue(session.pressShutter(1));
+        assertEquals(ViewfinderState.CAPTURING, session.state());
+
+        assertTrue(session.pressShutter(1));
+
+        assertEquals(ViewfinderState.PREVIEW, session.state());
+    }
 }

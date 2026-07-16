@@ -8,5 +8,10 @@ upload:
   max-grid-size: 4
   chunk-bytes: 8192
   timeout-seconds: 30
+video:
+  max-fps: 10
+  max-frames: 100
+  max-upload-chunks-per-second: 120
+  max-active-map-frames: 128
 invalid-token:
   kick-message: "Invalid or expired photo upload token"

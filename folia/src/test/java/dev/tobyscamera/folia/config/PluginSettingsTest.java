@@ -18,10 +18,19 @@ class PluginSettingsTest {
         assertEquals(4, settings.maxGridSize());
         assertEquals(8_192, settings.chunkBytes());
         assertEquals(30, settings.uploadTimeoutSeconds());
+        assertEquals(10, settings.videoMaxFps());
+        assertEquals(100, settings.videoMaxFrames());
+        assertEquals(120, settings.videoUploadChunksPerSecond());
+        assertEquals(128, settings.videoMaxActiveMapFrames());
     }
 
     @Test
     void permitsConfiguredGridLargerThanFour() {
         assertEquals(8, PluginSettings.from(Map.of("upload.max-grid-size", 8)).maxGridSize());
+    }
+
+    @Test
+    void rejectsVideoFpsOverMinecraftTickRate() {
+        assertThrows(IllegalArgumentException.class, () -> PluginSettings.from(Map.of("video.max-fps", 21)));
     }
 }

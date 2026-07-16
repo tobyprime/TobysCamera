@@ -12,4 +12,11 @@ class CameraFilmServiceTest {
 
         assertEquals(java.util.List.of("剩余胶卷: 9", "最大尺寸: 4x"), lore);
     }
+
+    @Test
+    void capsCameraVideoFpsAtTheConfiguredServerLimit() {
+        assertEquals(10, CameraFilmService.capVideoFps(17, 10));
+        assertEquals(8, CameraFilmService.capVideoFps(8, 10));
+        assertEquals(1, CameraFilmService.capVideoFps(0, 10));
+    }
 }

@@ -16,17 +16,23 @@ public final class ViewfinderOverlay {
     private final KeyMapping gridKey;
     private final KeyMapping compositionKey;
     private final KeyMapping shutterKey;
+    private final KeyMapping modeKey;
+    private final KeyMapping fpsUpKey;
+    private final KeyMapping fpsDownKey;
     private final IntSupplier remainingFilm;
     private int shutterTicks;
 
     public ViewfinderOverlay(ViewfinderSession session, KeyMapping zoomIn, KeyMapping zoomOut, KeyMapping gridKey,
-            KeyMapping compositionKey, KeyMapping shutterKey, IntSupplier remainingFilm) {
+            KeyMapping compositionKey, KeyMapping shutterKey, KeyMapping modeKey, KeyMapping fpsUpKey, KeyMapping fpsDownKey, IntSupplier remainingFilm) {
         this.session = session;
         this.zoomIn = zoomIn;
         this.zoomOut = zoomOut;
         this.gridKey = gridKey;
         this.compositionKey = compositionKey;
         this.shutterKey = shutterKey;
+        this.modeKey = modeKey;
+        this.fpsUpKey = fpsUpKey;
+        this.fpsDownKey = fpsDownKey;
         this.remainingFilm = remainingFilm;
     }
 
@@ -51,6 +57,7 @@ public final class ViewfinderOverlay {
         drawGrid(graphics, left, top, frameWidth, frameHeight);
         int film = remainingFilm.getAsInt();
         if (showsFilm(film)) graphics.drawString(minecraft.font, filmLabel(film), left + 6, top + 6, BORDER_COLOR, true);
+        graphics.drawString(minecraft.font, modeLabel(session.mode(), session.videoFps(), keyName(modeKey), keyName(fpsDownKey), keyName(fpsUpKey)), left + 6, top + 18, BORDER_COLOR, true);
         graphics.drawString(minecraft.font, hintText(session.targetZoom(), session.composition().aspectRatio().toString(),
                 keyName(zoomIn), keyName(zoomOut), keyName(gridKey), keyName(compositionKey), keyName(shutterKey)),
                 left + 6, top + frameHeight - 14, BORDER_COLOR, true);
@@ -74,6 +81,9 @@ public final class ViewfinderOverlay {
     }
 
     static String filmLabel(int remainingFilm) { return "Film: " + Math.max(0, remainingFilm); }
+    static String modeLabel(CaptureMode mode, int fps, String modeKey, String fpsDown, String fpsUp) {
+        return mode == CaptureMode.VIDEO ? "VIDEO %d FPS  [%s] mode  [%s/%s] fps".formatted(fps, modeKey, fpsDown, fpsUp) : "PHOTO  [%s] mode".formatted(modeKey);
+    }
     static boolean showsFilm(int remainingFilm) { return remainingFilm >= 0; }
 
     private static String keyName(KeyMapping key) { return key.getTranslatedKeyMessage().getString(); }
