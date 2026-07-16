@@ -29,4 +29,18 @@ class SquareImageProcessorTest {
         assertEquals(256, resized.image().getHeight());
         assertEquals(composition, resized.composition());
     }
+
+    @Test
+    void cropsAndResizesToTheCapturedFourByThreeComposition() {
+        CameraComposition composition = new CameraComposition(AspectRatio.of(4, 3), 0.0f);
+        CapturedFrame frame = new CapturedFrame(new BufferedImage(300, 200, BufferedImage.TYPE_INT_ARGB), 4, composition);
+
+        CapturedFrame cropped = new CenterSquareCropProcessor().process(frame);
+        CapturedFrame resized = new ResizeToGridProcessor().process(cropped);
+
+        assertEquals(267, cropped.image().getWidth());
+        assertEquals(200, cropped.image().getHeight());
+        assertEquals(512, resized.image().getWidth());
+        assertEquals(384, resized.image().getHeight());
+    }
 }
