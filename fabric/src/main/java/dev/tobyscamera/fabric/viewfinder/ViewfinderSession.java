@@ -11,6 +11,8 @@ public final class ViewfinderSession {
     private float targetZoom = MIN_ZOOM;
     private CameraComposition composition = CameraComposition.DEFAULT;
     private int gridSize;
+    private CaptureMode mode = CaptureMode.PHOTO;
+    private int videoFps = 10;
 
     public boolean open() {
         if (state != ViewfinderState.CLOSED) return false;
@@ -46,6 +48,8 @@ public final class ViewfinderSession {
     }
 
     public void finishUpload() { if (state == ViewfinderState.UPLOADING) state = ViewfinderState.VIEWFINDER; }
+    public CaptureMode toggleMode() { if (state == ViewfinderState.VIEWFINDER) mode = mode.next(); return mode; }
+    public int adjustVideoFps(int delta, int maximum) { videoFps = Math.clamp(videoFps + delta, 1, Math.max(1, maximum)); return videoFps; }
     public CompositionGrid cycleGrid() { grid = grid.next(); return grid; }
     public void adjustZoom(double scrollDelta) { targetZoom = Math.clamp(targetZoom + (float) scrollDelta * 0.25f, MIN_ZOOM, MAX_ZOOM); }
     public void setRollDegrees(float value) { composition = composition.withRollDegrees(value); }
@@ -55,6 +59,8 @@ public final class ViewfinderSession {
     public float targetZoom() { return targetZoom; }
     public CameraComposition composition() { return composition; }
     public int gridSize() { return gridSize; }
+    public CaptureMode mode() { return mode; }
+    public int videoFps() { return videoFps; }
     public boolean captureHidden() { return state == ViewfinderState.CAPTURING; }
     public boolean zoomActive() { return state == ViewfinderState.VIEWFINDER || state == ViewfinderState.CAPTURING; }
 }
