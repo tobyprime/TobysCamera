@@ -1,5 +1,7 @@
 package dev.tobyscamera.fabric.viewfinder;
 
+import dev.tobyscamera.fabric.camera.AspectRatio;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,5 +58,15 @@ class ViewfinderSessionTest {
         assertTrue(session.zoomActive());
         session.captureComplete();
         assertFalse(session.zoomActive());
+    }
+
+    @Test
+    void derivesFourByThreeViewfinderFrameFromTheSelectedAspectRatio() {
+        ViewfinderOverlay.Frame frame = ViewfinderOverlay.frame(1600, 1000, AspectRatio.of(4, 3));
+
+        assertEquals(1333, frame.width());
+        assertEquals(1000, frame.height());
+        assertEquals(133, frame.left());
+        assertEquals(0, frame.top());
     }
 }

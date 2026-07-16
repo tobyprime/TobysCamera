@@ -1,5 +1,6 @@
 package dev.tobyscamera.fabric.viewfinder;
 
+import dev.tobyscamera.fabric.camera.AspectRatio;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -20,38 +21,52 @@ public final class ViewfinderOverlay {
         Minecraft minecraft = Minecraft.getInstance();
         int width = minecraft.getWindow().getGuiScaledWidth();
         int height = minecraft.getWindow().getGuiScaledHeight();
-        int size = Math.min(width, height);
-        int left = (width - size) / 2;
-        int top = (height - size) / 2;
+        Frame frame = frame(width, height, session.composition().aspectRatio());
+        int left = frame.left();
+        int top = frame.top();
+        int frameWidth = frame.width();
+        int frameHeight = frame.height();
         graphics.fill(0, 0, width, top, MASK_COLOR);
-        graphics.fill(0, top + size, width, height, MASK_COLOR);
-        graphics.fill(0, top, left, top + size, MASK_COLOR);
-        graphics.fill(left + size, top, width, top + size, MASK_COLOR);
-        drawBorder(graphics, left, top, size);
-        drawGrid(graphics, left, top, size);
-        graphics.drawString(minecraft.font, "x%.2f  [/] zoom  G: %s  Enter: shutter  Esc: close".formatted(session.targetZoom(), session.grid().name().toLowerCase()), left + 6, top + size - 14, BORDER_COLOR, true);
-        if (shutterTicks > 0) graphics.fill(left, top, left + size, top + size, 0xDD000000);
+        graphics.fill(0, top + frameHeight, width, height, MASK_COLOR);
+        graphics.fill(0, top, left, top + frameHeight, MASK_COLOR);
+        graphics.fill(left + frameWidth, top, width, top + frameHeight, MASK_COLOR);
+        drawBorder(graphics, left, top, frameWidth, frameHeight);
+        drawGrid(graphics, left, top, frameWidth, frameHeight);
+        graphics.drawString(minecraft.font, "x%.2f  %s  [/] zoom  G: %s  Enter: shutter  Esc: close".formatted(session.targetZoom(), session.composition().aspectRatio(), session.grid().name().toLowerCase()), left + 6, top + frameHeight - 14, BORDER_COLOR, true);
+        if (shutterTicks > 0) graphics.fill(left, top, left + frameWidth, top + frameHeight, 0xDD000000);
     }
 
-    private static void drawBorder(GuiGraphics graphics, int left, int top, int size) {
+    static Frame frame(int screenWidth, int screenHeight, AspectRatio aspectRatio) {
+        int width = screenWidth;
+        int height = (int) Math.round(width / aspectRatio.value());
+        if (height > screenHeight) {
+            height = screenHeight;
+            width = (int) Math.round(height * aspectRatio.value());
+        }
+        return new Frame((screenWidth - width) / 2, (screenHeight - height) / 2, width, height);
+    }
+
+    private static void drawBorder(GuiGraphics graphics, int left, int top, int width, int height) {
         int stroke = 2;
-        graphics.fill(left, top, left + size, top + stroke, BORDER_COLOR);
-        graphics.fill(left, top + size - stroke, left + size, top + size, BORDER_COLOR);
-        graphics.fill(left, top, left + stroke, top + size, BORDER_COLOR);
-        graphics.fill(left + size - stroke, top, left + size, top + size, BORDER_COLOR);
+        graphics.fill(left, top, left + width, top + stroke, BORDER_COLOR);
+        graphics.fill(left, top + height - stroke, left + width, top + height, BORDER_COLOR);
+        graphics.fill(left, top, left + stroke, top + height, BORDER_COLOR);
+        graphics.fill(left + width - stroke, top, left + width, top + height, BORDER_COLOR);
     }
 
-    private void drawGrid(GuiGraphics graphics, int left, int top, int size) {
+    private void drawGrid(GuiGraphics graphics, int left, int top, int width, int height) {
         if (session.grid() == CompositionGrid.THIRDS) {
-            int third = size / 3;
-            graphics.fill(left + third, top, left + third + 1, top + size, GRID_COLOR);
-            graphics.fill(left + third * 2, top, left + third * 2 + 1, top + size, GRID_COLOR);
-            graphics.fill(left, top + third, left + size, top + third + 1, GRID_COLOR);
-            graphics.fill(left, top + third * 2, left + size, top + third * 2 + 1, GRID_COLOR);
+            int thirdWidth = width / 3, thirdHeight = height / 3;
+            graphics.fill(left + thirdWidth, top, left + thirdWidth + 1, top + height, GRID_COLOR);
+            graphics.fill(left + thirdWidth * 2, top, left + thirdWidth * 2 + 1, top + height, GRID_COLOR);
+            graphics.fill(left, top + thirdHeight, left + width, top + thirdHeight + 1, GRID_COLOR);
+            graphics.fill(left, top + thirdHeight * 2, left + width, top + thirdHeight * 2 + 1, GRID_COLOR);
         } else if (session.grid() == CompositionGrid.CROSSHAIR) {
-            int middleX = left + size / 2, middleY = top + size / 2;
-            graphics.fill(middleX, top, middleX + 1, top + size, GRID_COLOR);
-            graphics.fill(left, middleY, left + size, middleY + 1, GRID_COLOR);
+            int middleX = left + width / 2, middleY = top + height / 2;
+            graphics.fill(middleX, top, middleX + 1, top + height, GRID_COLOR);
+            graphics.fill(left, middleY, left + width, middleY + 1, GRID_COLOR);
         }
     }
+
+    record Frame(int left, int top, int width, int height) { }
 }
