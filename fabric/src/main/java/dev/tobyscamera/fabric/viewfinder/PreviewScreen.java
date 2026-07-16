@@ -3,6 +3,9 @@ package dev.tobyscamera.fabric.viewfinder;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.tobyscamera.fabric.camera.CapturedFrame;
 import dev.tobyscamera.fabric.camera.NativePixelFormat;
+import dev.tobyscamera.fabric.camera.PrintCanvasProcessor;
+import dev.tobyscamera.fabric.camera.PrintLayout;
+import java.awt.image.BufferedImage;
 import java.util.UUID;
 import java.util.List;
 import java.util.function.IntConsumer;
@@ -23,6 +26,8 @@ public final class PreviewScreen extends Screen {
     private boolean released;
 
     private int printSize;
+    private int previewImageWidth;
+    private int previewImageHeight;
 
     public PreviewScreen(CapturedFrame frame, IntConsumer usePhoto, Runnable retake) {
         super(Component.literal("Camera Preview"));
@@ -35,12 +40,12 @@ public final class PreviewScreen extends Screen {
     @Override
     protected void init() {
         textureId = Identifier.fromNamespaceAndPath("tobyscamera", "preview/" + UUID.randomUUID());
-        minecraft.getTextureManager().register(textureId, new DynamicTexture(() -> "tobyscamera-preview", nativeImage(frame)));
+        refreshPreviewTexture();
         int buttonY = height - 32;
         List<Integer> sizes = java.util.stream.IntStream.rangeClosed(1, frame.gridSize()).boxed().toList();
-        addRenderableWidget(CycleButton.builder(value -> Component.literal("Print: " + value + "x"), printSize)
+        addRenderableWidget(CycleButton.builder(value -> Component.literal(printLabel(value)), printSize)
                 .withValues(sizes)
-                .create(width / 2 - 75, buttonY - 24, 150, 20, Component.empty(), (button, value) -> printSize = value));
+                .create(width / 2 - 75, buttonY - 24, 150, 20, Component.empty(), (button, value) -> { printSize = value; refreshPreviewTexture(); }));
         addRenderableWidget(Button.builder(Component.literal("Retake"), button -> closeForRetake()).bounds(width / 2 - 155, buttonY, 150, 20).build());
         addRenderableWidget(Button.builder(Component.literal("Use photo"), button -> closeForUse()).bounds(width / 2 + 5, buttonY, 150, 20).build());
     }
@@ -48,7 +53,7 @@ public final class PreviewScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderTransparentBackground(graphics);
-        TextureBlit blit = textureBlit(20, 20, frame.image().getWidth(), frame.image().getHeight(), width - 40, height - 80);
+        TextureBlit blit = textureBlit(20, 20, previewImageWidth, previewImageHeight, width - 40, height - 80);
         graphics.blit(
             RenderPipelines.GUI_TEXTURED,
             textureId,
@@ -63,7 +68,7 @@ public final class PreviewScreen extends Screen {
             blit.textureWidth(),
             blit.textureHeight()
         );
-        graphics.drawCenteredString(font, "%d x %d maps".formatted(frame.gridSize(), frame.gridSize()), width / 2, blit.top() + blit.height() + 8, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, printLabel(printSize), width / 2, blit.top() + blit.height() + 8, 0xFFFFFFFF);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 
@@ -80,9 +85,25 @@ public final class PreviewScreen extends Screen {
     private void closeForRetake() { releaseTexture(); retake.run(); }
     private void releaseTexture() { if (!released && textureId != null) { minecraft.getTextureManager().release(textureId); released = true; } }
 
-    private static NativeImage nativeImage(CapturedFrame frame) {
-        NativeImage image = new NativeImage(frame.image().getWidth(), frame.image().getHeight(), false);
-        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) image.setPixel(x, y, NativePixelFormat.toAbgr(frame.image().getRGB(x, y)));
+    private void refreshPreviewTexture() {
+        BufferedImage image = new PrintCanvasProcessor().process(frame.image(), printLayout(frame, printSize));
+        previewImageWidth = image.getWidth();
+        previewImageHeight = image.getHeight();
+        minecraft.getTextureManager().register(textureId, new DynamicTexture(() -> "tobyscamera-preview", nativeImage(image)));
+    }
+
+    static PrintLayout printLayout(CapturedFrame frame, int printSize) {
+        return PrintLayout.forMaximumSide(printSize, frame.composition().aspectRatio());
+    }
+
+    private String printLabel(int size) {
+        PrintLayout layout = printLayout(frame, size);
+        return "Print %dx (%d×%d maps)".formatted(size, layout.gridWidth(), layout.gridHeight());
+    }
+
+    private static NativeImage nativeImage(BufferedImage source) {
+        NativeImage image = new NativeImage(source.getWidth(), source.getHeight(), false);
+        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) image.setPixel(x, y, NativePixelFormat.toAbgr(source.getRGB(x, y)));
         return image;
     }
 
