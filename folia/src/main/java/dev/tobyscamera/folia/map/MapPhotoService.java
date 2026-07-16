@@ -76,6 +76,7 @@ public final class MapPhotoService {
         if (metadata != null) {
             lore.add(Component.text("拍摄者: " + metadata.photographer(), NamedTextColor.GRAY));
             lore.add(Component.text("拍摄坐标: " + metadata.coordinates(), NamedTextColor.GRAY));
+            lore.add(Component.text("拍摄时间: " + metadata.capturedTime(), NamedTextColor.GRAY));
         }
         meta.lore(lore);
         item.setItemMeta(meta);
