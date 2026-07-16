@@ -46,7 +46,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
         });
         CameraFilmService films = new CameraFilmService(settings.cameraTagKey(), settings.filmTagKey(), settings.maxGridSize());
         coordinator = new UploadCoordinator(settings, films, this::send,
-                (player, session) -> createAndDeliver(player, session),
+                (player, session, coordinates) -> createAndDeliver(player, session, coordinates),
                 player -> player.playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.3f));
         PluginPayloadGateway gateway = new PluginPayloadGateway(this, coordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
@@ -74,11 +74,12 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
         return values;
     }
 
-    private void createAndDeliver(Player player, dev.tobyscamera.common.upload.UploadSession session) {
+    private void createAndDeliver(Player player, dev.tobyscamera.common.upload.UploadSession session,
+            dev.tobyscamera.folia.storage.PhotoCoordinates coordinates) {
         var world = player.getWorld();
         getServer().getGlobalRegionScheduler().run(this, ignored -> {
             try {
-                var record = photos.createMaps(player.getUniqueId(), world, session);
+                var record = photos.createMaps(player.getUniqueId(), world, coordinates, session);
                 getServer().getAsyncScheduler().runNow(this, asyncTask -> {
                     try {
                         photos.persist(record, session);

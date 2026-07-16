@@ -1,8 +1,14 @@
 package dev.tobyscamera.folia.camera;
 
+import java.util.ArrayList;
+import java.util.List;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 public final class CameraFilmService {
@@ -43,11 +49,31 @@ public final class CameraFilmService {
             container.set(remainingKey, PersistentDataType.INTEGER, loaded);
             if (!container.has(maximumKey)) container.set(maximumKey, PersistentDataType.INTEGER, configuredMaximum);
         });
+        updateLore(camera, loaded);
     }
     public boolean consume(ItemStack camera, int maps) {
         int remaining = remaining(camera);
         if (maps < 1 || remaining < maps) return false;
         camera.editPersistentDataContainer(container -> container.set(remainingKey, PersistentDataType.INTEGER, remaining - maps));
+        updateLore(camera, remaining - maps);
         return true;
+    }
+
+    public static List<Component> lore(int remaining, int maximum) {
+        return List.of(
+                Component.text("剩余胶卷: " + remaining, NamedTextColor.GRAY),
+                Component.text("最大尺寸: " + maximum + "x", NamedTextColor.GRAY));
+    }
+
+    private void updateLore(ItemStack camera, int remaining) {
+        ItemMeta meta = camera.getItemMeta();
+        List<Component> lines = new ArrayList<>();
+        if (meta.lore() != null) for (Component line : meta.lore()) {
+            String plain = PlainTextComponentSerializer.plainText().serialize(line);
+            if (!plain.startsWith("剩余胶卷: ") && !plain.startsWith("最大尺寸: ")) lines.add(line);
+        }
+        lines.addAll(lore(remaining, maximum(camera, configuredMaximum)));
+        meta.lore(lines);
+        camera.setItemMeta(meta);
     }
 }

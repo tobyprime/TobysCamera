@@ -9,6 +9,7 @@ import dev.tobyscamera.common.upload.UploadGrant;
 import dev.tobyscamera.common.upload.UploadSession;
 import dev.tobyscamera.folia.camera.CameraFilmService;
 import dev.tobyscamera.folia.config.PluginSettings;
+import dev.tobyscamera.folia.storage.PhotoCoordinates;
 import dev.tobyscamera.folia.sound.ShutterSoundService;
 import java.time.Instant;
 import java.util.HashMap;
@@ -29,6 +30,8 @@ public final class UploadCoordinator {
     private final SlidingWindowRateLimiter rateLimiter;
     private final Map<UUID, UploadGrant> grants = new HashMap<>();
     private final Map<UUID, UploadSession> sessions = new HashMap<>();
+    private final Map<UUID, PhotoCoordinates> capturedCoordinates = new HashMap<>();
+    private final Map<UUID, PhotoCoordinates> uploadCoordinates = new HashMap<>();
 
     public UploadCoordinator(PluginSettings settings, CameraFilmService films,
             PluginPayloadGatewaySender sender, CompletedUploadHandler completionHandler, ShutterSoundService shutterSound) {
@@ -58,6 +61,7 @@ public final class UploadCoordinator {
             return;
         }
         shutterSound.playFor(player);
+        capturedCoordinates.put(player.getUniqueId(), coordinatesOf(player));
     }
 
     private void begin(Player player, Packets.UploadBegin begin) {
@@ -89,6 +93,7 @@ public final class UploadCoordinator {
         try {
             grants.put(token, grant);
             sessions.put(token, new UploadSession(grant, begin.gridWidth(), begin.gridHeight()));
+            uploadCoordinates.put(token, capturedCoordinates.remove(player.getUniqueId()));
             sender.send(player, new Packets.UploadGranted(token, grant.expiresAt().toEpochMilli(), UploadSession.TILE_BYTES));
         } catch (UploadFailure exception) {
             grants.remove(token);
@@ -115,7 +120,8 @@ public final class UploadCoordinator {
         }
         grants.remove(finish.token());
         sessions.remove(finish.token());
-        completionHandler.accept(player, session);
+        PhotoCoordinates coordinates = uploadCoordinates.remove(finish.token());
+        completionHandler.accept(player, session, coordinates == null ? coordinatesOf(player) : coordinates);
     }
 
     private UploadGrant validGrantOrKick(Player player, UUID token) {
@@ -140,6 +146,11 @@ public final class UploadCoordinator {
 
     private void kick(Player player) {
         player.kick(Component.text(settings.invalidTokenKickMessage()));
+    }
+
+    private static PhotoCoordinates coordinatesOf(Player player) {
+        var location = player.getLocation();
+        return new PhotoCoordinates(player.getWorld().getKey().asString(), location.getBlockX(), location.getBlockY(), location.getBlockZ());
     }
 
     @FunctionalInterface

@@ -2,6 +2,7 @@ package dev.tobyscamera.folia.map;
 
 import dev.tobyscamera.common.upload.UploadSession;
 import dev.tobyscamera.folia.storage.PhotoRecord;
+import dev.tobyscamera.folia.storage.PhotoCoordinates;
 import dev.tobyscamera.folia.storage.PhotoRepository;
 import dev.tobyscamera.folia.storage.TileCoordinate;
 import java.io.IOException;
@@ -17,6 +18,8 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
 import org.bukkit.plugin.Plugin;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 
 public final class MapPhotoService {
     private final Plugin plugin;
@@ -27,7 +30,7 @@ public final class MapPhotoService {
         this.repository = repository;
     }
 
-    public PhotoRecord createMaps(UUID ownerId, World world, UploadSession session) {
+    public PhotoRecord createMaps(UUID ownerId, World world, PhotoCoordinates coordinates, UploadSession session) {
         UUID photoId = UUID.randomUUID();
         Map<TileCoordinate, Integer> mapIds = new LinkedHashMap<>();
         Map<TileCoordinate, byte[]> tiles = new LinkedHashMap<>();
@@ -40,7 +43,7 @@ public final class MapPhotoService {
             view.addRenderer(new TileMapRenderer(pixels));
             mapIds.put(coordinate, view.getId()); tiles.put(coordinate, pixels);
         }
-        PhotoRecord record = new PhotoRecord(photoId, ownerId, Instant.now(), session.width(), session.height(), mapIds);
+        PhotoRecord record = new PhotoRecord(photoId, ownerId, Instant.now(), coordinates, session.width(), session.height(), mapIds);
         return record;
     }
 
@@ -67,6 +70,7 @@ public final class MapPhotoService {
         ItemStack item = new ItemStack(org.bukkit.Material.FILLED_MAP);
         var meta = (org.bukkit.inventory.meta.MapMeta) item.getItemMeta();
         meta.setMapView(view);
+        meta.lore(java.util.List.of(Component.text("拍摄坐标: " + record.coordinates().display(), NamedTextColor.GRAY)));
         item.setItemMeta(meta);
         item.editPersistentDataContainer(container -> {
             container.set(new NamespacedKey("tobyscamera", "photo_id"), PersistentDataType.STRING, record.photoId().toString());

@@ -27,7 +27,7 @@ class UploadCoordinatorTest {
         when(films.heldCamera(player)).thenReturn(camera);
         when(films.maximumForFilm(camera, 4)).thenReturn(3);
         when(films.consume(camera, 9)).thenReturn(true);
-        UploadCoordinator coordinator = coordinator(sent, films, (ignored, session) -> { });
+        UploadCoordinator coordinator = coordinator(sent, films, (ignored, session, coordinates) -> { });
 
         coordinator.handle(player, new Packets.UploadBegin(3, 3));
         coordinator.handle(player, new Packets.UploadBegin(1, 1));
@@ -40,7 +40,7 @@ class UploadCoordinatorTest {
     @Test
     void kicksInvalidUploadTokenBeforeCreatingSession() {
         Player player = player();
-        UploadCoordinator coordinator = coordinator(new ArrayList<>(), mock(CameraFilmService.class), (ignored, session) -> { });
+        UploadCoordinator coordinator = coordinator(new ArrayList<>(), mock(CameraFilmService.class), (ignored, session, coordinates) -> { });
 
         coordinator.handle(player, new Packets.UploadFinish(UUID.randomUUID()));
 
