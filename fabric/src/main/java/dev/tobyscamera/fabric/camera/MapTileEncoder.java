@@ -34,8 +34,9 @@ public final class MapTileEncoder {
         for (int tileY = 0; tileY < photo.gridHeight(); tileY++) for (int tileX = 0; tileX < photo.gridWidth(); tileX++) {
             byte[] tile = photo.tiles().get(tileY * photo.gridWidth() + tileX);
             for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) {
-                int color = MapColor.getColorFromPackedId(Byte.toUnsignedInt(tile[y * 128 + x]));
-                preview.setRGB(tileX * 128 + x, tileY * 128 + y, 0xff000000 | color & 0x00ffffff);
+                int id = Byte.toUnsignedInt(tile[y * 128 + x]);
+                int color = MapColor.getColorFromPackedId(id);
+                preview.setRGB(tileX * 128 + x, tileY * 128 + y, (id == 0 ? 0 : 0xff000000) | color & 0x00ffffff);
             }
         }
         return preview;
@@ -70,7 +71,8 @@ public final class MapTileEncoder {
     private static byte[] nearestColorPixels(BufferedImage source, int targetWidth, int targetHeight) {
         byte[] pixels = new byte[targetWidth * targetHeight];
         for (int y = 0; y < targetHeight; y++) for (int x = 0; x < targetWidth; x++) {
-            pixels[y * targetWidth + x] = nearestMapColor(source.getRGB(sourceX(source, x, targetWidth), sourceY(source, y, targetHeight)));
+            int argb = source.getRGB(sourceX(source, x, targetWidth), sourceY(source, y, targetHeight));
+            pixels[y * targetWidth + x] = (argb >>> 24) == 0 ? 0 : nearestMapColor(argb);
         }
         return pixels;
     }
@@ -82,6 +84,10 @@ public final class MapTileEncoder {
         for (int y = 0; y < targetHeight; y++) {
             for (int x = 0; x < targetWidth; x++) {
                 int argb = source.getRGB(sourceX(source, x, targetWidth), sourceY(source, y, targetHeight));
+                if ((argb >>> 24) == 0) {
+                    pixels[y * targetWidth + x] = 0;
+                    continue;
+                }
                 int red = clamp(((argb >>> 16) & 0xff) + currentRed[x + 1]);
                 int green = clamp(((argb >>> 8) & 0xff) + currentGreen[x + 1]);
                 int blue = clamp((argb & 0xff) + currentBlue[x + 1]);

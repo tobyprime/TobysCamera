@@ -81,6 +81,16 @@ class MapTileEncoderTest {
         }
     }
 
+    @Test
+    void encodesTransparentCanvasPixelsAsTheTransparentMapColor() {
+        BufferedImage transparent = new BufferedImage(128, 128, BufferedImage.TYPE_INT_ARGB);
+
+        for (MapTileEncoder.DitheringMode mode : MapTileEncoder.DitheringMode.values()) {
+            byte[] tile = encoder.encode(transparent, mode).tiles().getFirst();
+            for (byte packedId : tile) assertEquals(0, Byte.toUnsignedInt(packedId));
+        }
+    }
+
     private static boolean imagesEqual(BufferedImage left, BufferedImage right) {
         for (int y = 0; y < left.getHeight(); y++) for (int x = 0; x < left.getWidth(); x++) {
             if (left.getRGB(x, y) != right.getRGB(x, y)) return false;

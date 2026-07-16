@@ -27,7 +27,7 @@ class PrintLayoutTest {
     }
 
     @Test
-    void containsSquarePhotoOnBlackCanvasWithoutCropping() {
+    void containsSquarePhotoOnTransparentCanvasWithoutCropping() {
         java.awt.image.BufferedImage source = new java.awt.image.BufferedImage(4, 4, java.awt.image.BufferedImage.TYPE_INT_ARGB);
         java.awt.Graphics2D graphics = source.createGraphics();
         graphics.setColor(java.awt.Color.RED);
@@ -38,12 +38,12 @@ class PrintLayoutTest {
 
         assertEquals(512, result.getWidth());
         assertEquals(256, result.getHeight());
-        assertEquals(0xff000000, result.getRGB(0, 0));
+        assertEquals(0x00000000, result.getRGB(0, 0));
         assertEquals(0xffff0000, result.getRGB(128, 0));
     }
 
     @Test
-    void keepsPortraitCompositionInsideOneSquareMapWithBlackSideBars() {
+    void keepsPortraitCompositionInsideOneSquareMapWithTransparentSideBars() {
         java.awt.image.BufferedImage source = new java.awt.image.BufferedImage(4, 4, java.awt.image.BufferedImage.TYPE_INT_ARGB);
         java.awt.Graphics2D graphics = source.createGraphics();
         graphics.setColor(java.awt.Color.RED);
@@ -54,7 +54,7 @@ class PrintLayoutTest {
 
         assertEquals(128, result.getWidth());
         assertEquals(128, result.getHeight());
-        assertEquals(0xff000000, result.getRGB(0, 64));
+        assertEquals(0x00000000, result.getRGB(0, 64));
         assertEquals(0xffff0000, result.getRGB(64, 64));
     }
 }
