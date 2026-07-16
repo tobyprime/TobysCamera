@@ -21,10 +21,10 @@ public final class PhotoUploadController {
         if (packet instanceof Packets.RateLimited || packet instanceof Packets.UploadRejected || packet instanceof Packets.PhotoCreated) clearPending();
     }
 
-    public boolean confirm(CapturedFrame frame, int printSize) {
+    public boolean confirm(CapturedFrame frame, int printSize, MapTileEncoder.DitheringMode ditheringMode) {
         if (pendingPhoto != null || printSize < 1 || printSize > frame.gridSize()) return false;
         PrintLayout layout = PrintLayout.forMaximumSide(printSize, frame.composition().aspectRatio());
-        MapTileEncoder.EncodedPhoto photo = encoder.encode(new PrintCanvasProcessor().process(frame.image(), layout));
+        MapTileEncoder.EncodedPhoto photo = encoder.encode(new PrintCanvasProcessor().process(frame.image(), layout), ditheringMode);
         pendingPhoto = photo;
         send(new Packets.UploadBegin(photo.gridWidth(), photo.gridHeight()));
         return true;

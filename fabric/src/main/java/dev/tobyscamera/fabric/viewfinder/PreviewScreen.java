@@ -2,13 +2,14 @@ package dev.tobyscamera.fabric.viewfinder;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.tobyscamera.fabric.camera.CapturedFrame;
+import dev.tobyscamera.fabric.camera.MapTileEncoder;
 import dev.tobyscamera.fabric.camera.NativePixelFormat;
 import dev.tobyscamera.fabric.camera.PrintCanvasProcessor;
 import dev.tobyscamera.fabric.camera.PrintLayout;
 import java.awt.image.BufferedImage;
 import java.util.UUID;
 import java.util.List;
-import java.util.function.IntConsumer;
+import java.util.function.BiConsumer;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
@@ -20,16 +21,18 @@ import net.minecraft.resources.Identifier;
 
 public final class PreviewScreen extends Screen {
     private final CapturedFrame frame;
-    private final IntConsumer usePhoto;
+    private final BiConsumer<Integer, MapTileEncoder.DitheringMode> usePhoto;
     private final Runnable retake;
+    private final MapTileEncoder encoder = new MapTileEncoder();
     private Identifier textureId;
     private boolean released;
 
     private int printSize;
+    private MapTileEncoder.DitheringMode ditheringMode = MapTileEncoder.DitheringMode.OFF;
     private int previewImageWidth;
     private int previewImageHeight;
 
-    public PreviewScreen(CapturedFrame frame, IntConsumer usePhoto, Runnable retake) {
+    public PreviewScreen(CapturedFrame frame, BiConsumer<Integer, MapTileEncoder.DitheringMode> usePhoto, Runnable retake) {
         super(Component.literal("Camera Preview"));
         this.frame = frame;
         this.usePhoto = usePhoto;
@@ -43,6 +46,9 @@ public final class PreviewScreen extends Screen {
         refreshPreviewTexture();
         int buttonY = height - 32;
         List<Integer> sizes = java.util.stream.IntStream.rangeClosed(1, frame.gridSize()).boxed().toList();
+        addRenderableWidget(CycleButton.builder(this::ditheringLabel, ditheringMode)
+                .withValues(List.of(MapTileEncoder.DitheringMode.OFF, MapTileEncoder.DitheringMode.FLOYD_STEINBERG))
+                .create(width / 2 - 100, buttonY - 48, 200, 20, Component.empty(), (button, value) -> { ditheringMode = value; refreshPreviewTexture(); }));
         addRenderableWidget(CycleButton.builder(value -> Component.literal(printLabel(value)), printSize)
                 .withValues(sizes)
                 .create(width / 2 - 75, buttonY - 24, 150, 20, Component.empty(), (button, value) -> { printSize = value; refreshPreviewTexture(); }));
@@ -53,7 +59,7 @@ public final class PreviewScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderTransparentBackground(graphics);
-        TextureBlit blit = textureBlit(20, 20, previewImageWidth, previewImageHeight, width - 40, height - 80);
+        TextureBlit blit = textureBlit(20, 20, previewImageWidth, previewImageHeight, width - 40, height - 104);
         graphics.blit(
             RenderPipelines.GUI_TEXTURED,
             textureId,
@@ -81,12 +87,13 @@ public final class PreviewScreen extends Screen {
     @Override
     public void removed() { releaseTexture(); }
 
-    private void closeForUse() { releaseTexture(); usePhoto.accept(printSize); }
+    private void closeForUse() { releaseTexture(); usePhoto.accept(printSize, ditheringMode); }
     private void closeForRetake() { releaseTexture(); retake.run(); }
     private void releaseTexture() { if (!released && textureId != null) { minecraft.getTextureManager().release(textureId); released = true; } }
 
     private void refreshPreviewTexture() {
-        BufferedImage image = new PrintCanvasProcessor().preview(frame.image(), frame.composition().aspectRatio());
+        BufferedImage canvas = new PrintCanvasProcessor().process(frame.image(), printLayout(frame, printSize));
+        BufferedImage image = encoder.palettePreview(canvas, ditheringMode);
         previewImageWidth = image.getWidth();
         previewImageHeight = image.getHeight();
         minecraft.getTextureManager().register(textureId, new DynamicTexture(() -> "tobyscamera-preview", nativeImage(image)));
@@ -99,6 +106,10 @@ public final class PreviewScreen extends Screen {
     private String printLabel(int size) {
         PrintLayout layout = printLayout(frame, size);
         return "Print %dx (%d×%d maps)".formatted(size, layout.gridWidth(), layout.gridHeight());
+    }
+
+    private Component ditheringLabel(MapTileEncoder.DitheringMode mode) {
+        return Component.literal("Color dithering: " + (mode == MapTileEncoder.DitheringMode.FLOYD_STEINBERG ? "Floyd-Steinberg" : "Off"));
     }
 
     private static NativeImage nativeImage(BufferedImage source) {
