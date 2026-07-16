@@ -29,6 +29,7 @@ import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Screenshot;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionResult;
 import org.lwjgl.glfw.GLFW;
@@ -92,11 +93,6 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (GRID_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.cycleGrid();
         while (ZOOM_IN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(1.0);
         while (ZOOM_OUT_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(-1.0);
-        while (SHUTTER_KEY.consumeClick()) {
-            ViewfinderState before = VIEWFINDER.state();
-            boolean accepted = INPUTS.pressShutter();
-            LOGGER.info("Camera shutter binding consumed while viewfinder is {}; capture request accepted={}.", before, accepted);
-        }
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING && CAPTURE.tick()) {
             int gridSize = CAPTURE.takeGridSize();
             Screenshot.takeScreenshot(client.getMainRenderTarget(), nativeImage -> openPreview(client, toFrame(nativeImage, gridSize)));
@@ -105,6 +101,14 @@ public final class TobysCameraClient implements ClientModInitializer {
 
     public static boolean closeViewfinder() {
         return INPUTS.close();
+    }
+
+    public static boolean handleShutterKey(KeyEvent event) {
+        if (!SHUTTER_KEY.matches(event)) return false;
+        ViewfinderState before = VIEWFINDER.state();
+        boolean accepted = INPUTS.pressShutter();
+        LOGGER.info("Camera shutter key event matched while viewfinder is {}; capture request accepted={}.", before, accepted);
+        return accepted;
     }
 
     public static float viewfinderZoom() {
