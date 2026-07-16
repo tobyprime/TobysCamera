@@ -86,7 +86,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
                         player.getScheduler().run(this, task -> {
                             try { deliveries.deliver(player, record, metadata); } catch (IOException exception) { throw new IllegalStateException(exception); }
                             send(player, new Packets.PhotoCreated(record.photoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight()));
-                        }, () -> { try { deliveries.queue(player, record); } catch (IOException exception) { getLogger().warning("Could not queue photo delivery: " + exception.getMessage()); } });
+                        }, () -> { try { deliveries.queue(player, record, metadata); } catch (IOException exception) { getLogger().warning("Could not queue photo delivery: " + exception.getMessage()); } });
                     } catch (IOException exception) {
                         player.getScheduler().run(this, task -> send(player, new Packets.UploadRejected("Could not save photo maps")), () -> { });
                     }
