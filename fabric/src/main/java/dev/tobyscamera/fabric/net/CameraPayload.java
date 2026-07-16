@@ -10,9 +10,14 @@ public record CameraPayload(byte[] data) implements CustomPacketPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, CameraPayload> CODEC = StreamCodec.of(
             (buffer, payload) -> {
                 if (payload.data.length > 8_256) throw new IllegalArgumentException("payload exceeds 8256 bytes");
-                buffer.writeByteArray(payload.data);
+                buffer.writeBytes(payload.data);
             },
-            buffer -> new CameraPayload(buffer.readByteArray(8_256)));
+            buffer -> {
+                if (buffer.readableBytes() > 8_256) throw new IllegalArgumentException("payload exceeds 8256 bytes");
+                byte[] data = new byte[buffer.readableBytes()];
+                buffer.readBytes(data);
+                return new CameraPayload(data);
+            });
 
     public CameraPayload { data = data.clone(); }
     @Override public byte[] data() { return data.clone(); }
