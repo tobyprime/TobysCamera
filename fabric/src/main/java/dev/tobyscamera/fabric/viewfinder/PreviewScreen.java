@@ -8,6 +8,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
@@ -40,7 +41,19 @@ public final class PreviewScreen extends Screen {
         int size = Math.min(width - 40, height - 80);
         int left = (width - size) / 2;
         int top = (height - size - 30) / 2;
-        graphics.blit(textureId, left, top, size, size, 0.0f, 1.0f, 0.0f, 1.0f);
+        TextureBlit blit = textureBlit(left, top, frame.image().getWidth(), frame.image().getHeight(), size);
+        graphics.blit(
+            RenderPipelines.GUI_TEXTURED,
+            textureId,
+            blit.left(),
+            blit.top(),
+            0.0f,
+            0.0f,
+            blit.width(),
+            blit.height(),
+            blit.textureWidth(),
+            blit.textureHeight()
+        );
         graphics.drawCenteredString(font, "%d x %d maps".formatted(frame.gridSize(), frame.gridSize()), width / 2, top + size + 8, 0xFFFFFFFF);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
@@ -63,4 +76,10 @@ public final class PreviewScreen extends Screen {
         for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) image.setPixel(x, y, NativePixelFormat.toAbgr(frame.image().getRGB(x, y)));
         return image;
     }
+
+    static TextureBlit textureBlit(int left, int top, int textureWidth, int textureHeight, int size) {
+        return new TextureBlit(left, top, size, size, textureWidth, textureHeight);
+    }
+
+    record TextureBlit(int left, int top, int width, int height, int textureWidth, int textureHeight) { }
 }
