@@ -1,12 +1,15 @@
 package dev.tobyscamera.fabric.camera;
 
 import dev.tobyscamera.common.protocol.CameraPacket;
+import com.mojang.logging.LogUtils;
 import dev.tobyscamera.common.protocol.Packets;
 import dev.tobyscamera.fabric.net.CameraPayload;
 import java.util.UUID;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import org.slf4j.Logger;
 
 public final class PhotoUploadController {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private final MapTileEncoder encoder = new MapTileEncoder();
     private UUID token;
     private long expiresAt;
@@ -40,5 +43,8 @@ public final class PhotoUploadController {
     public int gridSize() { return gridSize; }
     public void clearGrant() { token = null; expiresAt = 0; gridSize = 0; }
 
-    private static void send(CameraPacket packet) { ClientPlayNetworking.send(new CameraPayload(dev.tobyscamera.common.protocol.PacketCodec.encode(packet))); }
+    private static void send(CameraPacket packet) {
+        LOGGER.info("Sending camera packet {}.", packet.getClass().getSimpleName());
+        ClientPlayNetworking.send(new CameraPayload(dev.tobyscamera.common.protocol.PacketCodec.encode(packet)));
+    }
 }

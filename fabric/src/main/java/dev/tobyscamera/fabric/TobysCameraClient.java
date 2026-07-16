@@ -1,6 +1,7 @@
 package dev.tobyscamera.fabric;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.logging.LogUtils;
 import dev.tobyscamera.common.protocol.PacketCodec;
 import dev.tobyscamera.common.protocol.Packets;
 import dev.tobyscamera.fabric.camera.CapturedFrame;
@@ -31,8 +32,10 @@ import net.minecraft.client.Screenshot;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionResult;
 import org.lwjgl.glfw.GLFW;
+import org.slf4j.Logger;
 
 public final class TobysCameraClient implements ClientModInitializer {
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final PhotoUploadController UPLOADS = new PhotoUploadController();
     private static final ViewfinderSession VIEWFINDER = new ViewfinderSession();
     private static final ViewfinderOverlay OVERLAY = new ViewfinderOverlay(VIEWFINDER);
@@ -64,9 +67,11 @@ public final class TobysCameraClient implements ClientModInitializer {
         });
         ClientPlayNetworking.registerGlobalReceiver(CameraPayload.TYPE, (payload, context) -> handleServerPacket(context.client(), PacketCodec.decode(payload.data())));
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
+        LOGGER.info("Registered camera shutter binding with default key Enter; configure it in Controls > TobysCamera.");
     }
 
     private void handleServerPacket(net.minecraft.client.Minecraft client, dev.tobyscamera.common.protocol.CameraPacket packet) {
+        LOGGER.info("Received camera server packet {} while viewfinder is {}.", packet.getClass().getSimpleName(), VIEWFINDER.state());
         UPLOADS.handleServerPacket(packet);
         if (packet instanceof Packets.UploadGranted grant && VIEWFINDER.acceptGrant(grant.gridSize())) {
             OVERLAY.flashShutter();
@@ -87,7 +92,11 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (GRID_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.cycleGrid();
         while (ZOOM_IN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(1.0);
         while (ZOOM_OUT_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(-1.0);
-        while (SHUTTER_KEY.consumeClick()) INPUTS.pressShutter();
+        while (SHUTTER_KEY.consumeClick()) {
+            ViewfinderState before = VIEWFINDER.state();
+            boolean accepted = INPUTS.pressShutter();
+            LOGGER.info("Camera shutter binding consumed while viewfinder is {}; capture request accepted={}.", before, accepted);
+        }
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING && CAPTURE.tick()) {
             int gridSize = CAPTURE.takeGridSize();
             Screenshot.takeScreenshot(client.getMainRenderTarget(), nativeImage -> openPreview(client, toFrame(nativeImage, gridSize)));
