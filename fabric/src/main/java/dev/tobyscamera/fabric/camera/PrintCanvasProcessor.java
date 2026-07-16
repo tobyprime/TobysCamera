@@ -10,7 +10,13 @@ public final class PrintCanvasProcessor {
         if (source.getWidth() < 1 || source.getHeight() < 1) throw new IllegalArgumentException("source image must be non-empty");
         int targetWidth = layout.pixelWidth();
         int targetHeight = layout.pixelHeight();
-        double scale = Math.min((double) targetWidth / source.getWidth(), (double) targetHeight / source.getHeight());
+        int compositionWidth = targetWidth;
+        int compositionHeight = (int) Math.round(compositionWidth / layout.aspectRatio().value());
+        if (compositionHeight > targetHeight) {
+            compositionHeight = targetHeight;
+            compositionWidth = (int) Math.round(compositionHeight * layout.aspectRatio().value());
+        }
+        double scale = Math.min((double) compositionWidth / source.getWidth(), (double) compositionHeight / source.getHeight());
         int width = Math.max(1, (int) Math.round(source.getWidth() * scale));
         int height = Math.max(1, (int) Math.round(source.getHeight() * scale));
         BufferedImage canvas = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_ARGB);
