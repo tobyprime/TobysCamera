@@ -42,7 +42,7 @@ public final class VideoUploadCoordinator {
         if (camera == null) { sender.send(player, new Packets.UploadRejected("A tagged camera must be held")); return; }
         int maximum = films.maximumForFilm(camera, settings.maxGridSize());
         if (begin.gridWidth() < 1 || begin.gridHeight() < 1 || begin.gridWidth() > maximum || begin.gridHeight() > maximum
-                || begin.fps() < 1 || begin.fps() > settings.videoMaxFps() || begin.frameCount() < 1 || begin.frameCount() > settings.videoMaxFrames()) {
+                || begin.fps() < 1 || begin.fps() > films.maximumVideoFps(camera, settings.videoMaxFps()) || begin.frameCount() < 1 || begin.frameCount() > settings.videoMaxFrames()) {
             sender.send(player, new Packets.UploadRejected("Video settings exceed camera or server limits")); return;
         }
         int filmCost;

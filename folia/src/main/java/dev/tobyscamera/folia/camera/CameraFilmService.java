@@ -17,6 +17,7 @@ public final class CameraFilmService {
     private final NamespacedKey remainingKey;
     private final NamespacedKey maximumKey;
     private final NamespacedKey noFilmRequiredKey;
+    private final NamespacedKey maximumVideoFpsKey;
     private final int configuredMaximum;
 
     public CameraFilmService(String cameraTagKey, String filmTagKey, int configuredMaximum) {
@@ -26,6 +27,7 @@ public final class CameraFilmService {
         remainingKey = new NamespacedKey(cameraKey.getNamespace(), "film_remaining");
         maximumKey = new NamespacedKey(cameraKey.getNamespace(), "max_grid_size");
         noFilmRequiredKey = new NamespacedKey(cameraKey.getNamespace(), "no_film_required");
+        maximumVideoFpsKey = new NamespacedKey(cameraKey.getNamespace(), "max_video_fps");
         this.configuredMaximum = Math.max(1, configuredMaximum);
     }
 
@@ -71,6 +73,10 @@ public final class CameraFilmService {
 
     public static int capVideoFps(int componentMaximum, int configuredMaximum) {
         return Math.max(1, Math.min(Math.min(20, Math.max(1, configuredMaximum)), componentMaximum));
+    }
+
+    public int maximumVideoFps(ItemStack camera, int configuredMaximum) {
+        return capVideoFps(readInt(camera, maximumVideoFpsKey, configuredMaximum), configuredMaximum);
     }
 
     public static List<Component> lore(int remaining, int maximum) {
