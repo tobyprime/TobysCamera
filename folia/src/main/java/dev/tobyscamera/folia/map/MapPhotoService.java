@@ -8,6 +8,7 @@ import dev.tobyscamera.folia.storage.TileCoordinate;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Bukkit;
@@ -70,9 +71,13 @@ public final class MapPhotoService {
         ItemStack item = new ItemStack(org.bukkit.Material.FILLED_MAP);
         var meta = (org.bukkit.inventory.meta.MapMeta) item.getItemMeta();
         meta.setMapView(view);
-        if (metadata != null) meta.lore(java.util.List.of(
-                Component.text("拍摄者: " + metadata.photographer(), NamedTextColor.GRAY),
-                Component.text("拍摄坐标: " + metadata.coordinates(), NamedTextColor.GRAY)));
+        var lore = new ArrayList<Component>();
+        lore.add(Component.text("网格位置: " + coordinate.x() + ", " + coordinate.y(), NamedTextColor.GRAY));
+        if (metadata != null) {
+            lore.add(Component.text("拍摄者: " + metadata.photographer(), NamedTextColor.GRAY));
+            lore.add(Component.text("拍摄坐标: " + metadata.coordinates(), NamedTextColor.GRAY));
+        }
+        meta.lore(lore);
         item.setItemMeta(meta);
         item.editPersistentDataContainer(container -> {
             container.set(new NamespacedKey("tobyscamera", "photo_id"), PersistentDataType.STRING, record.photoId().toString());
