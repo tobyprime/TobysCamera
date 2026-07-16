@@ -50,11 +50,12 @@ video:
   max-frames: 100
   max-upload-chunks-per-second: 120
   max-active-map-frames: 128
+  max-update-distance: 128
 ```
 
 After editing `plugins/TobysCamera/config.yml`, run `/tobyscamera reload` (permission `tobyscamera.reload`, default OP). Existing maps and database connections remain active; new upload grants and the playback budget use the new values.
 
-Each retained frame costs one film for every final map tile: a 12-frame 2×3 video costs 72 film. Cameras marked `tobyscamera:no_film_required` remain free. Placed video maps loop independently at their own FPS; each server pass updates at most the nearest 128 individual item-frame maps.
+Each retained frame costs one film for every final map tile: a 12-frame 2×3 video costs 72 film. Cameras marked `tobyscamera:no_film_required` remain free. Placed video maps loop independently at their own FPS; each server pass updates at most the nearest 128 individual maps and only sends display-frame updates within `video.max-update-distance` blocks (default: 128). A held video map also receives its updates directly.
 
 ### Video manual verification
 

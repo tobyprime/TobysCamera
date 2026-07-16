@@ -13,5 +13,6 @@ video:
   max-frames: 100
   max-upload-chunks-per-second: 120
   max-active-map-frames: 128
+  max-update-distance: 128
 invalid-token:
   kick-message: "Invalid or expired photo upload token"

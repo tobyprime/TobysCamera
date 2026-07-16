@@ -71,14 +71,9 @@ public final class MapPhotoService {
         ItemStack item = new ItemStack(org.bukkit.Material.FILLED_MAP);
         var meta = (org.bukkit.inventory.meta.MapMeta) item.getItemMeta();
         meta.setMapView(view);
-        var lore = new ArrayList<Component>();
-        lore.add(Component.text("网格位置: " + coordinate.x() + ", " + coordinate.y(), NamedTextColor.GRAY));
-        if (metadata != null) {
-            lore.add(Component.text("拍摄者: " + metadata.photographer(), NamedTextColor.GRAY));
-            lore.add(Component.text("拍摄坐标: " + metadata.coordinates(), NamedTextColor.GRAY));
-            lore.add(Component.text("拍摄时间: " + metadata.capturedTime(), NamedTextColor.GRAY));
-        }
-        meta.lore(lore);
+        var presentation = MapItemPresentation.photo(coordinate, metadata);
+        meta.displayName(presentation.name());
+        meta.lore(presentation.lore());
         item.setItemMeta(meta);
         RootCustomData.update(item, tag -> {
             tag.putString("tobyscamera:photo_id", record.photoId().toString());

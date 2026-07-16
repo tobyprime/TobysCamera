@@ -72,10 +72,10 @@ public final class MapVideoService {
     public ItemStack mapItem(VideoRecord record, TileCoordinate coordinate, PhotoMetadata metadata) {
         MapView view = Bukkit.getMap(record.mapIds().get(coordinate)); if (view == null) throw new IllegalStateException("map no longer exists");
         ItemStack item = new ItemStack(org.bukkit.Material.FILLED_MAP); MapMeta meta = (MapMeta) item.getItemMeta(); meta.setMapView(view); item.setItemMeta(meta);
-        var lore = new ArrayList<Component>();
-        lore.add(Component.text("Grid position: " + coordinate.x() + ", " + coordinate.y(), NamedTextColor.GRAY));
-        if (metadata != null) { lore.add(Component.text("Photographer: " + metadata.photographer(), NamedTextColor.GRAY)); lore.add(Component.text("Location: " + metadata.coordinates(), NamedTextColor.GRAY)); lore.add(Component.text("Captured: " + metadata.capturedTime(), NamedTextColor.GRAY)); }
-        meta = (MapMeta) item.getItemMeta(); meta.lore(lore); item.setItemMeta(meta);
+        var presentation = MapItemPresentation.video(coordinate, metadata);
+        meta.displayName(presentation.name());
+        meta.lore(presentation.lore());
+        item.setItemMeta(meta);
         RootCustomData.update(item, tag -> { tag.putString("tobyscamera:video_id", record.videoId().toString()); tag.putInt("tobyscamera:tile_x", coordinate.x()); tag.putInt("tobyscamera:tile_y", coordinate.y()); tag.putInt("tobyscamera:grid_width", record.gridWidth()); tag.putInt("tobyscamera:grid_height", record.gridHeight()); if (metadata != null) { tag.putString("tobyscamera:photographer", metadata.photographer()); tag.putString("tobyscamera:capture_world", metadata.world()); tag.putInt("tobyscamera:capture_x", metadata.x()); tag.putInt("tobyscamera:capture_y", metadata.y()); tag.putInt("tobyscamera:capture_z", metadata.z()); tag.putLong("tobyscamera:captured_at", metadata.capturedAt().toEpochMilli()); } });
         return item;
     }

@@ -7,6 +7,7 @@ import dev.tobyscamera.folia.camera.CameraFilmInventoryListener;
 import dev.tobyscamera.folia.config.PluginSettings;
 import dev.tobyscamera.folia.net.PluginPayloadGateway;
 import dev.tobyscamera.folia.map.MapPhotoService;
+import dev.tobyscamera.folia.map.CameraMapCopyMetadataListener;
 import dev.tobyscamera.folia.delivery.MapDeliveryService;
 import dev.tobyscamera.folia.delivery.PendingDeliveryRepository;
 import dev.tobyscamera.folia.storage.PhotoRepository;
@@ -68,6 +69,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
         getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(new CameraMapCopyMetadataListener(), this);
         getCommand("tobyscamera").setExecutor(this);
     }
 
@@ -83,7 +85,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         if (gateway != null) gateway.setCoordinators(coordinator, videoCoordinator);
         filmListener = new CameraFilmInventoryListener(films);
         getServer().getPluginManager().registerEvents(filmListener, this);
-        videoPlayback = new VideoPlaybackService(this, videos, settings.videoMaxActiveMapFrames());
+        videoPlayback = new VideoPlaybackService(this, videos, settings.videoMaxActiveMapFrames(), settings.videoMaxUpdateDistance());
         videoPlayback.indexLoadedFrames();
         getServer().getPluginManager().registerEvents(videoPlayback, this);
         videoPlaybackTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, ignored -> videoPlayback.tick(), 1L, 1L);

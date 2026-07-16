@@ -45,6 +45,7 @@ Every tile remains exactly 16,384 bytes and is transferred in the existing 8,192
 - A global scheduler advances each video according to elapsed time and its own FPS, looping from the final frame to frame zero.
 - Map items inside item frames are indexed on entity/chunk lifecycle events. Playback targets individual maps, not complete screens.
 - Each playback pass selects at most `video-max-active-map-frames` indexed video maps (default 128), ordered by their minimum squared distance to any online player. Each selected map independently receives the current video tile packet; maps outside the budget retain their last sent image until selected again.
+- Display-frame updates are sent only within `video.max-update-distance` blocks (default 128). A player holding a video map receives that map's update directly, even if no item frame is nearby.
 - The map renderer/cache serves the selected frame to all tracking viewers. This uses normal map update packets, never modifies the item-frame entity itself.
 
 ## Testing

@@ -22,6 +22,7 @@ class PluginSettingsTest {
         assertEquals(100, settings.videoMaxFrames());
         assertEquals(120, settings.videoUploadChunksPerSecond());
         assertEquals(128, settings.videoMaxActiveMapFrames());
+        assertEquals(128, settings.videoMaxUpdateDistance());
     }
 
     @Test
@@ -32,5 +33,10 @@ class PluginSettingsTest {
     @Test
     void rejectsVideoFpsOverMinecraftTickRate() {
         assertThrows(IllegalArgumentException.class, () -> PluginSettings.from(Map.of("video.max-fps", 21)));
+    }
+
+    @Test
+    void rejectsNonPositiveVideoUpdateDistance() {
+        assertThrows(IllegalArgumentException.class, () -> PluginSettings.from(Map.of("video.max-update-distance", 0)));
     }
 }

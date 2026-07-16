@@ -8,4 +8,10 @@ class ActiveVideoMapSelectorTest {
         var maps = List.of(new ActiveVideoMapSelector.Candidate(1, overworld, 10, 0, 0), new ActiveVideoMapSelector.Candidate(2, nether, 0, 0, 0));
         assertEquals(List.of(1), new ActiveVideoMapSelector().select(maps, List.of(new ActiveVideoMapSelector.Point(overworld, 0, 0, 0)), 1).stream().map(ActiveVideoMapSelector.Candidate::mapId).toList());
     }
+    @Test void excludesFramesBeyondTheMaximumViewerDistance() {
+        var world = java.util.UUID.randomUUID();
+        var maps = List.of(new ActiveVideoMapSelector.Candidate(1, world, 64, 0, 0), new ActiveVideoMapSelector.Candidate(2, world, 65, 0, 0));
+        var viewers = List.of(new ActiveVideoMapSelector.Point(world, 0, 0, 0));
+        assertEquals(List.of(1), new ActiveVideoMapSelector().select(maps, viewers, 8, 64 * 64).stream().map(ActiveVideoMapSelector.Candidate::mapId).toList());
+    }
 }
