@@ -86,6 +86,14 @@ public final class MapPhotoService {
             tag.putInt("tobyscamera:tile_y", coordinate.y());
             tag.putInt("tobyscamera:grid_width", record.gridWidth());
             tag.putInt("tobyscamera:grid_height", record.gridHeight());
+            if (metadata != null) {
+                tag.putString("tobyscamera:photographer", metadata.photographer());
+                tag.putString("tobyscamera:capture_world", metadata.world());
+                tag.putInt("tobyscamera:capture_x", metadata.x());
+                tag.putInt("tobyscamera:capture_y", metadata.y());
+                tag.putInt("tobyscamera:capture_z", metadata.z());
+                tag.putLong("tobyscamera:captured_at", metadata.capturedAt().toEpochMilli());
+            }
         });
         return item;
     }
