@@ -56,6 +56,13 @@ After editing `plugins/TobysCamera/config.yml`, run `/tobyscamera reload` (permi
 
 Each retained frame costs one film for every final map tile: a 12-frame 2×3 video costs 72 film. Cameras marked `tobyscamera:no_film_required` remain free. Placed video maps loop independently at their own FPS; each server pass updates at most the nearest 128 individual item-frame maps.
 
+### Video manual verification
+
+1. Give yourself a tagged camera with enough film, or a `tobyscamera:no_film_required` camera. Hold it, right-click, press `V`, choose an FPS with `-` / `=`, then press the configured shutter key to start and stop a short recording.
+2. In confirmation, move the start/end controls to remove at least one frame from each side. Select a non-square composition (for example 4:3) and a print size that produces a rectangular map layout. The displayed preview must match the final map palette, including black borders and dithering.
+3. Confirm printing. Check that the server grants the upload, the client throttles rather than freezing, and every delivered `filled_map` has matching grid position, photographer, location and time lore.
+4. Place the delivered maps in item frames. They should loop at the selected FPS after a server restart. Place more than `video.max-active-map-frames` maps at varied distances; only the nearest configured number should receive refreshes each pass.
+
 ## Scope
 
 This core release deliberately excludes camera settings, selectable resolution and film consumption. The protocol is versioned and reserves room for those later additions.
