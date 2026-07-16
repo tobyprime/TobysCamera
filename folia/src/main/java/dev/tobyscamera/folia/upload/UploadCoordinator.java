@@ -17,8 +17,11 @@ import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class UploadCoordinator {
+    private static final Logger LOGGER = LoggerFactory.getLogger(UploadCoordinator.class);
     private final PluginSettings settings;
     private final CameraValidator cameraValidator;
     private final PluginPayloadGatewaySender sender;
@@ -39,6 +42,7 @@ public final class UploadCoordinator {
     }
 
     public void handle(Player player, CameraPacket packet) {
+        LOGGER.info("Handling camera packet {} for {}.", packet.getClass().getSimpleName(), player.getName());
         switch (packet) {
             case Packets.CaptureIntent ignored -> capture(player);
             case Packets.UploadBegin begin -> begin(player, begin);
@@ -50,18 +54,21 @@ public final class UploadCoordinator {
 
     private void capture(Player player) {
         if (!cameraValidator.isHoldingCamera(player)) {
+            LOGGER.info("Rejected capture intent for {} because no tagged camera is held.", player.getName());
             sender.send(player, new Packets.UploadRejected("A tagged camera must be held"));
             return;
         }
         Instant now = Instant.now();
         var rateResult = rateLimiter.tryAcquire(player.getUniqueId(), now);
         if (!rateResult.allowed()) {
+            LOGGER.info("Rate limited capture intent for {} for {} ms.", player.getName(), rateResult.retryAfterMillis());
             sender.send(player, new Packets.RateLimited(rateResult.retryAfterMillis()));
             return;
         }
         UUID token = UUID.randomUUID();
         grants.put(token, new UploadGrant(token, player.getUniqueId(), now, now.plusSeconds(settings.tokenTtlSeconds()), settings.maxGridSize()));
         shutterSound.playFor(player);
+        LOGGER.info("Granted photo upload token to {} with grid size {}.", player.getName(), settings.maxGridSize());
         sender.send(player, new Packets.UploadGranted(token, now.plusSeconds(settings.tokenTtlSeconds()).toEpochMilli(),
                 settings.maxGridSize(), UploadSession.TILE_BYTES));
     }
