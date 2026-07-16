@@ -36,7 +36,7 @@ public final class MapTileEncoder {
             for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) {
                 int id = Byte.toUnsignedInt(tile[y * 128 + x]);
                 int color = MapColor.getColorFromPackedId(id);
-                preview.setRGB(tileX * 128 + x, tileY * 128 + y, (id < 4 ? 0 : 0xff000000) | color & 0x00ffffff);
+                preview.setRGB(tileX * 128 + x, tileY * 128 + y, (id < 4 || id >= 248 ? 0 : 0xff000000) | color & 0x00ffffff);
             }
         }
         return preview;
@@ -126,8 +126,8 @@ public final class MapTileEncoder {
 
     private static int nearestMapColorId(int red, int green, int blue) {
         int bestDistance = Integer.MAX_VALUE, bestId = 4;
-        // Packed IDs 0..3 are MapColor.NONE at four brightness values and all render transparent.
-        for (int id = 4; id < 256; id++) {
+        // 0..3 are MapColor.NONE; 248..255 use undefined base colors and Paper skips them too.
+        for (int id = 4; id < 248; id++) {
             int palette = MapColor.getColorFromPackedId(id);
             int dr = red - ((palette >>> 16) & 0xff), dg = green - ((palette >>> 8) & 0xff), db = blue - (palette & 0xff);
             int distance = dr * dr + dg * dg + db * db;

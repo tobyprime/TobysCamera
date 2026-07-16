@@ -71,13 +71,16 @@ class MapTileEncoderTest {
     }
 
     @Test
-    void neverEncodesOpaqueBlackAsAnyTransparentNoneMapColorVariant() {
+    void neverEncodesOpaqueBlackAsAnyTransparentOrPaperSkippedMapColorVariant() {
         BufferedImage black = new BufferedImage(128, 128, BufferedImage.TYPE_INT_ARGB);
         for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) black.setRGB(x, y, 0xff000000);
 
         for (MapTileEncoder.DitheringMode mode : MapTileEncoder.DitheringMode.values()) {
             byte[] tile = encoder.encode(black, mode).tiles().getFirst();
-            for (byte packedId : tile) assertFalse(Byte.toUnsignedInt(packedId) < 4);
+            for (byte packedId : tile) {
+                int id = Byte.toUnsignedInt(packedId);
+                assertFalse(id < 4 || id >= 248);
+            }
         }
     }
 
