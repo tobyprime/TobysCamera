@@ -19,4 +19,12 @@ class CameraFilmServiceTest {
         assertEquals(8, CameraFilmService.capVideoFps(8, 10));
         assertEquals(1, CameraFilmService.capVideoFps(0, 10));
     }
+
+    @Test
+    void capsIndependentVideoGridAndFrameComponentsAtServerLimits() {
+        assertEquals(3, CameraFilmService.capVideoGridSize(3, 8));
+        assertEquals(8, CameraFilmService.capVideoGridSize(12, 8));
+        assertEquals(24, CameraFilmService.capVideoFrames(24, 100));
+        assertEquals(100, CameraFilmService.capVideoFrames(240, 100));
+    }
 }

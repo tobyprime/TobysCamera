@@ -22,7 +22,7 @@ class VideoUploadCoordinatorTest {
     void beginChargesEveryFinalFrameTileAndGrantsConfiguredChunkRate() {
         Player player = player();
         ItemStack camera = mock(ItemStack.class); CameraFilmService films = mock(CameraFilmService.class);
-        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumForFilm(camera, 4)).thenReturn(4); when(films.maximumVideoFps(camera, 10)).thenReturn(10); when(films.consume(camera, 240)).thenReturn(true);
+        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumVideoGridSize(camera, 4)).thenReturn(4); when(films.maximumVideoFrames(camera, 100)).thenReturn(100); when(films.maximumVideoFps(camera, 10)).thenReturn(10); when(films.consume(camera, 240)).thenReturn(true);
         List<CameraPacket> sent = new ArrayList<>();
         VideoUploadCoordinator coordinator = new VideoUploadCoordinator(PluginSettings.from(Map.of()), films, (ignored, packet) -> sent.add(packet), (ignored, session, metadata) -> { }, ignored -> { });
 
@@ -49,7 +49,7 @@ class VideoUploadCoordinatorTest {
     void rejectsFpsAboveTheHeldCamerasComponentLimitBeforeChargingFilm() {
         Player player = player();
         ItemStack camera = mock(ItemStack.class); CameraFilmService films = mock(CameraFilmService.class);
-        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumForFilm(camera, 4)).thenReturn(4);
+        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumVideoGridSize(camera, 4)).thenReturn(4); when(films.maximumVideoFrames(camera, 100)).thenReturn(100);
         when(films.maximumVideoFps(camera, 10)).thenReturn(5);
         List<CameraPacket> sent = new ArrayList<>();
         VideoUploadCoordinator coordinator = new VideoUploadCoordinator(PluginSettings.from(Map.of()), films, (ignored, packet) -> sent.add(packet), (ignored, session, metadata) -> { }, ignored -> { });
@@ -63,7 +63,7 @@ class VideoUploadCoordinatorTest {
     @Test
     void discardsThePriorShutterHintWhenVideoBeginOwnsItsMetadata() {
         Player player = player(); ItemStack camera = mock(ItemStack.class); CameraFilmService films = mock(CameraFilmService.class);
-        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumForFilm(camera, 4)).thenReturn(1); when(films.maximumVideoFps(camera, 10)).thenReturn(10); when(films.consume(camera, 1)).thenReturn(true);
+        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumVideoGridSize(camera, 4)).thenReturn(1); when(films.maximumVideoFrames(camera, 100)).thenReturn(100); when(films.maximumVideoFps(camera, 10)).thenReturn(10); when(films.consume(camera, 1)).thenReturn(true);
         var discarded = new java.util.concurrent.atomic.AtomicInteger();
         VideoUploadCoordinator coordinator = new VideoUploadCoordinator(PluginSettings.from(Map.of()), films, (ignored, packet) -> { }, (ignored, session, metadata) -> { }, ignored -> discarded.incrementAndGet());
 
@@ -75,7 +75,7 @@ class VideoUploadCoordinatorTest {
     @Test
     void rejectsAFrameRateThatDoesNotAlignWithServerTicks() {
         Player player = player(); ItemStack camera = mock(ItemStack.class); CameraFilmService films = mock(CameraFilmService.class);
-        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumForFilm(camera, 4)).thenReturn(1); when(films.maximumVideoFps(camera, 10)).thenReturn(10);
+        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumVideoGridSize(camera, 4)).thenReturn(1); when(films.maximumVideoFrames(camera, 100)).thenReturn(100); when(films.maximumVideoFps(camera, 10)).thenReturn(10);
         List<CameraPacket> sent = new ArrayList<>();
         VideoUploadCoordinator coordinator = new VideoUploadCoordinator(PluginSettings.from(Map.of()), films, (ignored, packet) -> sent.add(packet), (ignored, session, metadata) -> { }, ignored -> { });
 
@@ -89,7 +89,7 @@ class VideoUploadCoordinatorTest {
     void rejectsSecondChunkInsideConfiguredOneChunkWindow() {
         Player player = player();
         ItemStack camera = mock(ItemStack.class); CameraFilmService films = mock(CameraFilmService.class);
-        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumForFilm(camera, 4)).thenReturn(1); when(films.maximumVideoFps(camera, 10)).thenReturn(10); when(films.consume(camera, 1)).thenReturn(true);
+        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumVideoGridSize(camera, 4)).thenReturn(1); when(films.maximumVideoFrames(camera, 100)).thenReturn(100); when(films.maximumVideoFps(camera, 10)).thenReturn(10); when(films.consume(camera, 1)).thenReturn(true);
         List<CameraPacket> sent = new ArrayList<>();
         VideoUploadCoordinator coordinator = new VideoUploadCoordinator(PluginSettings.from(Map.of("video.max-upload-chunks-per-second", 1)), films, (ignored, packet) -> sent.add(packet), (ignored, session, metadata) -> { }, ignored -> { });
         coordinator.handle(player, new Packets.VideoBegin(1, 1, 1, 1));
@@ -103,7 +103,7 @@ class VideoUploadCoordinatorTest {
     void clearsTheVideoSessionAfterChunkRateLimitIsExceeded() {
         Player player = player();
         ItemStack camera = mock(ItemStack.class); CameraFilmService films = mock(CameraFilmService.class);
-        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumForFilm(camera, 4)).thenReturn(1); when(films.maximumVideoFps(camera, 10)).thenReturn(10); when(films.consume(camera, 1)).thenReturn(true);
+        when(films.heldCamera(player)).thenReturn(camera); when(films.supportsVideo(camera)).thenReturn(true); when(films.maximumVideoGridSize(camera, 4)).thenReturn(1); when(films.maximumVideoFrames(camera, 100)).thenReturn(100); when(films.maximumVideoFps(camera, 10)).thenReturn(10); when(films.consume(camera, 1)).thenReturn(true);
         List<CameraPacket> sent = new ArrayList<>();
         VideoUploadCoordinator coordinator = new VideoUploadCoordinator(PluginSettings.from(Map.of("video.max-upload-chunks-per-second", 1)), films, (ignored, packet) -> sent.add(packet), (ignored, session, metadata) -> { }, ignored -> { });
         coordinator.handle(player, new Packets.VideoBegin(1, 1, 1, 1));

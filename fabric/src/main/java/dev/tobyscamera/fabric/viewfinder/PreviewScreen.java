@@ -28,7 +28,7 @@ public final class PreviewScreen extends Screen {
     private boolean released;
 
     private int printSize;
-    private MapTileEncoder.DitheringMode ditheringMode = MapTileEncoder.DitheringMode.OFF;
+    private MapTileEncoder.DitheringMode ditheringMode = MapTileEncoder.DEFAULT_DITHERING;
     private MapTileEncoder.EncodedPhoto printPhoto;
     private int previewImageWidth;
     private int previewImageHeight;

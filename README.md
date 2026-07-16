@@ -40,7 +40,7 @@ settings.
 
 ## Video maps
 
-Only cameras with the `tobyscamera:video` component can record video. While holding one, `V` (rebindable in **TobysCamera** controls) switches between photo and video modes. In video mode, `-` / `=` select only tick-aligned `1 / 5 / 10 / 20 FPS` rates within the held camera's `tobyscamera:max_video_fps` component. Press the shutter once to start and again to stop. The confirmation screen trims the retained frame range, chooses the final rectangular map layout and dithering, then uploads exactly the palette bytes that it previews.
+Only cameras with the `tobyscamera:video` component can record video. `tobyscamera:video_max_grid_size` and `tobyscamera:video_max_frames` independently limit a video's map size and retained frame count; `tobyscamera:max_video_fps` limits its frame rate. While holding one, `V` (rebindable in **TobysCamera** controls) switches between photo and video modes. In video mode, `-` / `=` select only tick-aligned `1 / 5 / 10 / 20 FPS` rates. Press the shutter once to start and again to stop. The confirmation screen trims the retained frame range, chooses the final rectangular map layout and dithering, then uploads exactly the palette bytes that it previews. Floyd–Steinberg dithering is enabled by default.
 
 The plugin's reloadable `video:` configuration has these defaults:
 

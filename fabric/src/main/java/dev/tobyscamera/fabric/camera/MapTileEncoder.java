@@ -7,6 +7,7 @@ import java.util.List;
 import net.minecraft.world.level.material.MapColor;
 
 public final class MapTileEncoder {
+    public static final DitheringMode DEFAULT_DITHERING = DitheringMode.FLOYD_STEINBERG;
     public EncodedPhoto encode(CapturedFrame frame) {
         return encode(frame, DitheringMode.OFF);
     }

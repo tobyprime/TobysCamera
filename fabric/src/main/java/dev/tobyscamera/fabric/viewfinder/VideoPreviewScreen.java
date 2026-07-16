@@ -31,7 +31,7 @@ public final class VideoPreviewScreen extends Screen {
     private final Consumer<VideoEncoder> useVideo;
     private final Runnable cancel;
     private int startFrame, endFrame, displayedFrame, printSize;
-    private MapTileEncoder.DitheringMode dithering = MapTileEncoder.DitheringMode.OFF;
+    private MapTileEncoder.DitheringMode dithering = MapTileEncoder.DEFAULT_DITHERING;
     private Identifier textureId;
     private int imageWidth, imageHeight;
 

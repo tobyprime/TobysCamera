@@ -47,9 +47,9 @@ public final class VideoUploadCoordinator {
         var camera = films.heldCamera(player);
         if (camera == null) { sender.send(player, new Packets.UploadRejected("A tagged camera must be held")); return; }
         if (!films.supportsVideo(camera)) { sender.send(player, new Packets.UploadRejected("This camera does not support video")); return; }
-        int maximum = films.maximumForFilm(camera, settings.maxGridSize());
+        int maximum = films.maximumVideoGridSize(camera, settings.maxGridSize());
         if (begin.gridWidth() < 1 || begin.gridHeight() < 1 || begin.gridWidth() > maximum || begin.gridHeight() > maximum
-                || !VideoFrameRate.isSupported(begin.fps()) || begin.fps() > films.maximumVideoFps(camera, settings.videoMaxFps()) || begin.frameCount() < 1 || begin.frameCount() > settings.videoMaxFrames()) {
+                || !VideoFrameRate.isSupported(begin.fps()) || begin.fps() > films.maximumVideoFps(camera, settings.videoMaxFps()) || begin.frameCount() < 1 || begin.frameCount() > films.maximumVideoFrames(camera, settings.videoMaxFrames())) {
             sender.send(player, new Packets.UploadRejected("Video settings exceed camera or server limits")); return;
         }
         int filmCost;

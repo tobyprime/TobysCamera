@@ -63,8 +63,11 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static boolean videoPreviewRequested;
     private static boolean videoCaptureRequested;
     private static VideoCaptureFormat videoCaptureFormat;
+    private static int videoFrameLimit;
+    private static int videoCapturedFrames;
+    private static int videoGridSize;
     private static final ViewfinderInputController INPUTS = new ViewfinderInputController(
-            VIEWFINDER, TobysCameraClient::heldCameraGridSize, TobysCameraClient::heldCameraSupportsVideo, TobysCameraClient::startLocalCapture);
+            VIEWFINDER, TobysCameraClient::heldCameraCaptureGridSize, TobysCameraClient::heldCameraSupportsVideo, TobysCameraClient::startLocalCapture);
     private static final KeyMapping VIEWFINDER_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.viewfinder", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P,
             CameraKeyCategory.value()));
@@ -131,7 +134,9 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (FPS_DOWN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO && heldCameraSupportsVideo()) VIEWFINDER.adjustVideoFps(-1, heldCameraVideoFps());
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING) CAPTURE.tick();
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING && VIEWFINDER.mode() == CaptureMode.VIDEO
-                && !videoReadbackPending && VIDEO_CAPTURE.captureDue(System.currentTimeMillis())) videoCaptureRequested = true;
+                && !videoReadbackPending && videoCapturedFrames < videoFrameLimit && VIDEO_CAPTURE.captureDue(System.currentTimeMillis())) videoCaptureRequested = true;
+        if (VIEWFINDER.state() == ViewfinderState.CAPTURING && VIEWFINDER.mode() == CaptureMode.VIDEO
+                && videoCapturedFrames >= videoFrameLimit && !videoReadbackPending) finishVideoCaptureAtLimit();
         if (videoPreviewRequested && !videoReadbackPending) {
             videoPreviewRequested = false;
             VIDEO_FRAME_WRITES.flush(() -> net.minecraft.client.Minecraft.getInstance().execute(() -> openVideoPreview(net.minecraft.client.Minecraft.getInstance())));
@@ -156,7 +161,7 @@ public final class TobysCameraClient implements ClientModInitializer {
                     try { recording.appendNativeImage(copy); }
                     catch (IOException exception) { LOGGER.error("Could not store video frame", exception); }
                     finally { copy.close(); }
-                })) copy.close();
+                })) copy.close(); else videoCapturedFrames++;
                 videoReadbackPending = false;
             });
             return;
@@ -186,6 +191,14 @@ public final class TobysCameraClient implements ClientModInitializer {
                 HeldCameraChecker.maximumGridSize(player.getOffhandItem()));
     }
 
+    private static int heldCameraCaptureGridSize() { return VIEWFINDER.mode() == CaptureMode.VIDEO ? heldCameraVideoGridSize() : heldCameraGridSize(); }
+
+    private static int heldCameraVideoGridSize() {
+        var player = net.minecraft.client.Minecraft.getInstance().player;
+        if (player == null) return 0;
+        return Math.max(HeldCameraChecker.maximumVideoGridSize(player.getMainHandItem()), HeldCameraChecker.maximumVideoGridSize(player.getOffhandItem()));
+    }
+
     private static int heldCameraFilm() {
         var player = net.minecraft.client.Minecraft.getInstance().player;
         if (player == null) return 0;
@@ -202,6 +215,9 @@ public final class TobysCameraClient implements ClientModInitializer {
                 videoRecording = TemporaryVideoRecording.create(videoDirectory());
                 videoPreviewRequested = false;
                 videoCaptureRequested = false;
+                videoCapturedFrames = 0;
+                videoFrameLimit = heldCameraVideoFrameLimit();
+                videoGridSize = gridSize;
                 var target = net.minecraft.client.Minecraft.getInstance().getMainRenderTarget();
                 videoCaptureFormat = VideoCaptureFormat.forCamera(gridSize, VIEWFINDER.composition().aspectRatio(), target.width, target.height);
                 VIEWFINDER.capVideoFps(heldCameraVideoFps());
@@ -272,10 +288,16 @@ public final class TobysCameraClient implements ClientModInitializer {
         return player != null && (HeldCameraChecker.supportsVideo(player.getMainHandItem()) || HeldCameraChecker.supportsVideo(player.getOffhandItem()));
     }
 
+    private static int heldCameraVideoFrameLimit() {
+        var player = net.minecraft.client.Minecraft.getInstance().player;
+        if (player == null) return 0;
+        return Math.max(HeldCameraChecker.maximumVideoFrames(player.getMainHandItem()), HeldCameraChecker.maximumVideoFrames(player.getOffhandItem()));
+    }
+
     private static void openVideoPreview(net.minecraft.client.Minecraft client) {
         TemporaryVideoRecording recording = videoRecording;
         if (recording == null || recording.frameCount() < 1) { discardVideoRecording(); VIEWFINDER.retake(); return; }
-        int maximum = heldCameraGridSize();
+        int maximum = videoGridSize;
         if (maximum < 1) { discardVideoRecording(); VIEWFINDER.retake(); return; }
         var aspectRatio = videoCaptureFormat == null ? VIEWFINDER.composition().aspectRatio() : videoCaptureFormat.aspectRatio();
         client.setScreen(new VideoPreviewScreen(recording, VIEWFINDER.videoFps(), maximum, aspectRatio,
@@ -284,6 +306,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     }
 
     private static void discardVideoRecording() { if (videoRecording != null) try { videoRecording.close(); } catch (IOException ignored) { } finally { videoRecording = null; videoCaptureFormat = null; } }
+    private static void finishVideoCaptureAtLimit() { VIDEO_CAPTURE.stop(); videoCaptureRequested = false; videoPreviewRequested = VIEWFINDER.pressShutter(videoGridSize); }
     private static Path videoDirectory() { return net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath().resolve("tobyscamera").resolve("videos"); }
     private static BufferedImage toImage(com.mojang.blaze3d.platform.NativeImage nativeImage) {
         BufferedImage image = new BufferedImage(nativeImage.getWidth(), nativeImage.getHeight(), BufferedImage.TYPE_INT_ARGB);

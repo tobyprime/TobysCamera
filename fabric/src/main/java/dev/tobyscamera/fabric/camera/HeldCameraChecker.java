@@ -11,6 +11,8 @@ public final class HeldCameraChecker {
     private static final String NO_FILM_REQUIRED_KEY = "tobyscamera:no_film_required";
     private static final String MAX_VIDEO_FPS_KEY = "tobyscamera:max_video_fps";
     private static final String VIDEO_KEY = "tobyscamera:video";
+    private static final String MAX_VIDEO_GRID_SIZE_KEY = "tobyscamera:video_max_grid_size";
+    private static final String MAX_VIDEO_FRAMES_KEY = "tobyscamera:video_max_frames";
     private HeldCameraChecker() { }
 
     public static boolean isCamera(ItemStack stack) {
@@ -44,6 +46,17 @@ public final class HeldCameraChecker {
 
     public static boolean supportsVideo(ItemStack stack) {
         return isCamera(stack) && stack.get(DataComponents.CUSTOM_DATA).copyTag().contains(VIDEO_KEY);
+    }
+
+    public static int maximumVideoGridSize(ItemStack stack) {
+        if (!supportsVideo(stack)) return 0;
+        var tag = stack.get(DataComponents.CUSTOM_DATA).copyTag();
+        return Math.max(1, tag.getIntOr(MAX_VIDEO_GRID_SIZE_KEY, maximumGridSize(stack)));
+    }
+
+    public static int maximumVideoFrames(ItemStack stack) {
+        if (!supportsVideo(stack)) return 0;
+        return Math.max(1, stack.get(DataComponents.CUSTOM_DATA).copyTag().getIntOr(MAX_VIDEO_FRAMES_KEY, 100));
     }
 
 }
