@@ -10,7 +10,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
 
 public final class CameraFilmService {
     private final NamespacedKey cameraKey;
@@ -28,8 +27,8 @@ public final class CameraFilmService {
         this.configuredMaximum = Math.max(1, configuredMaximum);
     }
 
-    public boolean isCamera(ItemStack item) { return !item.isEmpty() && (RootCustomData.contains(item, cameraKey) || item.getPersistentDataContainer().has(cameraKey)); }
-    public boolean isFilm(ItemStack item) { return !item.isEmpty() && (RootCustomData.contains(item, filmKey) || item.getPersistentDataContainer().has(filmKey)); }
+    public boolean isCamera(ItemStack item) { return !item.isEmpty() && RootCustomData.contains(item, cameraKey); }
+    public boolean isFilm(ItemStack item) { return !item.isEmpty() && RootCustomData.contains(item, filmKey); }
     public ItemStack heldCamera(Player player) {
         ItemStack mainHand = player.getInventory().getItemInMainHand();
         return isCamera(mainHand) ? mainHand : isCamera(player.getInventory().getItemInOffHand())
@@ -52,7 +51,6 @@ public final class CameraFilmService {
             tag.putInt(remainingKey.toString(), loaded);
             tag.putInt(maximumKey.toString(), effectiveMaximum);
         });
-        clearLegacy(camera);
         updateLore(camera, loaded);
     }
     public boolean consume(ItemStack camera, int maps) {
@@ -62,7 +60,6 @@ public final class CameraFilmService {
             tag.putBoolean(cameraKey.toString(), true);
             tag.putInt(remainingKey.toString(), remaining - maps);
         });
-        clearLegacy(camera);
         updateLore(camera, remaining - maps);
         return true;
     }
@@ -85,15 +82,5 @@ public final class CameraFilmService {
         camera.setItemMeta(meta);
     }
 
-    private int readInt(ItemStack item, NamespacedKey key, int fallback) {
-        return RootCustomData.contains(item, key) ? RootCustomData.intOr(item, key, fallback)
-                : item.getPersistentDataContainer().getOrDefault(key, PersistentDataType.INTEGER, fallback);
-    }
-
-    private void clearLegacy(ItemStack camera) {
-        camera.editPersistentDataContainer(container -> {
-            container.remove(cameraKey); container.remove(filmKey);
-            container.remove(remainingKey); container.remove(maximumKey);
-        });
-    }
+    private int readInt(ItemStack item, NamespacedKey key, int fallback) { return RootCustomData.intOr(item, key, fallback); }
 }

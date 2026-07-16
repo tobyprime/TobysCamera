@@ -98,19 +98,7 @@ public final class SqlitePhotoRepository implements PhotoRepository {
         try (Statement statement = connection.createStatement()) {
             statement.executeUpdate("create table if not exists photos (id text primary key, owner text not null, created integer not null, width integer not null, height integer not null)");
             statement.executeUpdate("create table if not exists tiles (photo_id text not null, x integer not null, y integer not null, map_id integer not null, primary key(photo_id,x,y))");
-            dropColumnIfPresent(statement, "world");
-            dropColumnIfPresent(statement, "x");
-            dropColumnIfPresent(statement, "y");
-            dropColumnIfPresent(statement, "z");
         }
-    }
-
-    private static void dropColumnIfPresent(Statement statement, String name) throws SQLException {
-        boolean exists = false;
-        try (ResultSet columns = statement.executeQuery("pragma table_info(photos)")) {
-            while (columns.next()) if (name.equals(columns.getString("name"))) { exists = true; break; }
-        }
-        if (exists) statement.executeUpdate("alter table photos drop column " + name);
     }
 
     private static void validateTiles(PhotoRecord record, Map<TileCoordinate, byte[]> tiles) {
