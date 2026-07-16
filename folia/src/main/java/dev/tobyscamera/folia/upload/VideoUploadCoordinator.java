@@ -9,6 +9,7 @@ import dev.tobyscamera.common.upload.RateLimit;
 import dev.tobyscamera.common.upload.SlidingWindowRateLimiter;
 import dev.tobyscamera.folia.camera.CameraFilmService;
 import dev.tobyscamera.folia.config.PluginSettings;
+import dev.tobyscamera.folia.upload.PhotoMetadata;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,6 +24,7 @@ public final class VideoUploadCoordinator {
     private final Map<UUID, UploadGrant> grants = new HashMap<>();
     private final Map<UUID, VideoUploadSession> sessions = new HashMap<>();
     private final Map<UUID, SlidingWindowRateLimiter> chunkLimiters = new HashMap<>();
+    private final Map<UUID, PhotoMetadata> metadata = new HashMap<>();
 
     public VideoUploadCoordinator(PluginSettings settings, CameraFilmService films, UploadCoordinator.PluginPayloadGatewaySender sender, CompletedVideoUploadHandler completion) {
         this.settings = settings; this.films = films; this.sender = sender; this.completion = completion;
@@ -52,7 +54,7 @@ public final class VideoUploadCoordinator {
         Instant now = Instant.now(); UUID token = UUID.randomUUID();
         UploadGrant grant = new UploadGrant(token, player.getUniqueId(), now, now.plusSeconds(settings.tokenTtlSeconds()), maximum);
         try {
-            grants.put(token, grant); sessions.put(token, new VideoUploadSession(grant, begin.gridWidth(), begin.gridHeight(), begin.fps(), begin.frameCount()));
+            grants.put(token, grant); sessions.put(token, new VideoUploadSession(grant, begin.gridWidth(), begin.gridHeight(), begin.fps(), begin.frameCount())); metadata.put(token, PhotoMetadata.capture(player));
             chunkLimiters.put(token, new SlidingWindowRateLimiter(new RateLimit(settings.videoUploadChunksPerSecond(), Integer.MAX_VALUE)));
             sender.send(player, new Packets.VideoGranted(token, grant.expiresAt().toEpochMilli(), 16_384, settings.videoUploadChunksPerSecond()));
         } catch (UploadFailure exception) { grants.remove(token); sender.send(player, new Packets.UploadRejected(exception.getMessage())); }
@@ -71,8 +73,9 @@ public final class VideoUploadCoordinator {
     private void finish(Player player, Packets.VideoFinish finish) {
         VideoUploadSession session = valid(player, finish.token()); if (session == null) return;
         if (!session.isComplete()) { sender.send(player, new Packets.UploadRejected("Every video tile must be complete")); return; }
+        PhotoMetadata captured = metadata.get(finish.token());
         clear(finish.token());
-        completion.accept(player, session);
+        completion.accept(player, session, captured);
     }
     private VideoUploadSession valid(Player player, UUID token) {
         UploadGrant grant = grants.get(token);
@@ -86,6 +89,7 @@ public final class VideoUploadCoordinator {
         grants.remove(token);
         sessions.remove(token);
         chunkLimiters.remove(token);
+        metadata.remove(token);
     }
-    @FunctionalInterface public interface CompletedVideoUploadHandler { void accept(Player player, VideoUploadSession session); }
+    @FunctionalInterface public interface CompletedVideoUploadHandler { void accept(Player player, VideoUploadSession session, PhotoMetadata metadata); }
 }

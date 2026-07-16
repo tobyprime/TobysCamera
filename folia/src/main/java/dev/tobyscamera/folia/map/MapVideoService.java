@@ -12,12 +12,15 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 
 public final class MapVideoService {
     private final VideoRepository repository;
@@ -68,7 +71,11 @@ public final class MapVideoService {
     public ItemStack mapItem(VideoRecord record, TileCoordinate coordinate, PhotoMetadata metadata) {
         MapView view = Bukkit.getMap(record.mapIds().get(coordinate)); if (view == null) throw new IllegalStateException("map no longer exists");
         ItemStack item = new ItemStack(org.bukkit.Material.FILLED_MAP); MapMeta meta = (MapMeta) item.getItemMeta(); meta.setMapView(view); item.setItemMeta(meta);
-        RootCustomData.update(item, tag -> { tag.putString("tobyscamera:video_id", record.videoId().toString()); tag.putInt("tobyscamera:tile_x", coordinate.x()); tag.putInt("tobyscamera:tile_y", coordinate.y()); tag.putInt("tobyscamera:grid_width", record.gridWidth()); tag.putInt("tobyscamera:grid_height", record.gridHeight()); });
+        var lore = new ArrayList<Component>();
+        lore.add(Component.text("Grid position: " + coordinate.x() + ", " + coordinate.y(), NamedTextColor.GRAY));
+        if (metadata != null) { lore.add(Component.text("Photographer: " + metadata.photographer(), NamedTextColor.GRAY)); lore.add(Component.text("Location: " + metadata.coordinates(), NamedTextColor.GRAY)); lore.add(Component.text("Captured: " + metadata.capturedTime(), NamedTextColor.GRAY)); }
+        meta = (MapMeta) item.getItemMeta(); meta.lore(lore); item.setItemMeta(meta);
+        RootCustomData.update(item, tag -> { tag.putString("tobyscamera:video_id", record.videoId().toString()); tag.putInt("tobyscamera:tile_x", coordinate.x()); tag.putInt("tobyscamera:tile_y", coordinate.y()); tag.putInt("tobyscamera:grid_width", record.gridWidth()); tag.putInt("tobyscamera:grid_height", record.gridHeight()); if (metadata != null) { tag.putString("tobyscamera:photographer", metadata.photographer()); tag.putString("tobyscamera:capture_world", metadata.world()); tag.putInt("tobyscamera:capture_x", metadata.x()); tag.putInt("tobyscamera:capture_y", metadata.y()); tag.putInt("tobyscamera:capture_z", metadata.z()); tag.putLong("tobyscamera:captured_at", metadata.capturedAt().toEpochMilli()); } });
         return item;
     }
 

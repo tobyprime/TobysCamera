@@ -79,7 +79,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
         if (videoRepository != null) try { videoRepository.close(); } catch (IOException exception) { getLogger().warning("Could not close video storage: " + exception.getMessage()); }
     }
 
-    private void createAndDeliverVideo(Player player, dev.tobyscamera.common.upload.VideoUploadSession session) {
+    private void createAndDeliverVideo(Player player, dev.tobyscamera.common.upload.VideoUploadSession session, dev.tobyscamera.folia.upload.PhotoMetadata metadata) {
         var world = player.getWorld();
         getServer().getGlobalRegionScheduler().run(this, ignored -> {
             try {
@@ -89,7 +89,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
                         videos.persist(record, session);
                         player.getScheduler().run(this, task2 -> {
                             for (var coordinate : record.mapIds().keySet()) {
-                                var leftovers = player.getInventory().addItem(videos.mapItem(record, coordinate, null));
+                                var leftovers = player.getInventory().addItem(videos.mapItem(record, coordinate, metadata));
                                 leftovers.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
                             }
                             send(player, new Packets.VideoCreated(record.videoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight(), record.fps(), record.frameCount()));
