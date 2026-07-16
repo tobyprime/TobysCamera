@@ -40,7 +40,7 @@ settings.
 
 ## Video maps
 
-While the viewfinder is open, `V` (rebindable in **TobysCamera** controls) switches between photo and video modes. In video mode, `-` / `=` adjust FPS within the held camera's `tobyscamera:max_video_fps` component. Press the shutter once to start and again to stop. The confirmation screen trims the retained frame range, chooses the final rectangular map layout and dithering, then uploads exactly the palette bytes that it previews.
+While the viewfinder is open, `V` (rebindable in **TobysCamera** controls) switches between photo and video modes. In video mode, `-` / `=` select only tick-aligned `1 / 5 / 10 / 20 FPS` rates within the held camera's `tobyscamera:max_video_fps` component. Press the shutter once to start and again to stop. The confirmation screen trims the retained frame range, chooses the final rectangular map layout and dithering, then uploads exactly the palette bytes that it previews.
 
 The plugin's reloadable `video:` configuration has these defaults:
 

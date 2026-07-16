@@ -10,54 +10,76 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
+import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemFrame;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.plugin.Plugin;
 
-/** Indexes loaded video item frames and refreshes only the distance-budgeted map IDs. */
+/** Global playback uses region-owned event snapshots; it never reads entity state from the global scheduler. */
 public final class VideoPlaybackService implements Listener {
+    private final Plugin plugin;
     private final MapVideoService videos;
     private final int activeLimit;
-    private final VideoPlaybackClock clock;
+    private final VideoPlaybackClock clock = new VideoPlaybackClock();
     private final ActiveVideoMapSelector selector = new ActiveVideoMapSelector();
     private final MapUpdateDispatcher mapUpdates;
     private final Map<UUID, IndexedFrame> frames = new ConcurrentHashMap<>();
+    private final Map<UUID, IndexedPlayer> players = new ConcurrentHashMap<>();
+    private final Map<Integer, Integer> lastSentFrame = new ConcurrentHashMap<>();
+    private final AtomicLong serverTick = new AtomicLong();
 
-    public VideoPlaybackService(Plugin plugin, MapVideoService videos, int activeLimit, long startedAtMillis) {
-        this.videos = videos; this.activeLimit = activeLimit; this.clock = new VideoPlaybackClock(startedAtMillis); this.mapUpdates = new MapUpdateDispatcher(plugin);
+    public VideoPlaybackService(Plugin plugin, MapVideoService videos, int activeLimit) {
+        this.plugin = plugin; this.videos = videos; this.activeLimit = activeLimit; this.mapUpdates = new MapUpdateDispatcher(plugin);
     }
 
-    /** One initial scan covers frames already loaded before plugin enable; updates are event driven afterwards. */
+    /** Schedules each loaded chunk on its owning region before touching its entities. */
     public void indexLoadedFrames() {
-        for (var world : Bukkit.getWorlds()) for (ItemFrame frame : world.getEntitiesByClass(ItemFrame.class)) index(frame, frame.getItem());
+        for (var world : Bukkit.getWorlds()) for (Chunk chunk : world.getLoadedChunks()) {
+            int chunkX = chunk.getX(), chunkZ = chunk.getZ();
+            Bukkit.getRegionScheduler().run(plugin, world, chunkX, chunkZ, ignored -> {
+                for (Entity entity : world.getChunkAt(chunkX, chunkZ).getEntities()) if (entity instanceof ItemFrame frame) index(frame, frame.getItem());
+            });
+        }
     }
 
     @EventHandler public void onEntityAdded(EntityAddToWorldEvent event) { if (event.getEntity() instanceof ItemFrame frame) index(frame, frame.getItem()); }
     @EventHandler public void onEntityRemoved(EntityRemoveFromWorldEvent event) { if (event.getEntity() instanceof ItemFrame frame) frames.remove(frame.getUniqueId()); }
     @EventHandler public void onItemFrameChanged(PlayerItemFrameChangeEvent event) {
+        if (event.isCancelled()) return;
         if (event.getAction() == PlayerItemFrameChangeEvent.ItemFrameChangeAction.REMOVE) frames.remove(event.getItemFrame().getUniqueId());
         else index(event.getItemFrame(), event.getItemStack());
     }
+    @EventHandler public void onPlayerJoin(PlayerJoinEvent event) { indexPlayer(event.getPlayer(), event.getPlayer().getLocation()); }
+    @EventHandler public void onPlayerQuit(PlayerQuitEvent event) { players.remove(event.getPlayer().getUniqueId()); }
+    @EventHandler public void onPlayerMove(PlayerMoveEvent event) { indexPlayer(event.getPlayer(), event.getTo()); }
 
+    /** Runs globally: only immutable snapshots and player scheduler handles are used here. */
     public void tick() {
-        List<ActiveVideoMapSelector.Point> players = Bukkit.getOnlinePlayers().stream().map(player -> {
-            var location = player.getLocation(); return new ActiveVideoMapSelector.Point(player.getWorld().getUID(), location.getX(), location.getY(), location.getZ());
-        }).toList();
+        long tick = serverTick.getAndIncrement();
+        List<ActiveVideoMapSelector.Point> points = players.values().stream().map(player -> new ActiveVideoMapSelector.Point(player.worldId(), player.x(), player.y(), player.z())).toList();
         List<ActiveVideoMapSelector.Candidate> candidates = new ArrayList<>();
         for (IndexedFrame frame : frames.values()) candidates.add(new ActiveVideoMapSelector.Candidate(frame.mapId(), frame.worldId(), frame.x(), frame.y(), frame.z()));
-        long now = System.currentTimeMillis();
-        for (var candidate : selector.select(candidates, players, activeLimit)) {
+        for (var candidate : selector.select(candidates, points, activeLimit)) {
             var tile = videos.tileForMap(candidate.mapId()); if (tile == null) continue;
             var record = videos.record(tile.videoId()); if (record == null) continue;
+            int frameIndex = clock.frameAtTick(record.frameCount(), record.fps(), tick);
+            if (Integer.valueOf(frameIndex).equals(lastSentFrame.put(candidate.mapId(), frameIndex))) continue;
             try {
-                var map = videos.showFrame(record, candidate.mapId(), clock.frameAt(record.frameCount(), record.fps(), now));
-                if (map != null) mapUpdates.send(map, Bukkit.getOnlinePlayers().stream().filter(player -> player.getWorld().getUID().equals(candidate.worldId())).toList());
-            }
-            catch (IOException ignored) { }
+                var map = videos.showFrame(record, candidate.mapId(), frameIndex);
+                if (map != null) mapUpdates.send(map, players.values().stream().filter(player -> player.worldId().equals(candidate.worldId())).map(player -> new MapUpdateDispatcher.Viewer(player.player(), player.scheduler())).toList());
+            } catch (IOException ignored) { }
         }
     }
 
@@ -68,5 +90,11 @@ public final class VideoPlaybackService implements Listener {
         frames.put(frame.getUniqueId(), new IndexedFrame(mapId, frame.getWorld().getUID(), frame.getX(), frame.getY(), frame.getZ()));
     }
 
+    private void indexPlayer(Player player, Location location) {
+        if (location == null || location.getWorld() == null) return;
+        players.put(player.getUniqueId(), new IndexedPlayer(player, player.getScheduler(), location.getWorld().getUID(), location.getX(), location.getY(), location.getZ()));
+    }
+
     private record IndexedFrame(int mapId, UUID worldId, double x, double y, double z) { }
+    private record IndexedPlayer(Player player, io.papermc.paper.threadedregions.scheduler.EntityScheduler scheduler, UUID worldId, double x, double y, double z) { }
 }

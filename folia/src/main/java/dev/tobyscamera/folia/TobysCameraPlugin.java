@@ -83,7 +83,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         if (gateway != null) gateway.setCoordinators(coordinator, videoCoordinator);
         filmListener = new CameraFilmInventoryListener(films);
         getServer().getPluginManager().registerEvents(filmListener, this);
-        videoPlayback = new VideoPlaybackService(this, videos, settings.videoMaxActiveMapFrames(), System.currentTimeMillis());
+        videoPlayback = new VideoPlaybackService(this, videos, settings.videoMaxActiveMapFrames());
         videoPlayback.indexLoadedFrames();
         getServer().getPluginManager().registerEvents(videoPlayback, this);
         videoPlaybackTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, ignored -> videoPlayback.tick(), 1L, 1L);

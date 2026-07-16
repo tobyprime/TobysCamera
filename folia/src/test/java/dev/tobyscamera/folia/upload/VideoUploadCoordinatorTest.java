@@ -60,6 +60,19 @@ class VideoUploadCoordinatorTest {
     }
 
     @Test
+    void rejectsAFrameRateThatDoesNotAlignWithServerTicks() {
+        Player player = player(); ItemStack camera = mock(ItemStack.class); CameraFilmService films = mock(CameraFilmService.class);
+        when(films.heldCamera(player)).thenReturn(camera); when(films.maximumForFilm(camera, 4)).thenReturn(1); when(films.maximumVideoFps(camera, 10)).thenReturn(10);
+        List<CameraPacket> sent = new ArrayList<>();
+        VideoUploadCoordinator coordinator = new VideoUploadCoordinator(PluginSettings.from(Map.of()), films, (ignored, packet) -> sent.add(packet), (ignored, session, metadata) -> { }, ignored -> { });
+
+        coordinator.handle(player, new Packets.VideoBegin(1, 1, 2, 1));
+
+        assertEquals(Packets.UploadRejected.class, sent.getFirst().getClass());
+        org.mockito.Mockito.verify(films, org.mockito.Mockito.never()).consume(camera, 1);
+    }
+
+    @Test
     void rejectsSecondChunkInsideConfiguredOneChunkWindow() {
         Player player = player();
         ItemStack camera = mock(ItemStack.class); CameraFilmService films = mock(CameraFilmService.class);

@@ -72,7 +72,9 @@ class ViewfinderSessionTest {
         session.open();
         assertEquals(CaptureMode.VIDEO, session.toggleMode());
         assertEquals(10, session.adjustVideoFps(20, 10));
-        assertEquals(1, session.adjustVideoFps(-20, 10));
+        assertEquals(5, session.adjustVideoFps(-20, 10));
+        assertEquals(1, session.adjustVideoFps(-1, 10));
+        assertEquals(5, session.capVideoFps(6));
     }
 
     @Test

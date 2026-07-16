@@ -1,5 +1,6 @@
 package dev.tobyscamera.folia.video;
 
+import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
 import java.util.Collection;
 import org.bukkit.entity.Player;
 import org.bukkit.map.MapView;
@@ -11,7 +12,9 @@ public final class MapUpdateDispatcher {
 
     public MapUpdateDispatcher(Plugin plugin) { this.plugin = plugin; }
 
-    public void send(MapView map, Collection<? extends Player> viewers) {
-        for (Player viewer : viewers) viewer.getScheduler().run(plugin, ignored -> viewer.sendMap(map), () -> { });
+    public void send(MapView map, Collection<Viewer> viewers) {
+        for (Viewer viewer : viewers) viewer.scheduler().run(plugin, ignored -> viewer.player().sendMap(map), () -> { });
     }
+
+    public record Viewer(Player player, EntityScheduler scheduler) { }
 }

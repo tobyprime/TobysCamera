@@ -7,6 +7,7 @@ import dev.tobyscamera.common.upload.UploadGrant;
 import dev.tobyscamera.common.upload.VideoUploadSession;
 import dev.tobyscamera.common.upload.RateLimit;
 import dev.tobyscamera.common.upload.SlidingWindowRateLimiter;
+import dev.tobyscamera.common.video.VideoFrameRate;
 import dev.tobyscamera.folia.camera.CameraFilmService;
 import dev.tobyscamera.folia.config.PluginSettings;
 import dev.tobyscamera.folia.upload.PhotoMetadata;
@@ -47,7 +48,7 @@ public final class VideoUploadCoordinator {
         if (camera == null) { sender.send(player, new Packets.UploadRejected("A tagged camera must be held")); return; }
         int maximum = films.maximumForFilm(camera, settings.maxGridSize());
         if (begin.gridWidth() < 1 || begin.gridHeight() < 1 || begin.gridWidth() > maximum || begin.gridHeight() > maximum
-                || begin.fps() < 1 || begin.fps() > films.maximumVideoFps(camera, settings.videoMaxFps()) || begin.frameCount() < 1 || begin.frameCount() > settings.videoMaxFrames()) {
+                || !VideoFrameRate.isSupported(begin.fps()) || begin.fps() > films.maximumVideoFps(camera, settings.videoMaxFps()) || begin.frameCount() < 1 || begin.frameCount() > settings.videoMaxFrames()) {
             sender.send(player, new Packets.UploadRejected("Video settings exceed camera or server limits")); return;
         }
         int filmCost;

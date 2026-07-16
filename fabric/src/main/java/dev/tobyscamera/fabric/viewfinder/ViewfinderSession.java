@@ -2,6 +2,7 @@ package dev.tobyscamera.fabric.viewfinder;
 
 import dev.tobyscamera.fabric.camera.AspectRatio;
 import dev.tobyscamera.fabric.camera.CameraComposition;
+import dev.tobyscamera.common.video.VideoFrameRate;
 
 public final class ViewfinderSession {
     private static final float MIN_ZOOM = 1.0f;
@@ -53,7 +54,8 @@ public final class ViewfinderSession {
 
     public void finishUpload() { if (state == ViewfinderState.UPLOADING) state = ViewfinderState.VIEWFINDER; }
     public CaptureMode toggleMode() { if (state == ViewfinderState.VIEWFINDER) mode = mode.next(); return mode; }
-    public int adjustVideoFps(int delta, int maximum) { videoFps = Math.clamp(videoFps + delta, 1, Math.max(1, maximum)); return videoFps; }
+    public int adjustVideoFps(int delta, int maximum) { videoFps = VideoFrameRate.next(videoFps, delta, maximum); return videoFps; }
+    public int capVideoFps(int maximum) { videoFps = VideoFrameRate.clampToMaximum(maximum); return videoFps; }
     public CompositionGrid cycleGrid() { grid = grid.next(); return grid; }
     public void adjustZoom(double scrollDelta) { targetZoom = Math.clamp(targetZoom + (float) scrollDelta * 0.25f, MIN_ZOOM, MAX_ZOOM); }
     public void setRollDegrees(float value) { composition = composition.withRollDegrees(value); }

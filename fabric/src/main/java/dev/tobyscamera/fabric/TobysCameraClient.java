@@ -124,7 +124,7 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (ZOOM_IN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(1.0);
         while (ZOOM_OUT_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(-1.0);
         while (COMPOSITION_KEY.consumeClick()) toggleCompositionEditor(client);
-        while (MODE_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.toggleMode();
+        while (MODE_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) { VIEWFINDER.toggleMode(); if (VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.capVideoFps(heldCameraVideoFps()); }
         while (FPS_UP_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.adjustVideoFps(1, heldCameraVideoFps());
         while (FPS_DOWN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.adjustVideoFps(-1, heldCameraVideoFps());
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING) CAPTURE.tick();
@@ -198,6 +198,7 @@ public final class TobysCameraClient implements ClientModInitializer {
                 videoRecording = TemporaryVideoRecording.create(videoDirectory());
                 videoPreviewRequested = false;
                 videoCaptureRequested = false;
+                VIEWFINDER.capVideoFps(heldCameraVideoFps());
                 VIDEO_CAPTURE.start(VIEWFINDER.videoFps(), System.currentTimeMillis());
             } catch (IOException exception) {
                 LOGGER.error("Could not initialize temporary video recording", exception);
