@@ -4,7 +4,9 @@
   "refmap": "tobyscamera.refmap.json",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "AvatarRendererMixin",
     "CameraMixin",
+    "EntityRendererMixin",
     "KeyboardHandlerMixin"
   ],
   "injectors": {

@@ -8,6 +8,7 @@ import dev.tobyscamera.fabric.camera.CapturedFrame;
 import dev.tobyscamera.fabric.camera.CompositionCropProcessor;
 import dev.tobyscamera.fabric.camera.HeldCameraChecker;
 import dev.tobyscamera.fabric.camera.NativePixelFormat;
+import dev.tobyscamera.fabric.camera.PhotoRenderPolicy;
 import dev.tobyscamera.fabric.camera.PhotoUploadController;
 import dev.tobyscamera.fabric.camera.ResizeToGridProcessor;
 import dev.tobyscamera.fabric.input.CameraKeyCategory;
@@ -158,6 +159,10 @@ public final class TobysCameraClient implements ClientModInitializer {
 
     public static float viewfinderRollRadians() {
         return VIEWFINDER.zoomActive() ? (float) Math.toRadians(VIEWFINDER.composition().rollDegrees()) : 0.0f;
+    }
+
+    public static boolean hideNameTagsForPhoto() {
+        return PhotoRenderPolicy.hideNameTags(VIEWFINDER.state(), CAPTURE.captureReady());
     }
 
     private static void openPreview(net.minecraft.client.Minecraft client, CapturedFrame frame) {
