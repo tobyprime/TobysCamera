@@ -77,7 +77,7 @@ Run: `./gradlew.bat :fabric:test --tests dev.tobyscamera.fabric.viewfinder.Captu
 
 The client tick calls only `CAPTURE.tick()`. Add a public static method that consumes the prepared grid size and calls `Screenshot.takeScreenshot`.
 
-Inject `CameraMixin` into `GameRenderer.render` at the `renderItemInHand` invocation with `shift = BEFORE`, then call the public client method. This location is after `renderLevel` and before first-person hand and GUI composition.
+Inject `CameraMixin` into `GameRenderer.renderLevel` at the `renderItemInHand` invocation with `shift = BEFORE`, then call the public client method. This location is after world rendering and before first-person hand and GUI composition.
 
 - [ ] **Step 4: Re-run the focused test and compile Fabric**
 

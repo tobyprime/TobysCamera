@@ -93,10 +93,13 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (GRID_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.cycleGrid();
         while (ZOOM_IN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(1.0);
         while (ZOOM_OUT_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(-1.0);
-        if (VIEWFINDER.state() == ViewfinderState.CAPTURING && CAPTURE.tick()) {
-            int gridSize = CAPTURE.takeGridSize();
-            Screenshot.takeScreenshot(client.getMainRenderTarget(), nativeImage -> openPreview(client, toFrame(nativeImage, gridSize)));
-        }
+        if (VIEWFINDER.state() == ViewfinderState.CAPTURING) CAPTURE.tick();
+    }
+
+    public static void captureWorldBeforeHand(net.minecraft.client.Minecraft client) {
+        if (VIEWFINDER.state() != ViewfinderState.CAPTURING || !CAPTURE.captureReady()) return;
+        int gridSize = CAPTURE.takeGridSize();
+        Screenshot.takeScreenshot(client.getMainRenderTarget(), nativeImage -> openPreview(client, toFrame(nativeImage, gridSize)));
     }
 
     public static boolean closeViewfinder() {
@@ -121,14 +124,14 @@ public final class TobysCameraClient implements ClientModInitializer {
         return VIEWFINDER.zoomActive() ? VIEWFINDER.targetZoom() : 1.0f;
     }
 
-    private void openPreview(net.minecraft.client.Minecraft client, CapturedFrame frame) {
+    private static void openPreview(net.minecraft.client.Minecraft client, CapturedFrame frame) {
         if (!VIEWFINDER.captureComplete()) return;
         client.setScreen(new PreviewScreen(frame,
                 () -> { if (VIEWFINDER.beginUpload()) { if (UPLOADS.confirm(frame)) VIEWFINDER.finishUpload(); else VIEWFINDER.retake(); } client.setScreen(null); },
                 () -> { VIEWFINDER.retake(); client.setScreen(null); }));
     }
 
-    private CapturedFrame toFrame(com.mojang.blaze3d.platform.NativeImage nativeImage, int gridSize) {
+    private static CapturedFrame toFrame(com.mojang.blaze3d.platform.NativeImage nativeImage, int gridSize) {
         try {
             BufferedImage image = new BufferedImage(nativeImage.getWidth(), nativeImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
             for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) image.setRGB(x, y, NativePixelFormat.toArgb(nativeImage.getPixel(x, y)));

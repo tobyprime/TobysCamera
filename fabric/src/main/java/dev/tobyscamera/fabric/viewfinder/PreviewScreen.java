@@ -38,10 +38,7 @@ public final class PreviewScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderTransparentBackground(graphics);
-        int size = Math.min(width - 40, height - 80);
-        int left = (width - size) / 2;
-        int top = (height - size - 30) / 2;
-        TextureBlit blit = textureBlit(left, top, frame.image().getWidth(), frame.image().getHeight(), size);
+        TextureBlit blit = textureBlit(20, 20, frame.image().getWidth(), frame.image().getHeight(), width - 40, height - 80);
         graphics.blit(
             RenderPipelines.GUI_TEXTURED,
             textureId,
@@ -56,7 +53,7 @@ public final class PreviewScreen extends Screen {
             blit.textureWidth(),
             blit.textureHeight()
         );
-        graphics.drawCenteredString(font, "%d x %d maps".formatted(frame.gridSize(), frame.gridSize()), width / 2, top + size + 8, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, "%d x %d maps".formatted(frame.gridSize(), frame.gridSize()), width / 2, blit.top() + blit.height() + 8, 0xFFFFFFFF);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 
@@ -79,8 +76,14 @@ public final class PreviewScreen extends Screen {
         return image;
     }
 
-    static TextureBlit textureBlit(int left, int top, int textureWidth, int textureHeight, int size) {
-        return new TextureBlit(left, top, size, size, textureWidth, textureHeight, textureWidth, textureHeight);
+    static TextureBlit textureBlit(int availableLeft, int availableTop, int textureWidth, int textureHeight, int availableWidth, int availableHeight) {
+        if (textureWidth < 1 || textureHeight < 1 || availableWidth < 1 || availableHeight < 1) throw new IllegalArgumentException("dimensions must be positive");
+        double scale = Math.min((double) availableWidth / textureWidth, (double) availableHeight / textureHeight);
+        int width = (int) Math.round(textureWidth * scale);
+        int height = (int) Math.round(textureHeight * scale);
+        int left = availableLeft + (availableWidth - width) / 2;
+        int top = availableTop + (availableHeight - height) / 2;
+        return new TextureBlit(left, top, width, height, textureWidth, textureHeight, textureWidth, textureHeight);
     }
 
     record TextureBlit(int left, int top, int width, int height, int sourceWidth, int sourceHeight, int textureWidth, int textureHeight) { }

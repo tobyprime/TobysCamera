@@ -61,5 +61,5 @@ public final class ViewfinderSession {
     public float targetZoom() { return targetZoom; }
     public int gridSize() { return gridSize; }
     public boolean captureHidden() { return state == ViewfinderState.CAPTURING; }
-    public boolean zoomActive() { return state == ViewfinderState.VIEWFINDER || state == ViewfinderState.AWAITING_GRANT; }
+    public boolean zoomActive() { return state == ViewfinderState.VIEWFINDER || state == ViewfinderState.AWAITING_GRANT || state == ViewfinderState.CAPTURING; }
 }

@@ -46,13 +46,15 @@ class ViewfinderSessionTest {
     }
 
     @Test
-    void keepsZoomActiveOnlyBeforeCapture() {
+    void keepsZoomActiveUntilTheCaptureFrameIsRendered() {
         ViewfinderSession session = new ViewfinderSession();
         session.open();
         assertTrue(session.zoomActive());
         session.pressShutter();
         assertTrue(session.zoomActive());
         session.acceptGrant(1);
+        assertTrue(session.zoomActive());
+        session.captureComplete();
         assertFalse(session.zoomActive());
     }
 }

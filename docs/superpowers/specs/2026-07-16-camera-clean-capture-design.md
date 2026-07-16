@@ -6,7 +6,7 @@ Capture the zoomed world view without GUI or first-person hand rendering, while 
 
 ## Capture timing
 
-A client `GameRenderer` mixin will consume a pending camera capture immediately after `renderLevel` returns and before `renderItemInHand` and GUI rendering begin. The screenshot copy is therefore ordered after world rendering but before the hand, HUD, chat, crosshair, and viewfinder overlay.
+A client `GameRenderer` mixin will consume a pending camera capture inside `renderLevel`, immediately before its `renderItemInHand` call. The screenshot copy is therefore ordered after world rendering but before the hand, HUD, chat, crosshair, and viewfinder overlay.
 
 The viewfinder session remains in `CAPTURING` until the screenshot callback opens the preview. `CAPTURING` is included in the zoom-active states, so `GameRenderer.getFov` applies the selected zoom to the captured frame.
 
