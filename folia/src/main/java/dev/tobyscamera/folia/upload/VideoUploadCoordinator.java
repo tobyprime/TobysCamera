@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.bukkit.entity.Player;
 
 public final class VideoUploadCoordinator {
@@ -21,13 +22,14 @@ public final class VideoUploadCoordinator {
     private final CameraFilmService films;
     private final UploadCoordinator.PluginPayloadGatewaySender sender;
     private final CompletedVideoUploadHandler completion;
+    private final Consumer<Player> discardPhotoCaptureIntent;
     private final Map<UUID, UploadGrant> grants = new HashMap<>();
     private final Map<UUID, VideoUploadSession> sessions = new HashMap<>();
     private final Map<UUID, SlidingWindowRateLimiter> chunkLimiters = new HashMap<>();
     private final Map<UUID, PhotoMetadata> metadata = new HashMap<>();
 
-    public VideoUploadCoordinator(PluginSettings settings, CameraFilmService films, UploadCoordinator.PluginPayloadGatewaySender sender, CompletedVideoUploadHandler completion) {
-        this.settings = settings; this.films = films; this.sender = sender; this.completion = completion;
+    public VideoUploadCoordinator(PluginSettings settings, CameraFilmService films, UploadCoordinator.PluginPayloadGatewaySender sender, CompletedVideoUploadHandler completion, Consumer<Player> discardPhotoCaptureIntent) {
+        this.settings = settings; this.films = films; this.sender = sender; this.completion = completion; this.discardPhotoCaptureIntent = discardPhotoCaptureIntent;
     }
 
     public void handle(Player player, CameraPacket packet) {
@@ -40,6 +42,7 @@ public final class VideoUploadCoordinator {
     }
 
     private void begin(Player player, Packets.VideoBegin begin) {
+        discardPhotoCaptureIntent.accept(player);
         var camera = films.heldCamera(player);
         if (camera == null) { sender.send(player, new Packets.UploadRejected("A tagged camera must be held")); return; }
         int maximum = films.maximumForFilm(camera, settings.maxGridSize());

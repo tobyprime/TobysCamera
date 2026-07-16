@@ -63,6 +63,11 @@ public final class UploadCoordinator {
         capturedMetadata.put(player.getUniqueId(), PhotoMetadata.capture(player));
     }
 
+    /** A video uses the same shutter hint, but owns its own metadata at VideoBegin. */
+    public void discardCaptureIntent(Player player) {
+        capturedMetadata.remove(player.getUniqueId());
+    }
+
     private void begin(Player player, Packets.UploadBegin begin) {
         var camera = films.heldCamera(player);
         if (camera == null) {

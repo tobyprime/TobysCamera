@@ -60,7 +60,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener {
         coordinator = new UploadCoordinator(settings, films, this::send,
                 (player, session, metadata) -> createAndDeliver(player, session, metadata),
                 player -> player.playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.3f));
-        videoCoordinator = new VideoUploadCoordinator(settings, films, this::send, this::createAndDeliverVideo);
+        videoCoordinator = new VideoUploadCoordinator(settings, films, this::send, this::createAndDeliverVideo, coordinator::discardCaptureIntent);
         PluginPayloadGateway gateway = new PluginPayloadGateway(this, coordinator, videoCoordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
         getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);
