@@ -38,11 +38,14 @@ class CameraFilmServiceTest {
                 .when(data).set(any(), eq(PersistentDataType.INTEGER), anyInt());
         doAnswer(call -> { ((Consumer<PersistentDataContainer>) call.getArgument(0)).accept(data); return null; })
                 .when(camera).editPersistentDataContainer(any());
+        NamespacedKey maximumKey = new NamespacedKey("tobyscamera", "max_grid_size");
+        values.put(maximumKey, 8);
 
         films.load(camera, 9);
 
         assertEquals(9, films.remaining(camera));
         assertEquals(4, films.maximum(camera, 4));
+        assertEquals(4, values.get(maximumKey));
         assertEquals(3, films.maximumForFilm(camera, 4));
         assertTrue(films.consume(camera, 9));
         assertEquals(0, films.remaining(camera));

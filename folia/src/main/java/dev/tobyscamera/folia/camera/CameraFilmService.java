@@ -45,9 +45,10 @@ public final class CameraFilmService {
     public void load(ItemStack camera, int filmCount) {
         if (filmCount < 1) return;
         int loaded = Math.addExact(remaining(camera), filmCount);
+        int effectiveMaximum = maximum(camera, configuredMaximum);
         camera.editPersistentDataContainer(container -> {
             container.set(remainingKey, PersistentDataType.INTEGER, loaded);
-            if (!container.has(maximumKey)) container.set(maximumKey, PersistentDataType.INTEGER, configuredMaximum);
+            container.set(maximumKey, PersistentDataType.INTEGER, effectiveMaximum);
         });
         updateLore(camera, loaded);
     }
