@@ -16,6 +16,7 @@ public final class CameraFilmService {
     private final NamespacedKey filmKey;
     private final NamespacedKey remainingKey;
     private final NamespacedKey maximumKey;
+    private final NamespacedKey noFilmRequiredKey;
     private final int configuredMaximum;
 
     public CameraFilmService(String cameraTagKey, String filmTagKey, int configuredMaximum) {
@@ -24,11 +25,13 @@ public final class CameraFilmService {
         if (cameraKey == null || filmKey == null) throw new IllegalArgumentException("invalid item tag key");
         remainingKey = new NamespacedKey(cameraKey.getNamespace(), "film_remaining");
         maximumKey = new NamespacedKey(cameraKey.getNamespace(), "max_grid_size");
+        noFilmRequiredKey = new NamespacedKey(cameraKey.getNamespace(), "no_film_required");
         this.configuredMaximum = Math.max(1, configuredMaximum);
     }
 
     public boolean isCamera(ItemStack item) { return !item.isEmpty() && RootCustomData.contains(item, cameraKey); }
     public boolean isFilm(ItemStack item) { return !item.isEmpty() && RootCustomData.contains(item, filmKey); }
+    public boolean isFilmFree(ItemStack camera) { return isCamera(camera) && RootCustomData.contains(camera, noFilmRequiredKey); }
     public ItemStack heldCamera(Player player) {
         ItemStack mainHand = player.getInventory().getItemInMainHand();
         return isCamera(mainHand) ? mainHand : isCamera(player.getInventory().getItemInOffHand())
@@ -40,7 +43,8 @@ public final class CameraFilmService {
         return Math.max(1, componentMaximum);
     }
     public int maximumForFilm(ItemStack camera, int configuredMaximum) {
-        return Math.min(maximum(camera, configuredMaximum), (int) Math.sqrt(remaining(camera)));
+        int maximum = maximum(camera, configuredMaximum);
+        return isFilmFree(camera) ? maximum : Math.min(maximum, (int) Math.sqrt(remaining(camera)));
     }
     public void load(ItemStack camera, int filmCount) {
         if (filmCount < 1) return;
@@ -54,6 +58,7 @@ public final class CameraFilmService {
         updateLore(camera, loaded);
     }
     public boolean consume(ItemStack camera, int maps) {
+        if (isFilmFree(camera)) return maps > 0;
         int remaining = remaining(camera);
         if (maps < 1 || remaining < maps) return false;
         RootCustomData.update(camera, tag -> {
@@ -77,7 +82,8 @@ public final class CameraFilmService {
             String plain = PlainTextComponentSerializer.plainText().serialize(line);
             if (!plain.startsWith("剩余胶卷: ") && !plain.startsWith("最大尺寸: ")) lines.add(line);
         }
-        lines.addAll(lore(remaining, maximum(camera, configuredMaximum)));
+        if (isFilmFree(camera)) lines.add(Component.text("最大尺寸: " + maximum(camera, configuredMaximum) + "x", NamedTextColor.GRAY));
+        else lines.addAll(lore(remaining, maximum(camera, configuredMaximum)));
         meta.lore(lines);
         camera.setItemMeta(meta);
     }

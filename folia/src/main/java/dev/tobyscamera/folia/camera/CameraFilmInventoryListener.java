@@ -16,6 +16,7 @@ public final class CameraFilmInventoryListener implements Listener {
         ItemStack camera = event.getCurrentItem();
         ItemStack film = event.getCursor();
         if (camera == null || film == null || !films.isCamera(camera) || !films.isFilm(film)) return;
+        if (films.isFilmFree(camera)) { event.setCancelled(true); return; }
         films.load(camera, film.getAmount());
         event.setCursor(new ItemStack(Material.AIR));
         event.setCancelled(true);

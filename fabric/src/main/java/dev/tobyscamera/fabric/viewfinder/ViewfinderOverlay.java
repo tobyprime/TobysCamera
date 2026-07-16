@@ -49,7 +49,8 @@ public final class ViewfinderOverlay {
         graphics.fill(left + frameWidth, top, width, top + frameHeight, MASK_COLOR);
         drawBorder(graphics, left, top, frameWidth, frameHeight);
         drawGrid(graphics, left, top, frameWidth, frameHeight);
-        graphics.drawString(minecraft.font, filmLabel(remainingFilm.getAsInt()), left + 6, top + 6, BORDER_COLOR, true);
+        int film = remainingFilm.getAsInt();
+        if (showsFilm(film)) graphics.drawString(minecraft.font, filmLabel(film), left + 6, top + 6, BORDER_COLOR, true);
         graphics.drawString(minecraft.font, hintText(session.targetZoom(), session.composition().aspectRatio().toString(),
                 keyName(zoomIn), keyName(zoomOut), keyName(gridKey), keyName(compositionKey), keyName(shutterKey)),
                 left + 6, top + frameHeight - 14, BORDER_COLOR, true);
@@ -73,6 +74,7 @@ public final class ViewfinderOverlay {
     }
 
     static String filmLabel(int remainingFilm) { return "Film: " + Math.max(0, remainingFilm); }
+    static boolean showsFilm(int remainingFilm) { return remainingFilm >= 0; }
 
     private static String keyName(KeyMapping key) { return key.getTranslatedKeyMessage().getString(); }
 

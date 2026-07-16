@@ -15,5 +15,6 @@ class ViewfinderOverlayTest {
     void rendersRemainingFilmAsANonNegativeLabel() {
         assertEquals("Film: 9", ViewfinderOverlay.filmLabel(9));
         assertEquals("Film: 0", ViewfinderOverlay.filmLabel(-1));
+        assertEquals(false, ViewfinderOverlay.showsFilm(-1));
     }
 }
