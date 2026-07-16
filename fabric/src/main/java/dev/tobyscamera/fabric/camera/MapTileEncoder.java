@@ -119,8 +119,9 @@ public final class MapTileEncoder {
     }
 
     private static int nearestMapColorId(int red, int green, int blue) {
-        int bestDistance = Integer.MAX_VALUE, bestId = 0;
-        for (int id = 0; id < 256; id++) {
+        int bestDistance = Integer.MAX_VALUE, bestId = 1;
+        // Packed map color 0 is the transparent sentinel, never a valid camera pixel.
+        for (int id = 1; id < 256; id++) {
             int palette = MapColor.getColorFromPackedId(id);
             int dr = red - ((palette >>> 16) & 0xff), dg = green - ((palette >>> 8) & 0xff), db = blue - (palette & 0xff);
             int distance = dr * dr + dg * dg + db * db;

@@ -70,6 +70,17 @@ class MapTileEncoderTest {
         assertEquals(mapArgb(tile[16_383]), preview.getRGB(127, 127));
     }
 
+    @Test
+    void neverEncodesOpaqueBlackAsTheTransparentMapColor() {
+        BufferedImage black = new BufferedImage(128, 128, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) black.setRGB(x, y, 0xff000000);
+
+        for (MapTileEncoder.DitheringMode mode : MapTileEncoder.DitheringMode.values()) {
+            byte[] tile = encoder.encode(black, mode).tiles().getFirst();
+            for (byte packedId : tile) assertFalse(Byte.toUnsignedInt(packedId) == 0);
+        }
+    }
+
     private static boolean imagesEqual(BufferedImage left, BufferedImage right) {
         for (int y = 0; y < left.getHeight(); y++) for (int x = 0; x < left.getWidth(); x++) {
             if (left.getRGB(x, y) != right.getRGB(x, y)) return false;
