@@ -87,4 +87,14 @@ class ViewfinderSessionTest {
 
         assertEquals(ViewfinderState.PREVIEW, session.state());
     }
+
+    @Test
+    void keepsTheVideoHudVisibleWhileRecording() {
+        ViewfinderSession session = new ViewfinderSession();
+        session.open();
+        session.toggleMode();
+        session.pressShutter(1);
+
+        assertFalse(session.captureHidden());
+    }
 }

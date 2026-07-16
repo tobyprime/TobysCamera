@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.UUID;
 import javax.imageio.ImageIO;
+import com.mojang.blaze3d.platform.NativeImage;
 
 /** Disk-backed lossless source frames, removed on cancellation or successful upload. */
 public final class TemporaryVideoRecording implements AutoCloseable {
@@ -32,6 +33,13 @@ public final class TemporaryVideoRecording implements AutoCloseable {
         frameCount++;
     }
 
+    /** PNG encoding happens on the video writer thread; callers retain ownership of the NativeImage. */
+    public synchronized void appendNativeImage(NativeImage image) throws IOException {
+        if (!Files.exists(directory)) Files.createDirectories(directory);
+        image.writeToFile(framePath(frameCount));
+        frameCount++;
+    }
+
     public BufferedImage read(int index) throws IOException {
         if (index < 0 || index >= frameCount) throw new IndexOutOfBoundsException(index);
         BufferedImage image = ImageIO.read(framePath(index).toFile());
@@ -39,7 +47,7 @@ public final class TemporaryVideoRecording implements AutoCloseable {
         return image;
     }
 
-    public int frameCount() { return frameCount; }
+    public synchronized int frameCount() { return frameCount; }
     public Path directory() { return directory; }
 
     private Path framePath(int index) { return directory.resolve("frame-%06d.png".formatted(index)); }

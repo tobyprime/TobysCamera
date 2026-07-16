@@ -28,6 +28,8 @@ import dev.tobyscamera.fabric.video.VideoCaptureService;
 import dev.tobyscamera.fabric.video.VideoUploadController;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.awt.image.BufferedImage;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -51,8 +53,13 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final CaptureService CAPTURE = new CaptureService();
     private static final VideoCaptureService VIDEO_CAPTURE = new VideoCaptureService();
     private static final VideoUploadController VIDEO_UPLOADS = new VideoUploadController(TobysCameraClient::sendPacket, System::currentTimeMillis);
+    private static final ExecutorService VIDEO_FRAME_WRITER_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "TobysCamera video writer"); thread.setDaemon(true); return thread;
+    });
+    private static final dev.tobyscamera.fabric.video.VideoFrameWriteQueue VIDEO_FRAME_WRITES = new dev.tobyscamera.fabric.video.VideoFrameWriteQueue(VIDEO_FRAME_WRITER_EXECUTOR);
     private static TemporaryVideoRecording videoRecording;
-    private static boolean videoFramePending;
+    private static boolean videoReadbackPending;
+    private static boolean videoPreviewRequested;
     private static final ViewfinderInputController INPUTS = new ViewfinderInputController(
             VIEWFINDER, TobysCameraClient::heldCameraGridSize, TobysCameraClient::startLocalCapture);
     private static final KeyMapping VIEWFINDER_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
@@ -120,18 +127,29 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (FPS_UP_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.adjustVideoFps(1, heldCameraVideoFps());
         while (FPS_DOWN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.adjustVideoFps(-1, heldCameraVideoFps());
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING) CAPTURE.tick();
+        if (videoPreviewRequested && !videoReadbackPending) {
+            videoPreviewRequested = false;
+            VIDEO_FRAME_WRITES.flush(() -> net.minecraft.client.Minecraft.getInstance().execute(() -> openVideoPreview(net.minecraft.client.Minecraft.getInstance())));
+        }
         VIDEO_UPLOADS.tick();
     }
 
     public static void captureWorldBeforeHand(net.minecraft.client.Minecraft client) {
         if (VIEWFINDER.state() != ViewfinderState.CAPTURING) return;
         if (VIEWFINDER.mode() == CaptureMode.VIDEO) {
-            if (videoRecording == null || videoFramePending || !VIDEO_CAPTURE.captureDue(System.currentTimeMillis())) return;
-            videoFramePending = true;
+            if (videoRecording == null || videoReadbackPending || !VIDEO_CAPTURE.captureDue(System.currentTimeMillis())) return;
+            videoReadbackPending = true;
             Screenshot.takeScreenshot(client.getMainRenderTarget(), nativeImage -> {
-                try { videoRecording.append(toImage(nativeImage)); }
-                catch (IOException exception) { LOGGER.error("Could not store video frame", exception); }
-                finally { nativeImage.close(); videoFramePending = false; }
+                com.mojang.blaze3d.platform.NativeImage copy = new com.mojang.blaze3d.platform.NativeImage(nativeImage.getWidth(), nativeImage.getHeight(), false);
+                copy.copyFrom(nativeImage);
+                nativeImage.close();
+                TemporaryVideoRecording recording = videoRecording;
+                if (recording == null || !VIDEO_FRAME_WRITES.submit(() -> {
+                    try { recording.appendNativeImage(copy); }
+                    catch (IOException exception) { LOGGER.error("Could not store video frame", exception); }
+                    finally { copy.close(); }
+                })) copy.close();
+                videoReadbackPending = false;
             });
             return;
         }
@@ -174,6 +192,7 @@ public final class TobysCameraClient implements ClientModInitializer {
         if (VIEWFINDER.mode() == CaptureMode.VIDEO) {
             try {
                 videoRecording = TemporaryVideoRecording.create(videoDirectory());
+                videoPreviewRequested = false;
                 VIDEO_CAPTURE.start(VIEWFINDER.videoFps(), System.currentTimeMillis());
             } catch (IOException exception) {
                 LOGGER.error("Could not initialize temporary video recording", exception);
@@ -190,7 +209,7 @@ public final class TobysCameraClient implements ClientModInitializer {
         boolean accepted = INPUTS.pressShutter();
         if (accepted && before == ViewfinderState.CAPTURING && VIEWFINDER.mode() == CaptureMode.VIDEO && VIEWFINDER.state() == ViewfinderState.PREVIEW) {
             VIDEO_CAPTURE.stop();
-            openVideoPreview(net.minecraft.client.Minecraft.getInstance());
+            videoPreviewRequested = true;
         }
         LOGGER.info("Camera shutter key event matched while viewfinder is {}; capture request accepted={}.", before, accepted);
         return accepted;

@@ -23,6 +23,7 @@ public final class VideoPlaybackService implements Listener {
     private final int activeLimit;
     private final VideoPlaybackClock clock;
     private final ActiveVideoMapSelector selector = new ActiveVideoMapSelector();
+    private final MapUpdateDispatcher mapUpdates = new MapUpdateDispatcher();
     private final Map<UUID, IndexedFrame> frames = new ConcurrentHashMap<>();
 
     public VideoPlaybackService(MapVideoService videos, int activeLimit, long startedAtMillis) {
@@ -51,7 +52,10 @@ public final class VideoPlaybackService implements Listener {
         for (var candidate : selector.select(candidates, players, activeLimit)) {
             var tile = videos.tileForMap(candidate.mapId()); if (tile == null) continue;
             var record = videos.record(tile.videoId()); if (record == null) continue;
-            try { videos.showFrame(record, candidate.mapId(), clock.frameAt(record.frameCount(), record.fps(), now)); }
+            try {
+                var map = videos.showFrame(record, candidate.mapId(), clock.frameAt(record.frameCount(), record.fps(), now));
+                if (map != null) mapUpdates.send(map, Bukkit.getOnlinePlayers().stream().filter(player -> player.getWorld().getUID().equals(candidate.worldId())).toList());
+            }
             catch (IOException ignored) { }
         }
     }

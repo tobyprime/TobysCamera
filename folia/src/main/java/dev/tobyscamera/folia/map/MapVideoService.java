@@ -59,10 +59,11 @@ public final class MapVideoService {
         }
     }
 
-    public void showFrame(VideoRecord record, int mapId, int frameIndex) throws IOException {
+    public MapView showFrame(VideoRecord record, int mapId, int frameIndex) throws IOException {
         VideoTile tile = tilesByMapId.get(mapId); MutableTileMapRenderer renderer = renderers.get(mapId);
-        if (tile == null || renderer == null || !tile.videoId().equals(record.videoId())) return;
+        if (tile == null || renderer == null || !tile.videoId().equals(record.videoId())) return null;
         renderer.setPixels(repository.readTile(record.videoId(), frameIndex, tile.coordinate()));
+        return Bukkit.getMap(mapId);
     }
 
     public VideoTile tileForMap(int mapId) { return tilesByMapId.get(mapId); }

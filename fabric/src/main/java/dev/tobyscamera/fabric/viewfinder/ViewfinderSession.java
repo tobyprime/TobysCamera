@@ -65,6 +65,6 @@ public final class ViewfinderSession {
     public int gridSize() { return gridSize; }
     public CaptureMode mode() { return mode; }
     public int videoFps() { return videoFps; }
-    public boolean captureHidden() { return state == ViewfinderState.CAPTURING; }
+    public boolean captureHidden() { return state == ViewfinderState.CAPTURING && mode == CaptureMode.PHOTO; }
     public boolean zoomActive() { return state == ViewfinderState.VIEWFINDER || state == ViewfinderState.CAPTURING; }
 }
