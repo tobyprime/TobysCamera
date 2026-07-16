@@ -13,6 +13,6 @@ public final class CenterSquareCropProcessor {
         Graphics2D graphics = output.createGraphics();
         graphics.drawImage(source, 0, 0, size, size, x, y, x + size, y + size, null);
         graphics.dispose();
-        return new CapturedFrame(output, frame.gridSize());
+        return new CapturedFrame(output, frame.gridSize(), frame.composition());
     }
 }

@@ -20,11 +20,13 @@ class SquareImageProcessorTest {
 
     @Test
     void resizesSquareToTheServerGrid() {
-        CapturedFrame frame = new CapturedFrame(new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB), 2);
+        CameraComposition composition = new CameraComposition(AspectRatio.of(4, 3), 15.0f);
+        CapturedFrame frame = new CapturedFrame(new BufferedImage(32, 32, BufferedImage.TYPE_INT_ARGB), 2, composition);
 
         CapturedFrame resized = new ResizeToGridProcessor().process(frame);
 
         assertEquals(256, resized.image().getWidth());
         assertEquals(256, resized.image().getHeight());
+        assertEquals(composition, resized.composition());
     }
 }

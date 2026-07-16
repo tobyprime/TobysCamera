@@ -12,6 +12,6 @@ public final class ResizeToGridProcessor {
         graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         graphics.drawImage(frame.image(), 0, 0, size, size, null);
         graphics.dispose();
-        return new CapturedFrame(output, frame.gridSize());
+        return new CapturedFrame(output, frame.gridSize(), frame.composition());
     }
 }
