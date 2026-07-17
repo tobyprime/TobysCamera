@@ -7,8 +7,6 @@ import dev.tobyscamera.fabric.camera.CompositionCropProcessor;
 import dev.tobyscamera.fabric.camera.PrintCanvasProcessor;
 import dev.tobyscamera.fabric.camera.PrintLayout;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 /** Converts only retained disk-backed frames to the exact palette tiles that will be uploaded. */
 public final class VideoEncoder {
@@ -16,7 +14,8 @@ public final class VideoEncoder {
     private final VideoFrameRange range;
     private final PrintLayout layout;
     private final MapTileEncoder.DitheringMode dithering;
-    private final Map<Integer, MapTileEncoder.EncodedPhoto> encoded = new HashMap<>();
+    private int cachedFrameIndex = -1;
+    private MapTileEncoder.EncodedPhoto cachedFrame;
     private final MapTileEncoder tileEncoder = new MapTileEncoder();
     private final PrintCanvasProcessor canvasProcessor = new PrintCanvasProcessor();
     private final CompositionCropProcessor cropProcessor = new CompositionCropProcessor();
@@ -31,14 +30,14 @@ public final class VideoEncoder {
 
     public MapTileEncoder.EncodedPhoto frame(int retainedIndex) throws IOException {
         if (retainedIndex < 0 || retainedIndex >= frameCount()) throw new IndexOutOfBoundsException(retainedIndex);
-        MapTileEncoder.EncodedPhoto existing = encoded.get(retainedIndex);
-        if (existing != null) return existing;
+        if (cachedFrameIndex == retainedIndex) return cachedFrame;
         var captured = new CapturedFrame(recording.read(range.startInclusive() + retainedIndex), 1,
                 new CameraComposition(layout.aspectRatio(), 0.0f));
         var cropped = cropProcessor.process(captured).image();
         var processed = canvasProcessor.process(cropped, layout);
         var result = tileEncoder.encode(processed, dithering);
-        encoded.put(retainedIndex, result);
+        cachedFrameIndex = retainedIndex;
+        cachedFrame = result;
         return result;
     }
 }

@@ -59,7 +59,11 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final ViewfinderSession VIEWFINDER = new ViewfinderSession();
     private static final CaptureService CAPTURE = new CaptureService();
     private static final VideoCaptureService VIDEO_CAPTURE = new VideoCaptureService();
-    private static final VideoUploadController VIDEO_UPLOADS = new VideoUploadController(TobysCameraClient::sendPacket, System::currentTimeMillis);
+    private static final VideoUploadController VIDEO_UPLOADS = new VideoUploadController(TobysCameraClient::sendPacket, System::currentTimeMillis,
+            reason -> net.minecraft.client.Minecraft.getInstance().execute(() -> {
+                LOGGER.error(reason);
+                VIEWFINDER.cancelUpload();
+            }));
     private static final ExecutorService VIDEO_FRAME_WRITER_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "TobysCamera video writer"); thread.setDaemon(true); return thread;
     });
@@ -90,22 +94,20 @@ public final class TobysCameraClient implements ClientModInitializer {
             "key.tobyscamera.grid", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G,
             CameraKeyCategory.value()));
     private static final KeyMapping ZOOM_IN_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-            "key.tobyscamera.zoom_in", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_BRACKET,
+            "key.tobyscamera.zoom_in", InputConstants.Type.KEYSYM, CameraKeyBindings.defaultZoomInKey(),
             CameraKeyCategory.value()));
     private static final KeyMapping ZOOM_OUT_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-            "key.tobyscamera.zoom_out", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_BRACKET,
+            "key.tobyscamera.zoom_out", InputConstants.Type.KEYSYM, CameraKeyBindings.defaultZoomOutKey(),
             CameraKeyCategory.value()));
     private static final KeyMapping SHUTTER_KEY = KeyBindingHelper.registerKeyBinding(CameraKeyBindings.shutter());
     private static final KeyMapping COMPOSITION_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.composition", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, CameraKeyCategory.value()));
     private static final KeyMapping MODE_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
             "key.tobyscamera.mode", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, CameraKeyCategory.value()));
-    private static final KeyMapping FPS_UP_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-            "key.tobyscamera.fps_up", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_EQUAL, CameraKeyCategory.value()));
-    private static final KeyMapping FPS_DOWN_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-            "key.tobyscamera.fps_down", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_MINUS, CameraKeyCategory.value()));
+    private static final KeyMapping FPS_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+            "key.tobyscamera.fps", InputConstants.Type.KEYSYM, CameraKeyBindings.defaultVideoFpsKey(), CameraKeyCategory.value()));
     private static final ViewfinderOverlay OVERLAY = new ViewfinderOverlay(VIEWFINDER, ZOOM_IN_KEY, ZOOM_OUT_KEY,
-            GRID_KEY, COMPOSITION_KEY, SHUTTER_KEY, MODE_KEY, FPS_UP_KEY, FPS_DOWN_KEY, TobysCameraClient::heldCameraFilm, TobysCameraClient::uploadProgress);
+            GRID_KEY, COMPOSITION_KEY, SHUTTER_KEY, MODE_KEY, FPS_KEY, TobysCameraClient::heldCameraFilm, TobysCameraClient::uploadProgress);
 
     @Override
     public void onInitializeClient() {
@@ -125,7 +127,7 @@ public final class TobysCameraClient implements ClientModInitializer {
         });
         ClientPlayNetworking.registerGlobalReceiver(CameraPayload.TYPE, (payload, context) -> handleServerPacket(context.client(), PacketCodec.decode(payload.data())));
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
-        LOGGER.info("Registered camera shutter binding with default key Enter; configure it in Controls > TobysCamera.");
+        LOGGER.info("Registered camera shutter binding with default button Left Mouse; configure it in Controls > TobysCamera.");
     }
 
     private void handleServerPacket(net.minecraft.client.Minecraft client, dev.tobyscamera.common.protocol.CameraPacket packet) {
@@ -150,8 +152,7 @@ public final class TobysCameraClient implements ClientModInitializer {
         while (ZOOM_OUT_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER) VIEWFINDER.adjustZoom(-1.0);
         while (COMPOSITION_KEY.consumeClick()) toggleCompositionEditor(client);
         while (MODE_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && (VIEWFINDER.mode() == CaptureMode.VIDEO || heldCameraSupportsVideo())) { VIEWFINDER.toggleMode(); if (VIEWFINDER.mode() == CaptureMode.VIDEO) VIEWFINDER.capVideoFps(heldCameraVideoFps()); }
-        while (FPS_UP_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO && heldCameraSupportsVideo()) VIEWFINDER.adjustVideoFps(1, heldCameraVideoFps());
-        while (FPS_DOWN_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO && heldCameraSupportsVideo()) VIEWFINDER.adjustVideoFps(-1, heldCameraVideoFps());
+        while (FPS_KEY.consumeClick()) if (VIEWFINDER.state() == ViewfinderState.VIEWFINDER && VIEWFINDER.mode() == CaptureMode.VIDEO && heldCameraSupportsVideo()) VIEWFINDER.adjustVideoFps(1, heldCameraVideoFps());
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING) CAPTURE.tick();
         if (VIEWFINDER.state() == ViewfinderState.CAPTURING && VIEWFINDER.mode() == CaptureMode.VIDEO
                 && !videoReadbackPending && videoCapturedFrames < videoFrameLimit && VIDEO_CAPTURE.captureDue(System.currentTimeMillis())) videoCaptureRequested = true;
@@ -279,6 +280,10 @@ public final class TobysCameraClient implements ClientModInitializer {
     }
 
     public static boolean handleShutterMouse(net.minecraft.client.input.MouseButtonEvent event) {
+        if (ShutterMouseInput.consumeRightClickClose(event, TobysCameraClient::shutterInputAllowed, TobysCameraClient::closeViewfinder)) {
+            LOGGER.info("Closed camera viewfinder from right mouse button.");
+            return true;
+        }
         ViewfinderState before = VIEWFINDER.state();
         boolean accepted = ShutterMouseInput.consume(SHUTTER_KEY, event, TobysCameraClient::shutterInputAllowed, TobysCameraClient::pressShutter);
         if (SHUTTER_KEY.matchesMouse(event)) {

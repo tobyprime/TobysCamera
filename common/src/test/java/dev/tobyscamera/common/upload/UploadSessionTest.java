@@ -22,6 +22,9 @@ class UploadSessionTest {
         byte[] second = new byte[8_192];
         second[0] = 42;
 
+        session.appendPreview(PLAYER, 0, first);
+        session.appendPreview(PLAYER, 8_192, second);
+
         for (int y = 0; y < 2; y++) {
             for (int x = 0; x < 2; x++) {
                 session.append(PLAYER, x, y, 0, first);
@@ -30,7 +33,27 @@ class UploadSessionTest {
         }
 
         assertTrue(session.isComplete());
+        assertTrue(session.previewComplete());
+        assertArrayEquals(second, java.util.Arrays.copyOfRange(session.previewPixels(), 8_192, 16_384));
         assertArrayEquals(second, java.util.Arrays.copyOfRange(session.tile(1, 1), 8_192, 16_384));
+    }
+
+    @Test
+    void rejectsMediaUntilItsContiguousPreviewIsComplete() {
+        UploadSession session = new UploadSession(new UploadGrant(TOKEN, PLAYER,
+                Instant.EPOCH, Instant.MAX, 1), 1, 1);
+        byte[] chunk = new byte[8_192];
+
+        assertThrows(UploadFailure.class, () -> session.append(PLAYER, 0, 0, 0, chunk));
+        assertFalse(session.isComplete());
+        assertThrows(UploadFailure.class, () -> session.previewPixels());
+        session.appendPreview(PLAYER, 0, chunk);
+        assertFalse(session.previewComplete());
+        assertThrows(UploadFailure.class, () -> session.appendPreview(PLAYER, 8_191, chunk));
+        session.appendPreview(PLAYER, 8_192, chunk);
+        assertTrue(session.previewComplete());
+        session.append(PLAYER, 0, 0, 0, new byte[16_384]);
+        assertTrue(session.isComplete());
     }
 
     @Test

@@ -16,11 +16,8 @@ import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public final class UploadCoordinator {
-    private static final Logger LOGGER = LoggerFactory.getLogger(UploadCoordinator.class);
     private final PluginSettings settings;
     private final CameraFilmService films;
     private final PluginPayloadGatewaySender sender;
@@ -29,8 +26,11 @@ public final class UploadCoordinator {
     private final SlidingWindowRateLimiter rateLimiter;
     private final Map<UUID, UploadGrant> grants = new HashMap<>();
     private final Map<UUID, UploadSession> sessions = new HashMap<>();
+    private final Map<UUID, SlidingWindowRateLimiter> chunkLimiters = new HashMap<>();
+    private final Map<UUID, Long> sessionBytes = new HashMap<>();
     private final Map<UUID, PhotoMetadata> capturedMetadata = new HashMap<>();
     private final Map<UUID, PhotoMetadata> uploadMetadata = new HashMap<>();
+    private long activeUploadBytes;
 
     public UploadCoordinator(PluginSettings settings, CameraFilmService films,
             PluginPayloadGatewaySender sender, CompletedUploadHandler completionHandler, ShutterSoundService shutterSound) {
@@ -42,11 +42,11 @@ public final class UploadCoordinator {
         this.rateLimiter = new SlidingWindowRateLimiter(new RateLimit(settings.perSecond(), settings.perMinute()));
     }
 
-    public void handle(Player player, CameraPacket packet) {
-        LOGGER.info("Handling camera packet {} for {}.", packet.getClass().getSimpleName(), player.getName());
+    public synchronized void handle(Player player, CameraPacket packet) {
         switch (packet) {
             case Packets.CaptureIntent ignored -> capture(player);
             case Packets.UploadBegin begin -> begin(player, begin);
+            case Packets.UploadPreviewChunk chunk -> appendPreview(player, chunk);
             case Packets.UploadTileChunk chunk -> append(player, chunk);
             case Packets.UploadFinish finish -> finish(player, finish);
             default -> { }
@@ -55,7 +55,6 @@ public final class UploadCoordinator {
 
     private void capture(Player player) {
         if (films.heldCamera(player) == null) {
-            LOGGER.info("Rejected capture intent for {} because no tagged camera is held.", player.getName());
             sender.send(player, new Packets.UploadRejected("A tagged camera must be held"));
             return;
         }
@@ -64,7 +63,7 @@ public final class UploadCoordinator {
     }
 
     /** A video uses the same shutter hint, but owns its own metadata at VideoBegin. */
-    public void discardCaptureIntent(Player player) {
+    public synchronized void discardCaptureIntent(Player player) {
         capturedMetadata.remove(player.getUniqueId());
     }
 
@@ -86,6 +85,17 @@ public final class UploadCoordinator {
             sender.send(player, new Packets.UploadRejected("Camera does not have enough film for that print size"));
             return;
         }
+        final long uploadBytes;
+        try {
+            uploadBytes = Math.multiplyExact(Math.addExact(Math.multiplyExact((long) begin.gridWidth(), begin.gridHeight()), 1L), UploadSession.TILE_BYTES);
+        } catch (ArithmeticException exception) {
+            sender.send(player, new Packets.UploadRejected("Photo is too large"));
+            return;
+        }
+        if (uploadBytes > settings.uploadMaxActiveBytes() || activeUploadBytes > settings.uploadMaxActiveBytes() - uploadBytes) {
+            sender.send(player, new Packets.UploadRejected("Photo upload memory budget exceeded"));
+            return;
+        }
         int filmCost = Math.multiplyExact(begin.gridWidth(), begin.gridHeight());
         if (!films.consume(camera, filmCost)) {
             sender.send(player, new Packets.UploadRejected("Camera does not have enough film"));
@@ -97,10 +107,13 @@ public final class UploadCoordinator {
         try {
             grants.put(token, grant);
             sessions.put(token, new UploadSession(grant, begin.gridWidth(), begin.gridHeight()));
+            chunkLimiters.put(token, new SlidingWindowRateLimiter(new RateLimit(settings.uploadChunksPerSecond(), Integer.MAX_VALUE)));
+            sessionBytes.put(token, uploadBytes);
+            activeUploadBytes += uploadBytes;
             uploadMetadata.put(token, capturedMetadata.remove(player.getUniqueId()));
-            sender.send(player, new Packets.UploadGranted(token, grant.expiresAt().toEpochMilli(), UploadSession.TILE_BYTES));
+            sender.send(player, new Packets.UploadGranted(token, grant.expiresAt().toEpochMilli(), UploadSession.TILE_BYTES, settings.uploadChunksPerSecond()));
         } catch (UploadFailure exception) {
-            grants.remove(token);
+            clear(token);
             sender.send(player, new Packets.UploadRejected(exception.getMessage()));
         }
     }
@@ -108,9 +121,31 @@ public final class UploadCoordinator {
     private void append(Player player, Packets.UploadTileChunk chunk) {
         UploadSession session = validSessionOrKick(player, chunk.token());
         if (session == null) return;
+        if (!chunkLimiters.get(chunk.token()).tryAcquire(player.getUniqueId(), Instant.now()).allowed()) {
+            clear(chunk.token());
+            sender.send(player, new Packets.UploadRejected("Photo upload chunk rate exceeded"));
+            return;
+        }
         try {
             session.append(player.getUniqueId(), chunk.tileX(), chunk.tileY(), chunk.offset(), chunk.data());
         } catch (UploadFailure exception) {
+            clear(chunk.token());
+            sender.send(player, new Packets.UploadRejected(exception.getMessage()));
+        }
+    }
+
+    private void appendPreview(Player player, Packets.UploadPreviewChunk chunk) {
+        UploadSession session = validSessionOrKick(player, chunk.token());
+        if (session == null) return;
+        if (!chunkLimiters.get(chunk.token()).tryAcquire(player.getUniqueId(), Instant.now()).allowed()) {
+            clear(chunk.token());
+            sender.send(player, new Packets.UploadRejected("Photo upload chunk rate exceeded"));
+            return;
+        }
+        try {
+            session.appendPreview(player.getUniqueId(), chunk.offset(), chunk.data());
+        } catch (UploadFailure exception) {
+            clear(chunk.token());
             sender.send(player, new Packets.UploadRejected(exception.getMessage()));
         }
     }
@@ -122,9 +157,8 @@ public final class UploadCoordinator {
             sender.send(player, new Packets.UploadRejected("Every map tile must be complete"));
             return;
         }
-        grants.remove(finish.token());
-        sessions.remove(finish.token());
-        PhotoMetadata metadata = uploadMetadata.remove(finish.token());
+        PhotoMetadata metadata = uploadMetadata.get(finish.token());
+        clear(finish.token());
         completionHandler.accept(player, session, metadata == null ? PhotoMetadata.capture(player) : metadata);
     }
 
@@ -150,6 +184,26 @@ public final class UploadCoordinator {
 
     private void kick(Player player) {
         player.kick(Component.text(settings.invalidTokenKickMessage()));
+    }
+
+    /** Removes abandoned uploads even when their owners never send another packet. */
+    public synchronized int expireSessions(Instant now) {
+        var expired = grants.entrySet().stream()
+                .filter(entry -> !entry.getValue().expiresAt().isAfter(now))
+                .map(Map.Entry::getKey)
+                .toList();
+        expired.forEach(this::clear);
+        capturedMetadata.entrySet().removeIf(entry -> entry.getValue().capturedAt().plusSeconds(settings.tokenTtlSeconds()).isBefore(now));
+        return expired.size();
+    }
+
+    private void clear(UUID token) {
+        grants.remove(token);
+        sessions.remove(token);
+        chunkLimiters.remove(token);
+        Long bytes = sessionBytes.remove(token);
+        if (bytes != null) activeUploadBytes -= bytes;
+        uploadMetadata.remove(token);
     }
 
     @FunctionalInterface

@@ -14,6 +14,7 @@ public final class RootCustomData {
 
     public static boolean contains(ItemStack item, NamespacedKey key) { return tag(item).contains(key.toString()); }
     public static int intOr(ItemStack item, NamespacedKey key, int fallback) { return tag(item).getIntOr(key.toString(), fallback); }
+    public static long longOr(ItemStack item, NamespacedKey key, long fallback) { return tag(item).getLongOr(key.toString(), fallback); }
     public static String stringOr(ItemStack item, NamespacedKey key, String fallback) { return tag(item).getString(key.toString()).orElse(fallback); }
 
     public static void update(ItemStack item, Consumer<CompoundTag> editor) {

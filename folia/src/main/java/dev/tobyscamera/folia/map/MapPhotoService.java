@@ -33,7 +33,6 @@ public final class MapPhotoService {
     public PhotoRecord createMaps(UUID ownerId, World world, UploadSession session) {
         UUID photoId = UUID.randomUUID();
         Map<TileCoordinate, Integer> mapIds = new LinkedHashMap<>();
-        Map<TileCoordinate, byte[]> tiles = new LinkedHashMap<>();
         for (int y = 0; y < session.height(); y++) for (int x = 0; x < session.width(); x++) {
             TileCoordinate coordinate = new TileCoordinate(x, y);
             byte[] pixels = session.tile(x, y);
@@ -41,7 +40,7 @@ public final class MapPhotoService {
             view.setTrackingPosition(false); view.setUnlimitedTracking(false); view.setLocked(true);
             for (MapRenderer renderer : view.getRenderers()) view.removeRenderer(renderer);
             view.addRenderer(new TileMapRenderer(pixels));
-            mapIds.put(coordinate, view.getId()); tiles.put(coordinate, pixels);
+            mapIds.put(coordinate, view.getId());
         }
         PhotoRecord record = new PhotoRecord(photoId, ownerId, Instant.now(), session.width(), session.height(), mapIds);
         return record;
@@ -52,32 +51,46 @@ public final class MapPhotoService {
         for (int y = 0; y < session.height(); y++) for (int x = 0; x < session.width(); x++) {
             tiles.put(new TileCoordinate(x, y), session.tile(x, y));
         }
-        repository.save(record, tiles);
+        repository.save(record, tiles, session.previewPixels());
+    }
+
+    /** Removes this plugin's transient renderers from maps whose media storage failed. */
+    public void discard(PhotoRecord record) {
+        for (int mapId : record.mapIds().values()) {
+            MapView view = Bukkit.getMap(mapId);
+            if (view == null) continue;
+            for (MapRenderer renderer : view.getRenderers()) if (renderer instanceof TileMapRenderer) view.removeRenderer(renderer);
+        }
     }
 
     public PhotoRecord record(UUID photoId) throws IOException { return repository.find(photoId); }
 
     public ItemStack bag(World world, PhotoRecord record, UploadSession session) {
+        return bag(world, record, session, null);
+    }
+
+    public ItemStack bag(World world, PhotoRecord record, UploadSession session, PhotoMetadata metadata) {
         return PhotoBagFactory.create(world, record.photoId(), PhotoBagKind.PHOTO, record.gridWidth(), record.gridHeight(),
-                MapPreviewEncoder.encode(record.gridWidth(), record.gridHeight(), coordinate -> session.tile(coordinate.x(), coordinate.y())));
+                metadata,
+                session.previewPixels());
     }
 
     public ItemStack bag(World world, PhotoRecord record) throws IOException {
+        return bag(world, record, (PhotoMetadata) null);
+    }
+
+    public ItemStack bag(World world, PhotoRecord record, PhotoMetadata metadata) throws IOException {
         return PhotoBagFactory.create(world, record.photoId(), PhotoBagKind.PHOTO, record.gridWidth(), record.gridHeight(),
+                metadata,
                 previewPixels(new PhotoBagData(record.photoId(), PhotoBagKind.PHOTO, 0, record.gridWidth(), record.gridHeight())));
     }
 
-    /** Recreates a bag-preview palette from the durable source tiles after a server restart. */
+    /** Reads the client-generated preview persisted with the photo. Legacy bags are unsupported. */
     public byte[] previewPixels(PhotoBagData bag) throws IOException {
         if (bag.kind() != PhotoBagKind.PHOTO) throw new IllegalArgumentException("bag is not a photo");
-        try {
-            return MapPreviewEncoder.encode(bag.gridWidth(), bag.gridHeight(), coordinate -> {
-                try { return repository.readTile(bag.mediaId(), coordinate); }
-                catch (IOException exception) { throw new PreviewReadFailure(exception); }
-            });
-        } catch (PreviewReadFailure exception) {
-            throw exception.getCause();
-        }
+        byte[] preview = repository.readPreview(bag.mediaId());
+        if (preview == null || preview.length != 16_384) throw new IOException("photo bag preview is unavailable");
+        return preview;
     }
 
     public void restore() throws IOException {
@@ -117,8 +130,4 @@ public final class MapPhotoService {
         return item;
     }
 
-    private static final class PreviewReadFailure extends RuntimeException {
-        private PreviewReadFailure(IOException cause) { super(cause); }
-        @Override public IOException getCause() { return (IOException) super.getCause(); }
-    }
 }

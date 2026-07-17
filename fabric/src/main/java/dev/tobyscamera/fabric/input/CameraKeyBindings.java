@@ -9,10 +9,22 @@ public final class CameraKeyBindings {
     }
 
     public static int defaultShutterKey() {
-        return GLFW.GLFW_KEY_ENTER;
+        return GLFW.GLFW_MOUSE_BUTTON_LEFT;
+    }
+
+    public static int defaultZoomOutKey() {
+        return GLFW.GLFW_KEY_MINUS;
+    }
+
+    public static int defaultZoomInKey() {
+        return GLFW.GLFW_KEY_EQUAL;
+    }
+
+    public static int defaultVideoFpsKey() {
+        return GLFW.GLFW_KEY_RIGHT_BRACKET;
     }
 
     public static KeyMapping shutter() {
-        return new KeyMapping("key.tobyscamera.shutter", InputConstants.Type.KEYSYM, defaultShutterKey(), CameraKeyCategory.value());
+        return new KeyMapping("key.tobyscamera.shutter", InputConstants.Type.MOUSE, defaultShutterKey(), CameraKeyCategory.value());
     }
 }

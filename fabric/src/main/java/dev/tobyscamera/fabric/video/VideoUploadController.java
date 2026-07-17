@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import dev.tobyscamera.common.protocol.CameraPacket;
 import dev.tobyscamera.common.protocol.Packets;
 import dev.tobyscamera.fabric.camera.UploadProgress;
+import dev.tobyscamera.fabric.camera.MapTileEncoder;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -16,16 +17,24 @@ public final class VideoUploadController {
     private static final int CHUNKS_PER_TICK = 8;
     private final Consumer<CameraPacket> sender;
     private final LongSupplier clock;
+    private final Consumer<String> failureHandler;
     private VideoEncoder encoder;
     private TemporaryVideoRecording recording;
     private UUID token;
     private ChunkTokenBucket allowance;
-    private int frame, tile, offset;
+    private byte[] previewPixels;
+    private int previewOffset, frame, tile, offset;
     private boolean finishSent;
     private int completedChunks;
     private int totalChunks;
 
-    public VideoUploadController(Consumer<CameraPacket> sender, LongSupplier clock) { this.sender = sender; this.clock = clock; }
+    public VideoUploadController(Consumer<CameraPacket> sender, LongSupplier clock) { this(sender, clock, ignored -> { }); }
+
+    public VideoUploadController(Consumer<CameraPacket> sender, LongSupplier clock, Consumer<String> failureHandler) {
+        this.sender = sender;
+        this.clock = clock;
+        this.failureHandler = failureHandler;
+    }
 
     public boolean begin(VideoEncoder encoder, TemporaryVideoRecording recording, int fps) {
         if (this.encoder != null || encoder == null || recording == null || fps < 1) {
@@ -35,7 +44,7 @@ public final class VideoUploadController {
         }
         this.encoder = encoder; this.recording = recording;
         this.completedChunks = 0;
-        this.totalChunks = encoder.frameCount() * encoder.gridWidth() * encoder.gridHeight() * 2;
+        this.totalChunks = encoder.frameCount() * encoder.gridWidth() * encoder.gridHeight() * 2 + 2;
         LOGGER.info("Sending VideoBegin for {} frame(s), {}x{} map(s) per frame, at {} FPS.",
                 encoder.frameCount(), encoder.gridWidth(), encoder.gridHeight(), fps);
         sender.accept(new Packets.VideoBegin(encoder.gridWidth(), encoder.gridHeight(), fps, encoder.frameCount()));
@@ -65,12 +74,27 @@ public final class VideoUploadController {
         if (encoder == null || token == null || allowance == null || finishSent) return;
         int available = allowance.takeAvailable(clock.getAsLong(), CHUNKS_PER_TICK);
         try {
-            while (available-- > 0 && !complete()) sendNextChunk();
+            while (available-- > 0 && !complete()) {
+                if (!previewComplete()) sendPreviewChunk(); else sendNextChunk();
+            }
             if (complete() && !finishSent) { sender.accept(new Packets.VideoFinish(token)); finishSent = true; }
-        } catch (IOException exception) { clear(); }
+        } catch (IOException exception) {
+            clear();
+            failureHandler.accept("Could not encode video upload");
+        }
     }
 
     private boolean complete() { return frame >= encoder.frameCount(); }
+    private boolean previewComplete() { return previewOffset == 16_384; }
+
+    private void sendPreviewChunk() throws IOException {
+        if (previewPixels == null) previewPixels = new MapTileEncoder().bagPreview(encoder.frame(0));
+        int length = Math.min(8_192, previewPixels.length - previewOffset);
+        sender.accept(new Packets.VideoPreviewChunk(token, previewOffset,
+                java.util.Arrays.copyOfRange(previewPixels, previewOffset, previewOffset + length)));
+        completedChunks++;
+        previewOffset += length;
+    }
 
     private void sendNextChunk() throws IOException {
         byte[] pixels = encoder.frame(frame).tiles().get(tile);
@@ -84,7 +108,7 @@ public final class VideoUploadController {
     }
 
     public void clear() {
-        encoder = null; token = null; allowance = null; frame = tile = offset = 0; finishSent = false; completedChunks = totalChunks = 0;
+        encoder = null; token = null; allowance = null; previewPixels = null; previewOffset = frame = tile = offset = 0; finishSent = false; completedChunks = totalChunks = 0;
         if (recording != null) try { recording.close(); } catch (IOException ignored) { }
         recording = null;
     }

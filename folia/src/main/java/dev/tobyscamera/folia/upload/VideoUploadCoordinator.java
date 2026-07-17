@@ -28,14 +28,17 @@ public final class VideoUploadCoordinator {
     private final Map<UUID, VideoUploadSession> sessions = new HashMap<>();
     private final Map<UUID, SlidingWindowRateLimiter> chunkLimiters = new HashMap<>();
     private final Map<UUID, PhotoMetadata> metadata = new HashMap<>();
+    private final Map<UUID, Long> sessionBytes = new HashMap<>();
+    private long activeUploadBytes;
 
     public VideoUploadCoordinator(PluginSettings settings, CameraFilmService films, UploadCoordinator.PluginPayloadGatewaySender sender, CompletedVideoUploadHandler completion, Consumer<Player> discardPhotoCaptureIntent) {
         this.settings = settings; this.films = films; this.sender = sender; this.completion = completion; this.discardPhotoCaptureIntent = discardPhotoCaptureIntent;
     }
 
-    public void handle(Player player, CameraPacket packet) {
+    public synchronized void handle(Player player, CameraPacket packet) {
         switch (packet) {
             case Packets.VideoBegin begin -> begin(player, begin);
+            case Packets.VideoPreviewChunk chunk -> appendPreview(player, chunk);
             case Packets.VideoTileChunk chunk -> append(player, chunk);
             case Packets.VideoFinish finish -> finish(player, finish);
             default -> { }
@@ -55,14 +58,25 @@ public final class VideoUploadCoordinator {
         int filmCost;
         try { filmCost = Math.multiplyExact(Math.multiplyExact(begin.gridWidth(), begin.gridHeight()), begin.frameCount()); }
         catch (ArithmeticException exception) { sender.send(player, new Packets.UploadRejected("Video is too large")); return; }
+        final long uploadBytes;
+        try {
+            uploadBytes = Math.multiplyExact(Math.addExact(Math.multiplyExact(Math.multiplyExact((long) begin.gridWidth(), begin.gridHeight()), begin.frameCount()), 1L), 16_384L);
+        } catch (ArithmeticException exception) {
+            sender.send(player, new Packets.UploadRejected("Video is too large"));
+            return;
+        }
+        if (uploadBytes > settings.videoMaxActiveUploadBytes() || activeUploadBytes > settings.videoMaxActiveUploadBytes() - uploadBytes) {
+            sender.send(player, new Packets.UploadRejected("Video upload memory budget exceeded"));
+            return;
+        }
         if (!films.consume(camera, filmCost)) { sender.send(player, new Packets.UploadRejected("Camera does not have enough film")); return; }
         Instant now = Instant.now(); UUID token = UUID.randomUUID();
         UploadGrant grant = new UploadGrant(token, player.getUniqueId(), now, now.plusSeconds(settings.tokenTtlSeconds()), maximum);
         try {
-            grants.put(token, grant); sessions.put(token, new VideoUploadSession(grant, begin.gridWidth(), begin.gridHeight(), begin.fps(), begin.frameCount())); metadata.put(token, PhotoMetadata.capture(player));
+            grants.put(token, grant); sessions.put(token, new VideoUploadSession(grant, begin.gridWidth(), begin.gridHeight(), begin.fps(), begin.frameCount())); sessionBytes.put(token, uploadBytes); activeUploadBytes += uploadBytes; metadata.put(token, PhotoMetadata.capture(player));
             chunkLimiters.put(token, new SlidingWindowRateLimiter(new RateLimit(settings.videoUploadChunksPerSecond(), Integer.MAX_VALUE)));
             sender.send(player, new Packets.VideoGranted(token, grant.expiresAt().toEpochMilli(), 16_384, settings.videoUploadChunksPerSecond()));
-        } catch (UploadFailure exception) { grants.remove(token); sender.send(player, new Packets.UploadRejected(exception.getMessage())); }
+        } catch (UploadFailure exception) { clear(token); sender.send(player, new Packets.UploadRejected(exception.getMessage())); }
     }
 
     private void append(Player player, Packets.VideoTileChunk chunk) {
@@ -73,7 +87,17 @@ public final class VideoUploadCoordinator {
             return;
         }
         try { session.append(player.getUniqueId(), chunk.frameIndex(), chunk.tileX(), chunk.tileY(), chunk.offset(), chunk.data()); }
-        catch (UploadFailure exception) { sender.send(player, new Packets.UploadRejected(exception.getMessage())); }
+        catch (UploadFailure exception) { clear(chunk.token()); sender.send(player, new Packets.UploadRejected(exception.getMessage())); }
+    }
+    private void appendPreview(Player player, Packets.VideoPreviewChunk chunk) {
+        VideoUploadSession session = valid(player, chunk.token()); if (session == null) return;
+        if (!chunkLimiters.get(chunk.token()).tryAcquire(player.getUniqueId(), Instant.now()).allowed()) {
+            clear(chunk.token());
+            sender.send(player, new Packets.UploadRejected("Video upload chunk rate exceeded"));
+            return;
+        }
+        try { session.appendPreview(player.getUniqueId(), chunk.offset(), chunk.data()); }
+        catch (UploadFailure exception) { clear(chunk.token()); sender.send(player, new Packets.UploadRejected(exception.getMessage())); }
     }
     private void finish(Player player, Packets.VideoFinish finish) {
         VideoUploadSession session = valid(player, finish.token()); if (session == null) return;
@@ -95,6 +119,17 @@ public final class VideoUploadCoordinator {
         sessions.remove(token);
         chunkLimiters.remove(token);
         metadata.remove(token);
+        Long bytes = sessionBytes.remove(token);
+        if (bytes != null) activeUploadBytes -= bytes;
+    }
+    /** Removes abandoned uploads even when their owners never send another packet. */
+    public synchronized int expireSessions(Instant now) {
+        var expired = grants.entrySet().stream()
+                .filter(entry -> !entry.getValue().expiresAt().isAfter(now))
+                .map(Map.Entry::getKey)
+                .toList();
+        expired.forEach(this::clear);
+        return expired.size();
     }
     @FunctionalInterface public interface CompletedVideoUploadHandler { void accept(Player player, VideoUploadSession session, PhotoMetadata metadata); }
 }

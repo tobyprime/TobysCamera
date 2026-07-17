@@ -52,4 +52,28 @@ class ShutterMouseInputTest {
         assertFalse(consumed);
         assertEquals(0, shutterPresses.get());
     }
+
+    @Test
+    void consumesRightClickToCloseTheViewfinder() {
+        AtomicInteger closeRequests = new AtomicInteger();
+
+        boolean consumed = ShutterMouseInput.consumeRightClickClose(
+                new MouseButtonEvent(0.0, 0.0, new MouseButtonInfo(GLFW.GLFW_MOUSE_BUTTON_RIGHT, 0)),
+                () -> { closeRequests.incrementAndGet(); return true; });
+
+        assertTrue(consumed);
+        assertEquals(1, closeRequests.get());
+    }
+
+    @Test
+    void doesNotCloseOnLeftClick() {
+        AtomicInteger closeRequests = new AtomicInteger();
+
+        boolean consumed = ShutterMouseInput.consumeRightClickClose(
+                new MouseButtonEvent(0.0, 0.0, new MouseButtonInfo(GLFW.GLFW_MOUSE_BUTTON_LEFT, 0)),
+                () -> { closeRequests.incrementAndGet(); return true; });
+
+        assertFalse(consumed);
+        assertEquals(0, closeRequests.get());
+    }
 }

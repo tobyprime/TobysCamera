@@ -12,7 +12,7 @@ public final class Packets {
     }
 
     /** Sent only after the server has accepted and charged an UploadBegin request. */
-    public record UploadGranted(UUID token, long expiresAtEpochMillis, int tileBytes)
+    public record UploadGranted(UUID token, long expiresAtEpochMillis, int tileBytes, int maxChunksPerSecond)
             implements CameraPacket {
         @Override public PacketType type() { return PacketType.UPLOAD_GRANTED; }
     }
@@ -24,6 +24,15 @@ public final class Packets {
     /** Requests an upload session. It deliberately has no token: the server issues one after charging film. */
     public record UploadBegin(int gridWidth, int gridHeight) implements CameraPacket {
         @Override public PacketType type() { return PacketType.UPLOAD_BEGIN; }
+    }
+
+    public record UploadPreviewChunk(UUID token, int offset, byte[] data) implements CameraPacket {
+        public UploadPreviewChunk {
+            data = data.clone();
+        }
+
+        @Override public byte[] data() { return data.clone(); }
+        @Override public PacketType type() { return PacketType.UPLOAD_PREVIEW_CHUNK; }
     }
 
     public record UploadTileChunk(UUID token, int tileX, int tileY, int offset, byte[] data)
@@ -58,6 +67,11 @@ public final class Packets {
     }
     public record VideoGranted(UUID token, long expiresAtEpochMillis, int tileBytes, int maxChunksPerSecond) implements CameraPacket {
         @Override public PacketType type() { return PacketType.VIDEO_GRANTED; }
+    }
+    public record VideoPreviewChunk(UUID token, int offset, byte[] data) implements CameraPacket {
+        public VideoPreviewChunk { data = data.clone(); }
+        @Override public byte[] data() { return data.clone(); }
+        @Override public PacketType type() { return PacketType.VIDEO_PREVIEW_CHUNK; }
     }
     public record VideoTileChunk(UUID token, int frameIndex, int tileX, int tileY, int offset, byte[] data) implements CameraPacket {
         public VideoTileChunk { data = data.clone(); }

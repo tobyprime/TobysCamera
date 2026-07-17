@@ -1,6 +1,7 @@
 package dev.tobyscamera.folia.map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 import dev.tobyscamera.folia.bag.PhotoBagData;
@@ -14,24 +15,44 @@ import org.mockito.Mockito;
 
 class BagPreviewRestoreTest {
     @Test
-    void rebuildsPhotoPreviewPixelsFromPersistedTiles() throws Exception {
+    void rejectsLegacyPhotoWithoutPersistedPreview() throws Exception {
         PhotoRepository repository = Mockito.mock(PhotoRepository.class);
         UUID id = UUID.randomUUID();
-        byte[] pixels = filled((byte) 38);
-        when(repository.readTile(id, new TileCoordinate(0, 0))).thenReturn(pixels);
 
-        assertArrayEquals(pixels, new MapPhotoService(null, repository)
+        assertThrows(java.io.IOException.class, () -> new MapPhotoService(null, repository)
+                .previewPixels(new PhotoBagData(id, PhotoBagKind.PHOTO, 72, 1, 1)));
+        Mockito.verify(repository, Mockito.never()).readTile(Mockito.any(), Mockito.any());
+    }
+
+    @Test
+    void readsTheClientSuppliedPhotoPreviewBeforeConsideringSourceTiles() throws Exception {
+        PhotoRepository repository = Mockito.mock(PhotoRepository.class);
+        UUID id = UUID.randomUUID();
+        byte[] preview = filled((byte) 73);
+        when(repository.readPreview(id)).thenReturn(preview);
+
+        assertArrayEquals(preview, new MapPhotoService(null, repository)
                 .previewPixels(new PhotoBagData(id, PhotoBagKind.PHOTO, 72, 1, 1)));
     }
 
     @Test
-    void rebuildsVideoPreviewPixelsFromFirstPersistedFrame() throws Exception {
+    void rejectsLegacyVideoWithoutPersistedPreview() throws Exception {
         VideoRepository repository = Mockito.mock(VideoRepository.class);
         UUID id = UUID.randomUUID();
-        byte[] pixels = filled((byte) 65);
-        when(repository.readTile(id, 0, new TileCoordinate(0, 0))).thenReturn(pixels);
 
-        assertArrayEquals(pixels, new MapVideoService(repository)
+        assertThrows(java.io.IOException.class, () -> new MapVideoService(repository)
+                .previewPixels(new PhotoBagData(id, PhotoBagKind.VIDEO, 73, 1, 1)));
+        Mockito.verify(repository, Mockito.never()).readTile(Mockito.any(), Mockito.anyInt(), Mockito.any());
+    }
+
+    @Test
+    void readsTheClientSuppliedVideoPreviewBeforeConsideringSourceTiles() throws Exception {
+        VideoRepository repository = Mockito.mock(VideoRepository.class);
+        UUID id = UUID.randomUUID();
+        byte[] preview = filled((byte) 84);
+        when(repository.readPreview(id)).thenReturn(preview);
+
+        assertArrayEquals(preview, new MapVideoService(repository)
                 .previewPixels(new PhotoBagData(id, PhotoBagKind.VIDEO, 73, 1, 1)));
     }
 

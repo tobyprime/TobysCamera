@@ -41,14 +41,12 @@ public final class PluginPayloadGateway implements PluginMessageListener {
             plugin.getLogger().warning("Rejected malformed camera payload from " + player.getName() + ": " + exception.getMessage());
             return;
         }
-        plugin.getLogger().info("Received camera packet " + packet.getClass().getSimpleName() + " from " + player.getName() + ".");
         player.getScheduler().run(plugin, ignored -> new CameraPacketRouter(
                 photoPacket -> coordinator.handle(player, photoPacket),
                 videoPacket -> videoCoordinator.handle(player, videoPacket)).route(packet), () -> { });
     }
 
     public void send(Player player, CameraPacket packet) {
-        plugin.getLogger().info("Sending camera packet " + packet.getClass().getSimpleName() + " to " + player.getName() + ".");
         player.sendPluginMessage(plugin, CHANNEL, PacketCodec.encode(packet));
     }
 }

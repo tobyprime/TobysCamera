@@ -6,12 +6,13 @@ rate-limit:
   per-minute: 12
 upload:
   max-grid-size: 4
-  chunk-bytes: 8192
-  timeout-seconds: 30
+  max-chunks-per-second: 120
+  max-active-upload-bytes: 16777216
 video:
   max-fps: 10
   max-frames: 100
   max-upload-chunks-per-second: 120
+  max-active-upload-bytes: 67108864
   max-active-map-frames: 128
   max-update-distance: 128
 invalid-token:

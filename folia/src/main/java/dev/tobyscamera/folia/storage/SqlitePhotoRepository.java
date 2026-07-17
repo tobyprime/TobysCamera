@@ -39,8 +39,8 @@ public final class SqlitePhotoRepository implements PhotoRepository {
     }
 
     @Override
-    public synchronized void save(PhotoRecord record, Map<TileCoordinate, byte[]> tiles) throws IOException {
-        validateTiles(record, tiles);
+    public synchronized void save(PhotoRecord record, Map<TileCoordinate, byte[]> tiles, byte[] previewPixels) throws IOException {
+        validateTiles(record, tiles, previewPixels);
         Path staging = temporaryDirectory.resolve(record.photoId() + ".tbc");
         Path destination = ShardedMediaLayout.container(photosDirectory, record.photoId());
         try {
@@ -50,11 +50,11 @@ public final class SqlitePhotoRepository implements PhotoRepository {
             Map<String, TileContainer.Range> ranges = TileContainer.write(staging, contents);
             Files.move(staging, destination, StandardCopyOption.ATOMIC_MOVE);
             connection.setAutoCommit(false);
-            try (PreparedStatement photo = connection.prepareStatement("insert into photos(id, owner, created, width, height) values(?,?,?,?,?)");
+            try (PreparedStatement photo = connection.prepareStatement("insert into photos(id, owner, created, width, height, preview) values(?,?,?,?,?,?)");
                  PreparedStatement tile = connection.prepareStatement("insert into tiles(photo_id, x, y, map_id) values(?,?,?,?)");
                  PreparedStatement data = connection.prepareStatement("insert into photo_tile_data(photo_id,x,y,offset,length) values(?,?,?,?,?)")) {
                 photo.setString(1, record.photoId().toString()); photo.setString(2, record.ownerId().toString());
-                photo.setLong(3, record.createdAt().toEpochMilli()); photo.setInt(4, record.gridWidth()); photo.setInt(5, record.gridHeight()); photo.executeUpdate();
+                photo.setLong(3, record.createdAt().toEpochMilli()); photo.setInt(4, record.gridWidth()); photo.setInt(5, record.gridHeight()); photo.setBytes(6, previewPixels); photo.executeUpdate();
                 for (var entry : record.mapIds().entrySet()) {
                     tile.setString(1, record.photoId().toString()); tile.setInt(2, entry.getKey().x()); tile.setInt(3, entry.getKey().y()); tile.setInt(4, entry.getValue()); tile.addBatch();
                 }
@@ -68,6 +68,7 @@ public final class SqlitePhotoRepository implements PhotoRepository {
                 connection.rollback(); deleteQuietly(destination); throw exception;
             } finally { connection.setAutoCommit(true); }
         } catch (SQLException exception) { throw new IOException("could not save photo", exception); }
+        catch (IOException exception) { deleteQuietly(staging); throw exception; }
     }
 
     @Override
@@ -89,12 +90,27 @@ public final class SqlitePhotoRepository implements PhotoRepository {
 
     @Override
     public synchronized PhotoRecord find(UUID photoId) throws IOException {
-        for (PhotoRecord record : loadAll()) if (record.photoId().equals(photoId)) return record;
-        return null;
+        try (PreparedStatement photo = connection.prepareStatement("select id, owner, created, width, height from photos where id=?")) {
+            photo.setString(1, photoId.toString());
+            try (ResultSet result = photo.executeQuery()) {
+                if (!result.next()) return null;
+                Map<TileCoordinate, Integer> maps = new LinkedHashMap<>();
+                try (PreparedStatement tiles = connection.prepareStatement("select x, y, map_id from tiles where photo_id=? order by y,x")) {
+                    tiles.setString(1, photoId.toString());
+                    try (ResultSet rows = tiles.executeQuery()) {
+                        while (rows.next()) maps.put(new TileCoordinate(rows.getInt(1), rows.getInt(2)), rows.getInt(3));
+                    }
+                }
+                return new PhotoRecord(UUID.fromString(result.getString(1)), UUID.fromString(result.getString(2)),
+                        Instant.ofEpochMilli(result.getLong(3)), result.getInt(4), result.getInt(5), maps);
+            }
+        } catch (SQLException exception) {
+            throw new IOException("could not find photo", exception);
+        }
     }
 
     @Override
-    public byte[] readTile(UUID photoId, TileCoordinate coordinate) throws IOException {
+    public synchronized byte[] readTile(UUID photoId, TileCoordinate coordinate) throws IOException {
         try (PreparedStatement query = connection.prepareStatement("select offset,length from photo_tile_data where photo_id=? and x=? and y=?")) {
             query.setString(1, photoId.toString()); query.setInt(2, coordinate.x()); query.setInt(3, coordinate.y());
             try (ResultSet result = query.executeQuery()) {
@@ -104,21 +120,41 @@ public final class SqlitePhotoRepository implements PhotoRepository {
         } catch (SQLException exception) { throw new IOException("could not read photo tile index", exception); }
     }
 
-    @Override public void close() throws IOException { try { connection.close(); } catch (SQLException exception) { throw new IOException(exception); } }
+    @Override
+    public synchronized byte[] readPreview(UUID photoId) throws IOException {
+        try (PreparedStatement query = connection.prepareStatement("select preview from photos where id=?")) {
+            query.setString(1, photoId.toString());
+            try (ResultSet result = query.executeQuery()) {
+                if (!result.next()) throw new IOException("missing photo preview");
+                return result.getBytes(1);
+            }
+        } catch (SQLException exception) { throw new IOException("could not read photo preview", exception); }
+    }
+
+    @Override public synchronized void close() throws IOException { try { connection.close(); } catch (SQLException exception) { throw new IOException(exception); } }
 
     private void initialize() throws SQLException {
         try (Statement statement = connection.createStatement()) {
-            statement.executeUpdate("create table if not exists photos (id text primary key, owner text not null, created integer not null, width integer not null, height integer not null)");
+            statement.executeUpdate("create table if not exists photos (id text primary key, owner text not null, created integer not null, width integer not null, height integer not null, preview blob)");
             statement.executeUpdate("create table if not exists tiles (photo_id text not null, x integer not null, y integer not null, map_id integer not null, primary key(photo_id,x,y))");
             statement.executeUpdate("create table if not exists photo_tile_data (photo_id text not null, x integer not null, y integer not null, offset integer not null, length integer not null, primary key(photo_id,x,y))");
         }
+        ensurePreviewColumn();
+    }
+
+    private void ensurePreviewColumn() throws SQLException {
+        try (Statement statement = connection.createStatement(); ResultSet columns = statement.executeQuery("pragma table_info(photos)")) {
+            while (columns.next()) if ("preview".equals(columns.getString("name"))) return;
+        }
+        try (Statement statement = connection.createStatement()) { statement.executeUpdate("alter table photos add column preview blob"); }
     }
 
     private static String tileKey(TileCoordinate coordinate) { return coordinate.x() + "-" + coordinate.y(); }
 
-    private static void validateTiles(PhotoRecord record, Map<TileCoordinate, byte[]> tiles) {
+    private static void validateTiles(PhotoRecord record, Map<TileCoordinate, byte[]> tiles, byte[] previewPixels) {
         if (!tiles.keySet().equals(record.mapIds().keySet())) throw new IllegalArgumentException("tile keys must match map ids");
         for (byte[] tile : tiles.values()) if (tile.length != UploadSession.TILE_BYTES) throw new IllegalArgumentException("tile must be 16384 bytes");
+        if (previewPixels == null || previewPixels.length != UploadSession.TILE_BYTES) throw new IllegalArgumentException("preview must be 16384 bytes");
     }
 
     private void deleteQuietly(Path path) { try { if (Files.isDirectory(path)) { try (var children = Files.list(path)) { children.forEach(this::deleteQuietly); } } Files.deleteIfExists(path); } catch (IOException ignored) { } }

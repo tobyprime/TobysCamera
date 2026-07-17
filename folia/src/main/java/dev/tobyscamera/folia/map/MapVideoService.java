@@ -48,22 +48,31 @@ public final class MapVideoService {
 
     public void persist(VideoRecord record, VideoUploadSession session) throws IOException { repository.save(record, session); }
 
-    public ItemStack bag(World world, VideoRecord record, VideoUploadSession session) {
-        return PhotoBagFactory.create(world, record.videoId(), PhotoBagKind.VIDEO, record.gridWidth(), record.gridHeight(),
-                MapPreviewEncoder.encode(record.gridWidth(), record.gridHeight(), coordinate -> session.tile(0, coordinate.x(), coordinate.y())));
+    /** Stops serving maps created for a video that could not be persisted. Bukkit has no API to reclaim map ids. */
+    public void discard(VideoRecord record) {
+        recordsById.remove(record.videoId());
+        for (int mapId : record.mapIds().values()) {
+            renderers.remove(mapId);
+            tilesByMapId.remove(mapId);
+        }
     }
 
-    /** Recreates a bag-preview palette from frame zero in durable video storage. */
+    public ItemStack bag(World world, VideoRecord record, VideoUploadSession session) {
+        return bag(world, record, session, null);
+    }
+
+    public ItemStack bag(World world, VideoRecord record, VideoUploadSession session, PhotoMetadata metadata) {
+        return PhotoBagFactory.create(world, record.videoId(), PhotoBagKind.VIDEO, record.gridWidth(), record.gridHeight(),
+                metadata,
+                session.previewPixels());
+    }
+
+    /** Reads the client-generated preview persisted with the video. Legacy bags are unsupported. */
     public byte[] previewPixels(PhotoBagData bag) throws IOException {
         if (bag.kind() != PhotoBagKind.VIDEO) throw new IllegalArgumentException("bag is not a video");
-        try {
-            return MapPreviewEncoder.encode(bag.gridWidth(), bag.gridHeight(), coordinate -> {
-                try { return repository.readTile(bag.mediaId(), 0, coordinate); }
-                catch (IOException exception) { throw new PreviewReadFailure(exception); }
-            });
-        } catch (PreviewReadFailure exception) {
-            throw exception.getCause();
-        }
+        byte[] preview = repository.readPreview(bag.mediaId());
+        if (preview == null || preview.length != 16_384) throw new IOException("video bag preview is unavailable");
+        return preview;
     }
 
     public void restore() throws IOException {
@@ -102,8 +111,4 @@ public final class MapVideoService {
 
     public record VideoTile(UUID videoId, TileCoordinate coordinate) { }
 
-    private static final class PreviewReadFailure extends RuntimeException {
-        private PreviewReadFailure(IOException cause) { super(cause); }
-        @Override public IOException getCause() { return (IOException) super.getCause(); }
-    }
 }

@@ -32,4 +32,17 @@ class CameraPacketRouterTest {
         assertEquals(List.of(new Packets.UploadBegin(1, 1)), photos);
         assertEquals(List.of(), videos);
     }
+
+    @Test
+    void routesVideoPreviewPacketsOnlyToTheVideoHandler() {
+        List<CameraPacket> photos = new ArrayList<>();
+        List<CameraPacket> videos = new ArrayList<>();
+        CameraPacketRouter router = new CameraPacketRouter(photos::add, videos::add);
+        CameraPacket packet = new Packets.VideoPreviewChunk(java.util.UUID.randomUUID(), 0, new byte[8_192]);
+
+        router.route(packet);
+
+        assertEquals(List.of(), photos);
+        assertEquals(List.of(packet), videos);
+    }
 }

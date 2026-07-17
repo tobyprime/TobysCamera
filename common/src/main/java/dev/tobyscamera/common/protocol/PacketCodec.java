@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 public final class PacketCodec {
-    public static final byte VERSION = 1;
+    public static final byte VERSION = 2;
     public static final int MAX_CHUNK_BYTES = 8_192;
     private static final int MAX_STRING_BYTES = 512;
 
@@ -30,12 +30,14 @@ public final class PacketCodec {
                     writeUuid(out, value.token());
                     out.writeLong(value.expiresAtEpochMillis());
                     out.writeInt(value.tileBytes());
+                    out.writeInt(value.maxChunksPerSecond());
                 }
                 case Packets.RateLimited value -> out.writeLong(value.retryAfterMillis());
                 case Packets.UploadBegin value -> {
                     out.writeInt(value.gridWidth());
                     out.writeInt(value.gridHeight());
                 }
+                case Packets.UploadPreviewChunk value -> writePreviewChunk(out, value.token(), value.offset(), value.data());
                 case Packets.UploadTileChunk value -> {
                     if (value.data().length > MAX_CHUNK_BYTES) throw new ProtocolException("chunk exceeds limit");
                     writeUuid(out, value.token());
@@ -51,6 +53,7 @@ public final class PacketCodec {
                 case Packets.UploadRejected value -> writeString(out, value.reason());
                 case Packets.VideoBegin value -> { out.writeInt(value.gridWidth()); out.writeInt(value.gridHeight()); out.writeInt(value.fps()); out.writeInt(value.frameCount()); }
                 case Packets.VideoGranted value -> { writeUuid(out, value.token()); out.writeLong(value.expiresAtEpochMillis()); out.writeInt(value.tileBytes()); out.writeInt(value.maxChunksPerSecond()); }
+                case Packets.VideoPreviewChunk value -> writePreviewChunk(out, value.token(), value.offset(), value.data());
                 case Packets.VideoTileChunk value -> { if (value.data().length > MAX_CHUNK_BYTES) throw new ProtocolException("chunk exceeds limit"); writeUuid(out, value.token()); out.writeInt(value.frameIndex()); out.writeInt(value.tileX()); out.writeInt(value.tileY()); out.writeInt(value.offset()); out.writeInt(value.data().length); out.write(value.data()); }
                 case Packets.VideoFinish value -> writeUuid(out, value.token());
                 case Packets.VideoCreated value -> { writeUuid(out, value.videoId()); out.writeInt(value.gridWidth()); out.writeInt(value.gridHeight()); out.writeInt(value.fps()); out.writeInt(value.frameCount()); out.writeInt(value.mapIds().size()); for (int id : value.mapIds()) out.writeInt(id); }
@@ -71,15 +74,17 @@ public final class PacketCodec {
             if (in.get() != VERSION) throw new ProtocolException("unsupported protocol version");
             CameraPacket packet = switch (PacketType.fromId(in.get())) {
                 case CAPTURE_INTENT -> new Packets.CaptureIntent();
-                case UPLOAD_GRANTED -> new Packets.UploadGranted(readUuid(in), in.getLong(), in.getInt());
+                case UPLOAD_GRANTED -> new Packets.UploadGranted(readUuid(in), in.getLong(), in.getInt(), in.getInt());
                 case RATE_LIMITED -> new Packets.RateLimited(in.getLong());
                 case UPLOAD_BEGIN -> new Packets.UploadBegin(in.getInt(), in.getInt());
+                case UPLOAD_PREVIEW_CHUNK -> readUploadPreviewChunk(in);
                 case UPLOAD_TILE_CHUNK -> readChunk(in);
                 case UPLOAD_FINISH -> new Packets.UploadFinish(readUuid(in));
                 case PHOTO_CREATED -> readPhotoCreated(in);
                 case UPLOAD_REJECTED -> new Packets.UploadRejected(readString(in));
                 case VIDEO_BEGIN -> new Packets.VideoBegin(in.getInt(), in.getInt(), in.getInt(), in.getInt());
                 case VIDEO_GRANTED -> new Packets.VideoGranted(readUuid(in), in.getLong(), in.getInt(), in.getInt());
+                case VIDEO_PREVIEW_CHUNK -> readVideoPreviewChunk(in);
                 case VIDEO_TILE_CHUNK -> readVideoChunk(in);
                 case VIDEO_FINISH -> new Packets.VideoFinish(readUuid(in));
                 case VIDEO_CREATED -> readVideoCreated(in);
@@ -98,10 +103,30 @@ public final class PacketCodec {
         byte[] data = new byte[length]; in.get(data);
         return new Packets.UploadTileChunk(token, x, y, offset, data);
     }
+    private static Packets.UploadPreviewChunk readUploadPreviewChunk(ByteBuffer in) {
+        UUID token = readUuid(in); int offset = in.getInt();
+        return new Packets.UploadPreviewChunk(token, offset, readChunkData(in));
+    }
     private static Packets.VideoTileChunk readVideoChunk(ByteBuffer in) {
         UUID token = readUuid(in); int frame = in.getInt(), x = in.getInt(), y = in.getInt(), offset = in.getInt(), length = in.getInt();
         if (length < 0 || length > MAX_CHUNK_BYTES || length > in.remaining()) throw new ProtocolException("invalid chunk length");
         byte[] data = new byte[length]; in.get(data); return new Packets.VideoTileChunk(token, frame, x, y, offset, data);
+    }
+    private static Packets.VideoPreviewChunk readVideoPreviewChunk(ByteBuffer in) {
+        UUID token = readUuid(in); int offset = in.getInt();
+        return new Packets.VideoPreviewChunk(token, offset, readChunkData(in));
+    }
+
+    private static void writePreviewChunk(DataOutputStream out, UUID token, int offset, byte[] data) throws IOException {
+        if (data.length > MAX_CHUNK_BYTES) throw new ProtocolException("chunk exceeds limit");
+        writeUuid(out, token); out.writeInt(offset); out.writeInt(data.length); out.write(data);
+    }
+
+    private static byte[] readChunkData(ByteBuffer in) {
+        int length = in.getInt();
+        if (length < 0 || length > MAX_CHUNK_BYTES || length > in.remaining()) throw new ProtocolException("invalid chunk length");
+        byte[] data = new byte[length]; in.get(data);
+        return data;
     }
 
     private static Packets.PhotoCreated readPhotoCreated(ByteBuffer in) {

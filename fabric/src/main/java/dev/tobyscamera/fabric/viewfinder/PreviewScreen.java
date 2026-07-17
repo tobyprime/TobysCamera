@@ -61,8 +61,9 @@ public final class PreviewScreen extends Screen {
         addRenderableWidget(CycleButton.builder(this::ditheringValueLabel, ditheringMode)
                 .withValues(List.of(MapTileEncoder.DitheringMode.OFF, MapTileEncoder.DitheringMode.FLOYD_STEINBERG))
                 .create(width / 2 - 100, buttonY - 48, 200, 20, Component.translatable("tobyscamera.preview.dithering_label"), (button, value) -> { ditheringMode = value; requestPreviewRefresh(); }));
-        addRenderableWidget(CycleButton.builder(this::printValueLabel, printSize)
+        addRenderableWidget(CycleButton.builder(PreviewScreen::resolutionValueLabel, printSize)
                 .withValues(sizes)
+                .displayOnlyValue()
                 .create(width / 2 - 75, buttonY - 24, 150, 20, Component.translatable("tobyscamera.preview.print_label"), (button, value) -> { printSize = value; requestPreviewRefresh(); }));
         addRenderableWidget(Button.builder(Component.translatable("tobyscamera.preview.retake"), button -> closeForRetake()).bounds(width / 2 - 155, buttonY, 150, 20).build());
         addRenderableWidget(Button.builder(Component.translatable("tobyscamera.preview.use_photo"), button -> closeForUse()).bounds(width / 2 + 5, buttonY, 150, 20).build());
@@ -143,7 +144,7 @@ public final class PreviewScreen extends Screen {
     }
 
     private Component ditheringValueLabel(MapTileEncoder.DitheringMode mode) { return Component.translatable(mode == MapTileEncoder.DitheringMode.FLOYD_STEINBERG ? "tobyscamera.preview.dithering.floyd_steinberg" : "tobyscamera.preview.dithering.off"); }
-    private Component printValueLabel(int size) { return Component.literal(size + "x"); }
+    static Component resolutionValueLabel(int size) { return Component.translatable("tobyscamera.preview.resolution", size); }
 
     static TextureBlit textureBlit(int availableLeft, int availableTop, int textureWidth, int textureHeight, int availableWidth, int availableHeight) {
         if (textureWidth < 1 || textureHeight < 1 || availableWidth < 1 || availableHeight < 1) throw new IllegalArgumentException("dimensions must be positive");

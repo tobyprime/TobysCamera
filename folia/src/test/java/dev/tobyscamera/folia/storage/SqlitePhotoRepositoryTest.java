@@ -30,14 +30,21 @@ class SqlitePhotoRepositoryTest {
         PhotoRecord record = new PhotoRecord(photoId, UUID.randomUUID(), Instant.parse("2026-07-16T00:00:00Z"), 2, 2, maps);
 
         try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
-            repository.save(record, pixels);
+            repository.save(record, pixels, filled((byte) 91));
         }
         assertTrue(Files.exists(directory.resolve("photos").resolve(photoId.toString().substring(0, 2)).resolve(photoId + ".tbc")));
         try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
             PhotoRecord restored = repository.loadAll().getFirst();
             assertEquals(record, restored);
             assertArrayEquals(pixels.get(new TileCoordinate(1, 1)), repository.readTile(photoId, new TileCoordinate(1, 1)));
+            assertArrayEquals(filled((byte) 91), repository.readPreview(photoId));
         }
+    }
+
+    private static byte[] filled(byte value) {
+        byte[] result = new byte[16_384];
+        java.util.Arrays.fill(result, value);
+        return result;
     }
 
 }

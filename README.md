@@ -32,7 +32,7 @@ settings.
    /give @s minecraft:spyglass[custom_data={PublicBukkitValues:{"tobyscamera:camera":1b}}]
    ```
 
-4. Hold the camera and right-click to open the square viewfinder. Use `[` / `]` to zoom, `G` to switch guides, and `Enter` to take a picture. The shutter key appears under the **TobysCamera** category in Minecraft's Controls settings and can be rebound. The server should play a shutter sound and issue a short-lived upload Token.
+4. Hold the camera and right-click to open the square viewfinder. Use `-` / `=` to zoom, `G` to switch guides, and `Enter` to take a picture. The shutter key appears under the **TobysCamera** category in Minecraft's Controls settings and can be rebound. The server should play a shutter sound and issue a short-lived upload Token.
 5. The client captures its rendered frame and opens a preview. Select **Use photo** to upload map palette tiles or **Retake** to return to the viewfinder.
 6. Verify the resulting 1x1, 2x2 and 4x4 `filled_map` items can be held or put in item frames by an unmodded player.
 7. Restart the server and verify the same maps still render. Fill the photographer's inventory to verify overflow drops at their feet; disconnect during delivery to verify the pending delivery is retried on join.
@@ -40,7 +40,7 @@ settings.
 
 ## Video maps
 
-Only cameras with the `tobyscamera:video` component can record video. `tobyscamera:video_max_grid_size` and `tobyscamera:video_max_frames` independently limit a video's map size and retained frame count; `tobyscamera:max_video_fps` limits its frame rate. While holding one, `V` (rebindable in **TobysCamera** controls) switches between photo and video modes. In video mode, `-` / `=` select only tick-aligned `1 / 5 / 10 / 20 FPS` rates. Press the shutter once to start and again to stop. The confirmation screen trims the retained frame range, chooses the final rectangular map layout and dithering, then uploads exactly the palette bytes that it previews. Floyd–Steinberg dithering is enabled by default.
+Only cameras with the `tobyscamera:video` component can record video. `tobyscamera:video_max_grid_size` and `tobyscamera:video_max_frames` independently limit a video's map size and retained frame count; `tobyscamera:max_video_fps` limits its frame rate. While holding one, `V` (rebindable in **TobysCamera** controls) switches between photo and video modes. In video mode, `]` cycles only tick-aligned `1 / 5 / 10 / 20 FPS` rates. Press the shutter once to start and again to stop. The confirmation screen trims the retained frame range, chooses the final rectangular map layout and dithering, then uploads exactly the palette bytes that it previews. Floyd–Steinberg dithering is enabled by default.
 
 The plugin's reloadable `video:` configuration has these defaults:
 
@@ -59,7 +59,7 @@ Each retained frame costs one film for every final map tile: a 12-frame 2×3 vid
 
 ### Video manual verification
 
-1. Give yourself a tagged camera with `tobyscamera:video`, enough film (or `tobyscamera:no_film_required`), and optionally `tobyscamera:max_video_fps`. Hold it, right-click, press `V`, choose an FPS with `-` / `=`, then press the configured shutter key to start and stop a short recording.
+1. Give yourself a tagged camera with `tobyscamera:video`, enough film (or `tobyscamera:no_film_required`), and optionally `tobyscamera:max_video_fps`. Hold it, right-click, press `V`, choose an FPS with `]`, then press the configured shutter key to start and stop a short recording.
 2. In confirmation, move the start/end controls to remove at least one frame from each side. Select a non-square composition (for example 4:3) and a print size that produces a rectangular map layout. The displayed preview must match the final map palette, including black borders and dithering.
 3. Confirm printing. Check that the server grants the upload, the client throttles rather than freezing, and every delivered `filled_map` has matching grid position, photographer, location and time lore.
 4. Place the delivered maps in item frames. They should loop at the selected FPS after a server restart. Place more than `video.max-active-map-frames` maps at varied distances; only the nearest configured number should receive refreshes each pass.

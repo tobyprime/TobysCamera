@@ -17,7 +17,7 @@ public final class MapDeliveryService {
         deliver(player, record, transientMetadata.remove(record.photoId()));
     }
     public void deliver(Player player, PhotoRecord record, PhotoMetadata metadata) throws IOException {
-        MapItemDelivery.deliver(java.util.List.of(maps.bag(player.getWorld(), record)),
+        MapItemDelivery.deliver(java.util.List.of(maps.bag(player.getWorld(), record, metadata)),
                 player.getInventory()::addItem, item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
     }
     public void queue(Player player, PhotoRecord record, PhotoMetadata metadata) throws IOException {

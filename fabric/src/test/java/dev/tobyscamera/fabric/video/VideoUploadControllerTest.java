@@ -12,26 +12,51 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 class VideoUploadControllerTest {
+    @Test
+    void reportsLocalEncodingFailureInsteadOfSilentlyStayingInUploadState() throws Exception {
+        List<CameraPacket> sent = new ArrayList<>();
+        TemporaryVideoRecording recording = TemporaryVideoRecording.create(Files.createTempDirectory("camera-video"));
+        VideoTestImages.append(recording, new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB));
+        VideoEncoder encoder = new VideoEncoder(recording, new VideoFrameRange(0, 0, 1),
+                new PrintLayout(1, 1, new AspectRatio(1, 1)), MapTileEncoder.DitheringMode.OFF);
+        AtomicReference<String> failure = new AtomicReference<>();
+        VideoUploadController controller = new VideoUploadController(sent::add, () -> 1_000L, failure::set);
+        controller.begin(encoder, recording, 10);
+        controller.handleServerPacket(new Packets.VideoGranted(UUID.randomUUID(), 2_000L, 16_384, 2));
+        recording.close();
+
+        controller.tick();
+
+        assertEquals("Could not encode video upload", failure.get());
+    }
+
     @Test
     void sendsBeginThenRateLimitedFrameTilesThenFinish() throws Exception {
         List<CameraPacket> sent = new ArrayList<>();
         try (TemporaryVideoRecording recording = TemporaryVideoRecording.create(Files.createTempDirectory("camera-video"))) {
             VideoTestImages.append(recording, new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB));
             VideoEncoder encoder = new VideoEncoder(recording, new VideoFrameRange(0, 0, 1), new PrintLayout(1, 1, new AspectRatio(1, 1)), MapTileEncoder.DitheringMode.OFF);
-            VideoUploadController controller = new VideoUploadController(sent::add, () -> 1_000L);
+            AtomicLong now = new AtomicLong(1_000L);
+            VideoUploadController controller = new VideoUploadController(sent::add, now::get);
             controller.begin(encoder, recording, 10);
             controller.handleServerPacket(new Packets.VideoGranted(UUID.randomUUID(), 2_000L, 16_384, 2));
             controller.tick();
+            now.addAndGet(1_000L);
+            controller.tick();
 
             assertEquals(Packets.VideoBegin.class, sent.get(0).getClass());
-            assertEquals(Packets.VideoTileChunk.class, sent.get(1).getClass());
-            assertEquals(Packets.VideoTileChunk.class, sent.get(2).getClass());
-            assertEquals(Packets.VideoFinish.class, sent.get(3).getClass());
-            assertEquals(2, controller.progress().completedChunks());
-            assertEquals(2, controller.progress().totalChunks());
+            assertEquals(Packets.VideoPreviewChunk.class, sent.get(1).getClass());
+            assertEquals(Packets.VideoPreviewChunk.class, sent.get(2).getClass());
+            assertEquals(Packets.VideoTileChunk.class, sent.get(3).getClass());
+            assertEquals(Packets.VideoTileChunk.class, sent.get(4).getClass());
+            assertEquals(Packets.VideoFinish.class, sent.get(5).getClass());
+            assertEquals(4, controller.progress().completedChunks());
+            assertEquals(4, controller.progress().totalChunks());
         }
     }
 
@@ -50,9 +75,9 @@ class VideoUploadControllerTest {
             controller.handleServerPacket(new Packets.VideoGranted(UUID.randomUUID(), 2_000L, 16_384, 100));
             controller.tick();
 
-            assertEquals(8, sent.stream().filter(Packets.VideoTileChunk.class::isInstance).count());
+            assertEquals(6, sent.stream().filter(Packets.VideoTileChunk.class::isInstance).count());
             assertEquals(8, controller.progress().completedChunks());
-            assertEquals(10, controller.progress().totalChunks());
+            assertEquals(12, controller.progress().totalChunks());
         }
     }
 }

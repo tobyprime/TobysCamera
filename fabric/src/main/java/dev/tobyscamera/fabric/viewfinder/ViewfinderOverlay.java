@@ -12,8 +12,14 @@ import java.util.Locale;
 
 public final class ViewfinderOverlay {
     private static final int MASK_COLOR = 0xB0000000;
-    private static final int BORDER_COLOR = 0xE0FFFFFF;
-    private static final int GRID_COLOR = 0x80FFFFFF;
+    private static final int LENS_SHADOW = 0x8C000000;
+    private static final int LENS_DEEP_SHADOW = 0xC8000000;
+    private static final int HUD_PANEL = 0x8C000000;
+    private static final int HUD_TEXT = 0xE8F5FFF4;
+    private static final int HUD_MUTED_TEXT = 0xB8D8E4D6;
+    private static final int HUD_ACCENT = 0xE0D6FF74;
+    private static final int HUD_RECORDING = 0xE0FF2F2F;
+    private static final int GRID_COLOR = 0x68FFFFFF;
     private final ViewfinderSession session;
     private final KeyMapping zoomIn;
     private final KeyMapping zoomOut;
@@ -21,14 +27,13 @@ public final class ViewfinderOverlay {
     private final KeyMapping compositionKey;
     private final KeyMapping shutterKey;
     private final KeyMapping modeKey;
-    private final KeyMapping fpsUpKey;
-    private final KeyMapping fpsDownKey;
+    private final KeyMapping fpsKey;
     private final IntSupplier remainingFilm;
     private final Supplier<UploadProgress> uploadProgress;
     private int shutterTicks;
 
     public ViewfinderOverlay(ViewfinderSession session, KeyMapping zoomIn, KeyMapping zoomOut, KeyMapping gridKey,
-            KeyMapping compositionKey, KeyMapping shutterKey, KeyMapping modeKey, KeyMapping fpsUpKey, KeyMapping fpsDownKey, IntSupplier remainingFilm,
+            KeyMapping compositionKey, KeyMapping shutterKey, KeyMapping modeKey, KeyMapping fpsKey, IntSupplier remainingFilm,
             Supplier<UploadProgress> uploadProgress) {
         this.session = session;
         this.zoomIn = zoomIn;
@@ -37,8 +42,7 @@ public final class ViewfinderOverlay {
         this.compositionKey = compositionKey;
         this.shutterKey = shutterKey;
         this.modeKey = modeKey;
-        this.fpsUpKey = fpsUpKey;
-        this.fpsDownKey = fpsDownKey;
+        this.fpsKey = fpsKey;
         this.remainingFilm = remainingFilm;
         this.uploadProgress = uploadProgress;
     }
@@ -60,18 +64,12 @@ public final class ViewfinderOverlay {
         graphics.fill(0, top + frameHeight, width, height, MASK_COLOR);
         graphics.fill(0, top, left, top + frameHeight, MASK_COLOR);
         graphics.fill(left + frameWidth, top, width, top + frameHeight, MASK_COLOR);
-        drawBorder(graphics, left, top, frameWidth, frameHeight);
+        drawLensBorder(graphics, left, top, frameWidth, frameHeight);
         drawGrid(graphics, left, top, frameWidth, frameHeight);
-        int film = remainingFilm.getAsInt();
-        if (showsFilm(film)) graphics.drawString(minecraft.font, Component.translatable("tobyscamera.viewfinder.film", Math.max(0, film)), left + 6, top + 6, BORDER_COLOR, true);
-        Component mode = session.mode() == CaptureMode.VIDEO
-                ? Component.translatable("tobyscamera.viewfinder.video_mode", session.videoFps(), keyName(modeKey), keyName(fpsDownKey), keyName(fpsUpKey))
-                : Component.translatable("tobyscamera.viewfinder.photo_mode", keyName(modeKey));
-        graphics.drawString(minecraft.font, mode, left + 6, top + 18, BORDER_COLOR, true);
+        drawCameraHud(graphics, minecraft, left, top, frameWidth, frameHeight);
         if (session.state() == ViewfinderState.UPLOADING) drawUploadProgress(graphics, minecraft, left, top, frameWidth, frameHeight);
-        else drawHint(graphics, minecraft, left, top, Component.translatable("tobyscamera.viewfinder.hint", String.format(Locale.ROOT, "%.2f", session.targetZoom()), session.composition().aspectRatio().toString(),
-                keyName(zoomIn), keyName(zoomOut), keyName(gridKey), keyName(compositionKey), keyName(shutterKey)),
-                frameWidth);
+        else drawHint(graphics, minecraft, left, top, hintComponent(keyName(zoomIn), keyName(zoomOut), keyName(gridKey),
+                keyName(compositionKey), keyName(shutterKey)), frameWidth, frameHeight);
         if (shutterTicks > 0) graphics.fill(left, top, left + frameWidth, top + frameHeight, 0xDD000000);
     }
 
@@ -87,37 +85,129 @@ public final class ViewfinderOverlay {
 
     static String hintText(float zoom, String aspectRatio, String zoomIn, String zoomOut, String grid,
             String composition, String shutter) {
-        return "x%.2f  %s  [%s/%s] zoom  [%s] grid  [%s] composition  [%s] shutter  [Esc] close"
-                .formatted(zoom, aspectRatio, zoomIn, zoomOut, grid, composition, shutter);
+        return "[%s/%s] zoom  [%s] grid  [%s] composition  [%s] shutter  [Right Mouse] close"
+                .formatted(zoomIn, zoomOut, grid, composition, shutter);
+    }
+    static Component hintComponent(String zoomIn, String zoomOut, String grid, String composition, String shutter) {
+        return Component.translatable("tobyscamera.viewfinder.hint", zoomIn, zoomOut, grid, composition, shutter);
     }
 
-    static String filmLabel(int remainingFilm) { return "Film: " + Math.max(0, remainingFilm); }
-    static String modeLabel(CaptureMode mode, int fps, String modeKey, String fpsDown, String fpsUp) {
-        return mode == CaptureMode.VIDEO ? "VIDEO %d FPS  [%s] mode  [%s/%s] fps".formatted(fps, modeKey, fpsDown, fpsUp) : "PHOTO  [%s] mode".formatted(modeKey);
+    static String filmLabel(int remainingFilm) { return "FILM %02d".formatted(Math.max(0, remainingFilm)); }
+    static String modeLabel(CaptureMode mode, int fps, String modeKey, String fpsKey) {
+        return mode == CaptureMode.VIDEO ? "VIDEO %dFPS  [%s] mode  %s fps".formatted(fps, modeKey, fpsKey) : "PHOTO  [%s] mode".formatted(modeKey);
     }
     static boolean showsFilm(int remainingFilm) { return remainingFilm >= 0; }
+    static String statusLabel(ViewfinderState state, CaptureMode mode) {
+        if (state == ViewfinderState.UPLOADING) return "UPL";
+        if (state == ViewfinderState.CAPTURING) return mode == CaptureMode.VIDEO ? "REC" : "CAP";
+        if (state == ViewfinderState.AWAITING_GRANT) return "WAIT";
+        return mode == CaptureMode.VIDEO ? "VIDEO" : "PHOTO";
+    }
+    static String zoomLabel(float zoom) { return String.format(Locale.ROOT, "x%.2f", zoom); }
+    static String aspectLabel(String aspectRatio) { return "AR " + aspectRatio; }
 
     private void drawUploadProgress(GuiGraphics graphics, Minecraft minecraft, int left, int top, int width, int height) {
         UploadProgress progress = uploadProgress.get();
         int barWidth = Math.min(240, width - 24), barLeft = left + (width - barWidth) / 2, barTop = top + height / 2;
         graphics.fill(barLeft, barTop, barLeft + barWidth, barTop + 8, 0xB0000000);
         graphics.fill(barLeft, barTop, barLeft + (int) Math.round(barWidth * progress.fraction()), barTop + 8, 0xE0FFFFFF);
-        graphics.drawCenteredString(minecraft.font, Component.translatable("tobyscamera.viewfinder.uploading", progress.percentage()), left + width / 2, barTop - 12, BORDER_COLOR);
+        graphics.drawCenteredString(minecraft.font, Component.translatable("tobyscamera.viewfinder.uploading", progress.percentage()), left + width / 2, barTop - 12, HUD_TEXT);
     }
-    private static void drawHint(GuiGraphics graphics, Minecraft minecraft, int left, int top, Component hint, int frameWidth) {
-        int hintWidth = Math.min(frameWidth - 12, minecraft.font.width(hint) + 8);
-        graphics.fill(left + 2, top + 30, left + 2 + hintWidth, top + 44, 0x90000000);
-        graphics.drawString(minecraft.font, hint, left + 6, top + 32, BORDER_COLOR, true);
+
+    private void drawCameraHud(GuiGraphics graphics, Minecraft minecraft, int left, int top, int width, int height) {
+        HudLayout layout = hudLayout(left, top, width, height, 0);
+        String status = statusLabel(session.state(), session.mode());
+        int statusColor = status.equals("REC") ? HUD_RECORDING : HUD_ACCENT;
+        drawReadout(graphics, minecraft, Component.literal(status), layout.statusLeft(), layout.statusTop(), statusColor);
+        if (status.equals("REC")) graphics.fill(layout.statusLeft() + minecraft.font.width(status) + 14, layout.statusTop() + 5,
+                layout.statusLeft() + minecraft.font.width(status) + 20, layout.statusTop() + 11, HUD_RECORDING);
+        Component mode = Component.literal(modeLabel(session.mode(), session.videoFps(), keyName(modeKey), keyName(fpsKey)));
+        graphics.drawString(minecraft.font, mode, layout.statusLeft(), layout.statusTop() + 18, HUD_MUTED_TEXT, true);
+        int film = remainingFilm.getAsInt();
+        if (showsFilm(film)) drawReadoutRight(graphics, minecraft, Component.literal(filmLabel(film)), layout.safeRight(), layout.statusTop(), HUD_TEXT);
+        String bottomLeft = zoomLabel(session.targetZoom()) + "  " + aspectLabel(session.composition().aspectRatio().toString());
+        drawReadout(graphics, minecraft, Component.literal(bottomLeft), layout.safeLeft(), layout.exposureTop(), HUD_TEXT);
+        graphics.drawString(minecraft.font, Component.literal(gridLabel(session.grid())), layout.safeLeft(), layout.gridTop(), HUD_MUTED_TEXT, true);
+    }
+
+    private static String gridLabel(CompositionGrid grid) {
+        return switch (grid) {
+            case NONE -> "GRID OFF";
+            case THIRDS -> "GRID 3x3";
+            case CROSSHAIR -> "GRID +";
+        };
+    }
+
+    private static void drawHint(GuiGraphics graphics, Minecraft minecraft, int left, int top, Component hint, int frameWidth, int frameHeight) {
+        HudLayout layout = hudLayout(left, top, frameWidth, frameHeight, minecraft.font.width(hint) + 10);
+        graphics.fill(layout.hintLeft(), layout.hintTop(), layout.hintLeft() + layout.hintWidth(), layout.hintTop() + 14, HUD_PANEL);
+        graphics.drawString(minecraft.font, hint, layout.hintLeft() + 5, layout.hintTop() + 3, HUD_MUTED_TEXT, true);
     }
 
     private static String keyName(KeyMapping key) { return key.getTranslatedKeyMessage().getString(); }
 
-    private static void drawBorder(GuiGraphics graphics, int left, int top, int width, int height) {
+    static HudLayout hudLayout(int left, int top, int width, int height, int preferredHintWidth) {
+        int inset = 10;
+        int safeLeft = left + inset;
+        int safeTop = top + inset;
+        int safeRight = left + width - inset;
+        int safeBottom = top + height - inset;
+        int hintWidth = Math.min(Math.max(0, preferredHintWidth), Math.max(0, safeRight - safeLeft));
+        int hintLeft = safeLeft + Math.max(0, (safeRight - safeLeft - hintWidth) / 2);
+        int hintTop = safeBottom - 16;
+        int exposureTop = hintTop - 30;
+        return new HudLayout(safeLeft, safeTop, safeRight, safeBottom, safeLeft, safeTop,
+                hintLeft, hintTop, hintWidth, exposureTop, exposureTop - 14);
+    }
+
+    private static void drawReadout(GuiGraphics graphics, Minecraft minecraft, Component text, int left, int top, int color) {
+        int width = minecraft.font.width(text) + 10;
+        graphics.fill(left, top, left + width, top + 15, HUD_PANEL);
+        graphics.drawString(minecraft.font, text, left + 5, top + 4, color, true);
+    }
+
+    private static void drawReadoutRight(GuiGraphics graphics, Minecraft minecraft, Component text, int right, int top, int color) {
+        int width = minecraft.font.width(text) + 10;
+        drawReadout(graphics, minecraft, text, right - width, top, color);
+    }
+
+    private static void drawLensBorder(GuiGraphics graphics, int left, int top, int width, int height) {
+        LensBorderLayout layout = lensBorderLayout(left, top, width, height);
+        int rim = layout.rim();
+        int inner = Math.max(3, rim / 3);
+        int right = left + width;
+        int bottom = top + height;
+        graphics.fill(layout.outerLeft(), layout.outerTop(), layout.outerRight(), top, LENS_DEEP_SHADOW);
+        graphics.fill(layout.outerLeft(), bottom, layout.outerRight(), layout.outerBottom(), LENS_DEEP_SHADOW);
+        graphics.fill(layout.outerLeft(), top, left, bottom, LENS_DEEP_SHADOW);
+        graphics.fill(right, top, layout.outerRight(), bottom, LENS_DEEP_SHADOW);
+        graphics.fill(left, top - inner, right, top, LENS_SHADOW);
+        graphics.fill(left, bottom, right, bottom + inner, LENS_SHADOW);
+        graphics.fill(left - inner, top, left, bottom, LENS_SHADOW);
+        graphics.fill(right, top, right + inner, bottom, LENS_SHADOW);
+        drawCornerBrackets(graphics, layout.bracketLeft(), layout.bracketTop(), layout.bracketWidth(), layout.bracketHeight());
+    }
+
+    private static int lensRim(int width, int height) { return Math.max(8, Math.min(width, height) / 28); }
+
+    static LensBorderLayout lensBorderLayout(int left, int top, int width, int height) {
+        int rim = lensRim(width, height);
+        return new LensBorderLayout(rim, left - rim, top - rim, left + width + rim, top + height + rim,
+                left, top, width, height);
+    }
+
+    private static void drawCornerBrackets(GuiGraphics graphics, int left, int top, int width, int height) {
+        int length = Math.max(18, Math.min(52, Math.min(width, height) / 8));
         int stroke = 2;
-        graphics.fill(left, top, left + width, top + stroke, BORDER_COLOR);
-        graphics.fill(left, top + height - stroke, left + width, top + height, BORDER_COLOR);
-        graphics.fill(left, top, left + stroke, top + height, BORDER_COLOR);
-        graphics.fill(left + width - stroke, top, left + width, top + height, BORDER_COLOR);
+        int color = 0xD8FFFFFF;
+        graphics.fill(left, top, left + length, top + stroke, color);
+        graphics.fill(left, top, left + stroke, top + length, color);
+        graphics.fill(left + width - length, top, left + width, top + stroke, color);
+        graphics.fill(left + width - stroke, top, left + width, top + length, color);
+        graphics.fill(left, top + height - stroke, left + length, top + height, color);
+        graphics.fill(left, top + height - length, left + stroke, top + height, color);
+        graphics.fill(left + width - length, top + height - stroke, left + width, top + height, color);
+        graphics.fill(left + width - stroke, top + height - length, left + width, top + height, color);
     }
 
     private void drawGrid(GuiGraphics graphics, int left, int top, int width, int height) {
@@ -135,4 +225,8 @@ public final class ViewfinderOverlay {
     }
 
     record Frame(int left, int top, int width, int height) { }
+    record HudLayout(int safeLeft, int safeTop, int safeRight, int safeBottom, int statusLeft, int statusTop,
+            int hintLeft, int hintTop, int hintWidth, int exposureTop, int gridTop) { }
+    record LensBorderLayout(int rim, int outerLeft, int outerTop, int outerRight, int outerBottom,
+            int bracketLeft, int bracketTop, int bracketWidth, int bracketHeight) { }
 }

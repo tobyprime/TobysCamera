@@ -76,6 +76,17 @@ class MapTileEncoderTest {
     }
 
     @Test
+    void bagPreviewDownsamplesTheEntireEncodedTileGridToOneMapTile() {
+        var encoded = new MapTileEncoder.EncodedPhoto(2, 1, java.util.List.of(filled((byte) 11), filled((byte) 22)));
+
+        byte[] preview = encoder.bagPreview(encoded);
+
+        assertEquals(16_384, preview.length);
+        assertEquals(11, Byte.toUnsignedInt(preview[0]));
+        assertEquals(22, Byte.toUnsignedInt(preview[127]));
+    }
+
+    @Test
     void neverEncodesOpaqueBlackAsAnyTransparentOrPaperSkippedMapColorVariant() {
         BufferedImage black = new BufferedImage(128, 128, BufferedImage.TYPE_INT_ARGB);
         for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) black.setRGB(x, y, 0xff000000);
@@ -108,5 +119,11 @@ class MapTileEncoderTest {
 
     private static int mapArgb(byte packedId) {
         return 0xff000000 | MapColor.getColorFromPackedId(Byte.toUnsignedInt(packedId)) & 0x00ffffff;
+    }
+
+    private static byte[] filled(byte value) {
+        byte[] pixels = new byte[16_384];
+        Arrays.fill(pixels, value);
+        return pixels;
     }
 }

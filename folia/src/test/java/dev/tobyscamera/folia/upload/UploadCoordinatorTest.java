@@ -12,12 +12,30 @@ import dev.tobyscamera.folia.config.PluginSettings;
 import dev.tobyscamera.folia.camera.CameraFilmService;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.Test;
 
 class UploadCoordinatorTest {
+    @Test
+    void expiresIncompleteUploadSessionsWithoutWaitingForAnotherPacket() {
+        Player player = player();
+        List<CameraPacket> sent = new ArrayList<>();
+        CameraFilmService films = mock(CameraFilmService.class);
+        ItemStack camera = mock(ItemStack.class);
+        when(films.heldCamera(player)).thenReturn(camera);
+        when(films.maximumForFilm(camera, 4)).thenReturn(1);
+        when(films.consume(camera, 1)).thenReturn(true);
+        UploadCoordinator coordinator = coordinator(sent, films, (ignored, session, metadata) -> { });
+
+        coordinator.handle(player, new Packets.UploadBegin(1, 1));
+
+        assertEquals(1, coordinator.expireSessions(Instant.now().plusSeconds(61)));
+    }
+
     @Test
     void beginChargesFilmThenGrantsTokenAndRateLimitsSecondBegin() {
         Player player = player();
@@ -47,6 +65,66 @@ class UploadCoordinatorTest {
         verify(player).kick(any());
     }
 
+    @Test
+    void acceptsClientPreviewBeforeCompletingThePhoto() {
+        Player player = player();
+        List<CameraPacket> sent = new ArrayList<>();
+        CameraFilmService films = mock(CameraFilmService.class);
+        ItemStack camera = mock(ItemStack.class);
+        when(films.heldCamera(player)).thenReturn(camera);
+        when(films.maximumForFilm(camera, 4)).thenReturn(1);
+        when(films.consume(camera, 1)).thenReturn(true);
+        AtomicReference<dev.tobyscamera.common.upload.UploadSession> completed = new AtomicReference<>();
+        UploadCoordinator coordinator = coordinator(sent, films, (ignored, session, metadata) -> completed.set(session));
+
+        coordinator.handle(player, new Packets.UploadBegin(1, 1));
+        UUID token = ((Packets.UploadGranted) sent.getFirst()).token();
+        coordinator.handle(player, new Packets.UploadPreviewChunk(token, 0, filled((byte) 17, 8_192)));
+        coordinator.handle(player, new Packets.UploadPreviewChunk(token, 8_192, filled((byte) 23, 8_192)));
+        coordinator.handle(player, new Packets.UploadTileChunk(token, 0, 0, 0, new byte[8_192]));
+        coordinator.handle(player, new Packets.UploadTileChunk(token, 0, 0, 8_192, new byte[8_192]));
+        coordinator.handle(player, new Packets.UploadFinish(token));
+
+        assertEquals(23, Byte.toUnsignedInt(completed.get().previewPixels()[8_192]));
+    }
+
+    @Test
+    void rejectsPhotoSecondChunkInsideConfiguredOneChunkWindow() {
+        Player player = player();
+        List<CameraPacket> sent = new ArrayList<>();
+        CameraFilmService films = mock(CameraFilmService.class);
+        ItemStack camera = mock(ItemStack.class);
+        when(films.heldCamera(player)).thenReturn(camera);
+        when(films.maximumForFilm(camera, 4)).thenReturn(1);
+        when(films.consume(camera, 1)).thenReturn(true);
+        UploadCoordinator coordinator = new UploadCoordinator(PluginSettings.from(java.util.Map.of("upload.max-chunks-per-second", 1)), films,
+                (ignored, packet) -> sent.add(packet), (ignored, session, metadata) -> { }, ignored -> { });
+
+        coordinator.handle(player, new Packets.UploadBegin(1, 1));
+        UUID token = ((Packets.UploadGranted) sent.getFirst()).token();
+        coordinator.handle(player, new Packets.UploadPreviewChunk(token, 0, new byte[8_192]));
+        coordinator.handle(player, new Packets.UploadPreviewChunk(token, 8_192, new byte[8_192]));
+
+        assertEquals(Packets.UploadRejected.class, sent.getLast().getClass());
+    }
+
+    @Test
+    void rejectsPhotoThatExceedsTheConfiguredActiveUploadMemoryBudget() {
+        Player player = player();
+        List<CameraPacket> sent = new ArrayList<>();
+        CameraFilmService films = mock(CameraFilmService.class);
+        ItemStack camera = mock(ItemStack.class);
+        when(films.heldCamera(player)).thenReturn(camera);
+        when(films.maximumForFilm(camera, 4)).thenReturn(1);
+        UploadCoordinator coordinator = new UploadCoordinator(PluginSettings.from(java.util.Map.of("upload.max-active-upload-bytes", 16_384L)), films,
+                (ignored, packet) -> sent.add(packet), (ignored, session, metadata) -> { }, ignored -> { });
+
+        coordinator.handle(player, new Packets.UploadBegin(1, 1));
+
+        assertEquals(Packets.UploadRejected.class, sent.getFirst().getClass());
+        org.mockito.Mockito.verify(films, org.mockito.Mockito.never()).consume(camera, 1);
+    }
+
     private static UploadCoordinator coordinator(List<CameraPacket> sent, CameraFilmService films, CompletedUploadHandler completed) {
         return new UploadCoordinator(PluginSettings.from(java.util.Map.of()), films,
                 (player, packet) -> sent.add(packet), completed, ignored -> { });
@@ -55,6 +133,14 @@ class UploadCoordinatorTest {
     private static Player player() {
         Player player = mock(Player.class);
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
+        org.bukkit.World world = mock(org.bukkit.World.class);
+        when(world.getKey()).thenReturn(new org.bukkit.NamespacedKey("minecraft", "world"));
+        when(player.getWorld()).thenReturn(world);
+        when(player.getLocation()).thenReturn(new org.bukkit.Location(world, 1, 2, 3));
         return player;
+    }
+
+    private static byte[] filled(byte value, int length) {
+        byte[] result = new byte[length]; java.util.Arrays.fill(result, value); return result;
     }
 }

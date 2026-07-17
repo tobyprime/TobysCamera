@@ -16,8 +16,7 @@ class PluginSettingsTest {
         assertEquals(1, settings.perSecond());
         assertEquals(12, settings.perMinute());
         assertEquals(4, settings.maxGridSize());
-        assertEquals(8_192, settings.chunkBytes());
-        assertEquals(30, settings.uploadTimeoutSeconds());
+        assertEquals(120, settings.uploadChunksPerSecond());
         assertEquals(10, settings.videoMaxFps());
         assertEquals(100, settings.videoMaxFrames());
         assertEquals(120, settings.videoUploadChunksPerSecond());

@@ -1,7 +1,10 @@
 package dev.tobyscamera.fabric.viewfinder;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import org.junit.jupiter.api.Test;
 
 final class PreviewScreenTest {
@@ -41,5 +44,14 @@ final class PreviewScreenTest {
         assertEquals(300, blit.height());
         assertEquals(256, blit.sourceWidth());
         assertEquals(512, blit.sourceHeight());
+    }
+
+    @Test
+    void printSizeControlShowsResolutionInsteadOfPrint() {
+        Component label = PreviewScreen.resolutionValueLabel(3);
+        TranslatableContents contents = assertInstanceOf(TranslatableContents.class, label.getContents());
+
+        assertEquals("tobyscamera.preview.resolution", contents.getKey());
+        assertEquals(3, contents.getArgs()[0]);
     }
 }

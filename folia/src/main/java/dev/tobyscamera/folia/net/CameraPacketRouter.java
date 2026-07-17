@@ -16,6 +16,7 @@ final class CameraPacketRouter {
     void route(CameraPacket packet) {
         switch (packet) {
             case Packets.VideoBegin ignored -> videoHandler.accept(packet);
+            case Packets.VideoPreviewChunk ignored -> videoHandler.accept(packet);
             case Packets.VideoTileChunk ignored -> videoHandler.accept(packet);
             case Packets.VideoFinish ignored -> videoHandler.accept(packet);
             default -> photoHandler.accept(packet);

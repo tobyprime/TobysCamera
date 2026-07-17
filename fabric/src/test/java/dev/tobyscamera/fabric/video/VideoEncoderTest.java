@@ -2,6 +2,7 @@ package dev.tobyscamera.fabric.video;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 import dev.tobyscamera.fabric.camera.AspectRatio;
 import dev.tobyscamera.fabric.camera.MapTileEncoder;
@@ -11,6 +12,21 @@ import java.nio.file.Files;
 import org.junit.jupiter.api.Test;
 
 class VideoEncoderTest {
+    @Test
+    void retainsOnlyTheMostRecentlyEncodedFrame() throws Exception {
+        try (TemporaryVideoRecording recording = TemporaryVideoRecording.create(Files.createTempDirectory("camera-video"))) {
+            VideoTestImages.append(recording, new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB));
+            VideoTestImages.append(recording, new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB));
+            VideoEncoder encoder = new VideoEncoder(recording, new VideoFrameRange(0, 1, 2),
+                    new PrintLayout(1, 1, new AspectRatio(1, 1)), MapTileEncoder.DitheringMode.OFF);
+
+            var first = encoder.frame(0);
+            encoder.frame(1);
+
+            assertNotSame(first, encoder.frame(0));
+        }
+    }
+
     @Test
     void encodesEveryRetainedFrameAtTheSelectedRectangularPrintLayout() throws Exception {
         try (TemporaryVideoRecording recording = TemporaryVideoRecording.create(Files.createTempDirectory("camera-video"))) {

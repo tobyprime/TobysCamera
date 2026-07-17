@@ -9,11 +9,12 @@ public record PluginSettings(
         int perSecond,
         int perMinute,
         int maxGridSize,
-        int chunkBytes,
-        int uploadTimeoutSeconds,
+        int uploadChunksPerSecond,
+        long uploadMaxActiveBytes,
         int videoMaxFps,
         int videoMaxFrames,
         int videoUploadChunksPerSecond,
+        long videoMaxActiveUploadBytes,
         int videoMaxActiveMapFrames,
         int videoMaxUpdateDistance,
         String invalidTokenKickMessage) {
@@ -26,11 +27,12 @@ public record PluginSettings(
                 integer(values, "rate-limit.per-second", 1),
                 integer(values, "rate-limit.per-minute", 12),
                 integer(values, "upload.max-grid-size", 4),
-                integer(values, "upload.chunk-bytes", 8_192),
-                integer(values, "upload.timeout-seconds", 30),
+                integer(values, "upload.max-chunks-per-second", 120),
+                longValue(values, "upload.max-active-upload-bytes", 16_777_216L),
                 integer(values, "video.max-fps", 10),
                 integer(values, "video.max-frames", 100),
                 integer(values, "video.max-upload-chunks-per-second", 120),
+                longValue(values, "video.max-active-upload-bytes", 67_108_864L),
                 integer(values, "video.max-active-map-frames", 128),
                 integer(values, "video.max-update-distance", 128),
                 string(values, "invalid-token.kick-message", "Invalid or expired photo upload token"));
@@ -41,12 +43,12 @@ public record PluginSettings(
     private void validate() {
         if (!cameraTagKey.contains(":")) throw new IllegalArgumentException("camera-tag-key must be namespaced");
         if (!filmTagKey.contains(":")) throw new IllegalArgumentException("film-tag-key must be namespaced");
-        if (tokenTtlSeconds < 1 || perSecond < 1 || perMinute < 1 || uploadTimeoutSeconds < 1) {
+        if (tokenTtlSeconds < 1 || perSecond < 1 || perMinute < 1) {
             throw new IllegalArgumentException("durations and rate limits must be positive");
         }
         if (maxGridSize < 1) throw new IllegalArgumentException("max-grid-size must be positive");
-        if (chunkBytes < 1 || chunkBytes > 8_192) throw new IllegalArgumentException("chunk-bytes must be 1..8192");
-        if (videoMaxFps < 1 || videoMaxFps > 20 || videoMaxFrames < 1 || videoUploadChunksPerSecond < 1 || videoMaxActiveMapFrames < 1 || videoMaxUpdateDistance < 1)
+        if (uploadChunksPerSecond < 1 || uploadMaxActiveBytes < 16_384L) throw new IllegalArgumentException("upload limits are invalid");
+        if (videoMaxFps < 1 || videoMaxFps > 20 || videoMaxFrames < 1 || videoUploadChunksPerSecond < 1 || videoMaxActiveUploadBytes < 16_384L || videoMaxActiveMapFrames < 1 || videoMaxUpdateDistance < 1)
             throw new IllegalArgumentException("video limits are invalid");
     }
 
@@ -60,5 +62,12 @@ public record PluginSettings(
         if (value == null) return fallback;
         if (value instanceof Number number) return number.intValue();
         return Integer.parseInt(value.toString());
+    }
+
+    private static long longValue(Map<String, ?> values, String key, long fallback) {
+        Object value = values.get(key);
+        if (value == null) return fallback;
+        if (value instanceof Number number) return number.longValue();
+        return Long.parseLong(value.toString());
     }
 }

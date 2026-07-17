@@ -184,11 +184,11 @@ public final class PhotoBagPlacementListener implements Listener {
         if (bag.kind() == PhotoBagKind.PHOTO) {
             PhotoRecord record = photos.record(bag.mediaId());
             if (record == null || record.gridWidth() != bag.gridWidth() || record.gridHeight() != bag.gridHeight()) throw new IllegalArgumentException("photo bag does not match stored photo");
-            for (int y = 0; y < bag.gridHeight(); y++) for (int x = 0; x < bag.gridWidth(); x++) maps.add(photos.mapItem(record, new TileCoordinate(x, y), null));
+            for (int y = 0; y < bag.gridHeight(); y++) for (int x = 0; x < bag.gridWidth(); x++) maps.add(photos.mapItem(record, new TileCoordinate(x, y), bag.metadata()));
         } else {
             VideoRecord record = videos.record(bag.mediaId());
             if (record == null || record.gridWidth() != bag.gridWidth() || record.gridHeight() != bag.gridHeight()) throw new IllegalArgumentException("video bag does not match stored video");
-            for (int y = 0; y < bag.gridHeight(); y++) for (int x = 0; x < bag.gridWidth(); x++) maps.add(videos.mapItem(record, new TileCoordinate(x, y), null));
+            for (int y = 0; y < bag.gridHeight(); y++) for (int x = 0; x < bag.gridWidth(); x++) maps.add(videos.mapItem(record, new TileCoordinate(x, y), bag.metadata()));
         }
         return maps;
     }
