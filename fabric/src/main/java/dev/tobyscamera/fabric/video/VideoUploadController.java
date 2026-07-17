@@ -8,7 +8,9 @@ import dev.tobyscamera.fabric.camera.MapTileEncoder;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import org.slf4j.Logger;
@@ -17,11 +19,12 @@ import org.slf4j.Logger;
 public final class VideoUploadController {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int CHUNKS_PER_TICK = 8;
-    private static final Executor FRAME_ENCODER_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
+    private static final Executor FRAME_ENCODER_EXECUTOR = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+            new SynchronousQueue<>(), runnable -> {
         Thread thread = new Thread(runnable, "TobysCamera video encoder");
         thread.setDaemon(true);
         return thread;
-    });
+    }, new ThreadPoolExecutor.AbortPolicy());
     private final Consumer<CameraPacket> sender;
     private final LongSupplier clock;
     private final Consumer<String> failureHandler;

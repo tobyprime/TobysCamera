@@ -17,12 +17,18 @@ final class VideoTileCache {
         };
     }
 
-    synchronized byte[] get(Key key, Loader loader) throws IOException {
-        byte[] cached = entries.get(key);
-        if (cached != null) return cached;
+    byte[] get(Key key, Loader loader) throws IOException {
+        synchronized (this) {
+            byte[] cached = entries.get(key);
+            if (cached != null) return cached;
+        }
         byte[] loaded = loader.load();
-        entries.put(key, loaded);
-        return loaded;
+        synchronized (this) {
+            byte[] cached = entries.get(key);
+            if (cached != null) return cached;
+            entries.put(key, loaded);
+            return loaded;
+        }
     }
 
     /** Returns an already-loaded tile without invoking storage. */

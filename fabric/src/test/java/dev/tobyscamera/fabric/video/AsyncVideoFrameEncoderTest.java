@@ -1,6 +1,7 @@
 package dev.tobyscamera.fabric.video;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,6 +10,7 @@ import dev.tobyscamera.fabric.camera.MapTileEncoder;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
@@ -57,5 +59,15 @@ class AsyncVideoFrameEncoderTest {
 
         assertTrue(finished.await(1, TimeUnit.SECONDS));
         assertEquals(1, interrupted.get());
+    }
+
+    @Test
+    void doesNotRemainBusyWhenTheExecutorRejectsItsFrame() {
+        AsyncVideoFrameEncoder frames = new AsyncVideoFrameEncoder(runnable -> {
+            throw new RejectedExecutionException();
+        });
+
+        assertFalse(frames.request(0, ignored -> new MapTileEncoder.EncodedPhoto(1, 1, List.of(new byte[16_384]))));
+        assertFalse(frames.request(0, ignored -> new MapTileEncoder.EncodedPhoto(1, 1, List.of(new byte[16_384]))));
     }
 }

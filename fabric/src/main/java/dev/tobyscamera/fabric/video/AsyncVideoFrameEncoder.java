@@ -4,6 +4,7 @@ import dev.tobyscamera.fabric.camera.MapTileEncoder;
 import java.io.IOException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
 
 /** Encodes one video frame at a time and exposes completed work through non-blocking polling. */
 final class AsyncVideoFrameEncoder {
@@ -17,15 +18,22 @@ final class AsyncVideoFrameEncoder {
 
     AsyncVideoFrameEncoder(Executor executor) { this.executor = executor; }
 
-    synchronized void request(int frame, FrameEncoder encoder) {
-        if (requestedFrame >= 0) return;
+    synchronized boolean request(int frame, FrameEncoder encoder) {
+        if (requestedFrame >= 0) return false;
         requestedFrame = frame;
         int requestGeneration = ++generation;
         task = new FutureTask<>(() -> {
             encode(frame, requestGeneration, encoder);
             return null;
         });
-        executor.execute(task);
+        try {
+            executor.execute(task);
+            return true;
+        } catch (RejectedExecutionException exception) {
+            requestedFrame = -1;
+            task = null;
+            return false;
+        }
     }
 
     synchronized MapTileEncoder.EncodedPhoto poll(int frame) throws IOException {
