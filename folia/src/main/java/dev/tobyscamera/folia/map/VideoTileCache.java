@@ -25,6 +25,11 @@ final class VideoTileCache {
         return loaded;
     }
 
+    /** Returns an already-loaded tile without invoking storage. */
+    synchronized byte[] find(Key key) {
+        return entries.get(key);
+    }
+
     record Key(UUID videoId, int frameIndex, TileCoordinate coordinate) { }
     @FunctionalInterface interface Loader { byte[] load() throws IOException; }
 }

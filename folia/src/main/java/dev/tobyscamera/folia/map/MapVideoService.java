@@ -87,11 +87,21 @@ public final class MapVideoService {
         }
     }
 
-    public MapView showFrame(VideoRecord record, int mapId, int frameIndex) throws IOException {
+    /** Reads one frame tile into the cache. Call only from an async scheduler. */
+    public void preloadFrame(VideoRecord record, int mapId, int frameIndex) throws IOException {
+        VideoTile tile = tilesByMapId.get(mapId);
+        if (tile == null || !tile.videoId().equals(record.videoId())) return;
+        tileCache.get(new VideoTileCache.Key(record.videoId(), frameIndex, tile.coordinate()),
+                () -> repository.readTile(record.videoId(), frameIndex, tile.coordinate()));
+    }
+
+    /** Applies a previously loaded frame tile without performing storage I/O. */
+    public MapView showCachedFrame(VideoRecord record, int mapId, int frameIndex) {
         VideoTile tile = tilesByMapId.get(mapId); MutableTileMapRenderer renderer = renderers.get(mapId);
         if (tile == null || renderer == null || !tile.videoId().equals(record.videoId())) return null;
-        renderer.setPixels(tileCache.get(new VideoTileCache.Key(record.videoId(), frameIndex, tile.coordinate()),
-                () -> repository.readTile(record.videoId(), frameIndex, tile.coordinate())));
+        byte[] pixels = tileCache.find(new VideoTileCache.Key(record.videoId(), frameIndex, tile.coordinate()));
+        if (pixels == null) return null;
+        renderer.setPixels(pixels);
         return Bukkit.getMap(mapId);
     }
 

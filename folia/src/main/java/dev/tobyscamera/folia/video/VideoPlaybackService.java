@@ -39,6 +39,7 @@ public final class VideoPlaybackService implements Listener {
     private final VideoPlaybackClock clock = new VideoPlaybackClock();
     private final VideoPlaybackIndex index = new VideoPlaybackIndex();
     private final MapUpdateDispatcher mapUpdates;
+    private final VideoFrameLoadRequests frameLoads = new VideoFrameLoadRequests();
     private final Map<UUID, IndexedPlayer> players = new ConcurrentHashMap<>();
     private final Map<Integer, Integer> lastSentFrame = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastReadErrorAt = new ConcurrentHashMap<>();
@@ -87,18 +88,37 @@ public final class VideoPlaybackService implements Listener {
             var record = videos.record(tile.videoId()); if (record == null) continue;
             if (!clock.shouldUpdateAtTick(record.fps(), tick)) continue;
             int frameIndex = clock.frameAtTick(record.frameCount(), record.fps(), tick);
-            if (Integer.valueOf(frameIndex).equals(lastSentFrame.put(mapId, frameIndex))) continue;
-            try {
-                var map = videos.showFrame(record, mapId, frameIndex);
-                if (map != null) mapUpdates.send(map, viewers(active.getValue()));
-            } catch (IOException exception) {
-                long now = System.currentTimeMillis();
-                Long last = lastReadErrorAt.putIfAbsent(record.videoId(), now);
-                if (last == null || now - last >= 60_000L) {
-                    lastReadErrorAt.put(record.videoId(), now);
-                    plugin.getLogger().warning("Could not load video frame " + record.videoId() + ": " + exception.getMessage());
-                }
+            if (Integer.valueOf(frameIndex).equals(lastSentFrame.get(mapId))) continue;
+            var map = videos.showCachedFrame(record, mapId, frameIndex);
+            if (map == null) {
+                preload(record, mapId, frameIndex);
+                continue;
             }
+            lastSentFrame.put(mapId, frameIndex);
+            mapUpdates.send(map, viewers(active.getValue()));
+        }
+    }
+
+    private void preload(dev.tobyscamera.folia.storage.VideoRecord record, int mapId, int frameIndex) {
+        VideoFrameLoadRequests.Key key = new VideoFrameLoadRequests.Key(record.videoId(), mapId, frameIndex);
+        if (!frameLoads.begin(key)) return;
+        plugin.getServer().getAsyncScheduler().runNow(plugin, ignored -> {
+            try {
+                videos.preloadFrame(record, mapId, frameIndex);
+            } catch (IOException exception) {
+                logReadFailure(record.videoId(), exception);
+            } finally {
+                frameLoads.complete(key);
+            }
+        });
+    }
+
+    private void logReadFailure(UUID videoId, IOException exception) {
+        long now = System.currentTimeMillis();
+        Long last = lastReadErrorAt.putIfAbsent(videoId, now);
+        if (last == null || now - last >= 60_000L) {
+            lastReadErrorAt.put(videoId, now);
+            plugin.getLogger().warning("Could not load video frame " + videoId + ": " + exception.getMessage());
         }
     }
 

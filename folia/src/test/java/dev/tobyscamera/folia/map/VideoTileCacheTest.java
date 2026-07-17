@@ -1,6 +1,7 @@
 package dev.tobyscamera.folia.map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import dev.tobyscamera.folia.storage.TileCoordinate;
 import java.util.UUID;
@@ -8,6 +9,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class VideoTileCacheTest {
+    @Test
+    void reportsACacheMissWithoutLoadingTheTile() {
+        VideoTileCache cache = new VideoTileCache(1);
+
+        assertNull(cache.find(new VideoTileCache.Key(UUID.randomUUID(), 0, new TileCoordinate(0, 0))));
+    }
+
     @Test
     void loadsTheSameVideoTileOnlyOnceUntilItIsEvicted() throws Exception {
         VideoTileCache cache = new VideoTileCache(1);
