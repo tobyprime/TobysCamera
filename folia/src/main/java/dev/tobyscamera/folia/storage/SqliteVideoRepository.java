@@ -2,8 +2,6 @@ package dev.tobyscamera.folia.storage;
 
 import dev.tobyscamera.common.upload.VideoUploadSession;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -17,8 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 /** SQLite video metadata plus independently compressed palette tiles on disk. */
 public final class SqliteVideoRepository implements VideoRepository {
@@ -35,6 +31,7 @@ public final class SqliteVideoRepository implements VideoRepository {
                 statement.executeUpdate("create table if not exists videos(id text primary key, owner text, created integer, width integer, height integer, fps integer, frames integer)");
                 statement.executeUpdate("create table if not exists video_maps(video_id text,x integer,y integer,map_id integer,primary key(video_id,x,y))");
                 statement.executeUpdate("create index if not exists video_maps_video_index on video_maps(video_id)");
+                statement.executeUpdate("create table if not exists video_tile_data(video_id text,frame integer,x integer,y integer,offset integer,length integer,primary key(video_id,frame,x,y))");
             }
         } catch (SQLException exception) { throw new IOException(exception); }
     }
@@ -42,27 +39,33 @@ public final class SqliteVideoRepository implements VideoRepository {
     public Path root() { return root; }
 
     @Override public synchronized void save(VideoRecord record, VideoUploadSession session) throws IOException {
-        Path finalDirectory = videoDirectory.resolve(record.videoId().toString());
-        Path stagingDirectory = videoDirectory.resolve("." + record.videoId() + ".staging");
-        if (Files.exists(finalDirectory) || Files.exists(stagingDirectory)) throw new IOException("video already exists: " + record.videoId());
+        Path finalFile = ShardedMediaLayout.container(videoDirectory, record.videoId());
+        Path stagingFile = videoDirectory.resolve("." + record.videoId() + ".staging.tbc");
+        if (Files.exists(finalFile) || Files.exists(stagingFile)) throw new IOException("video already exists: " + record.videoId());
         try {
-            Files.createDirectories(stagingDirectory);
-            for (int frame = 0; frame < record.frameCount(); frame++) for (int y = 0; y < record.gridHeight(); y++) for (int x = 0; x < record.gridWidth(); x++) {
-                writeTile(stagingDirectory.resolve(tileName(frame, x, y)), session.tile(frame, x, y));
-            }
+            Files.createDirectories(finalFile.getParent());
+            Map<String, byte[]> tiles = new LinkedHashMap<>();
+            for (int frame = 0; frame < record.frameCount(); frame++) for (int y = 0; y < record.gridHeight(); y++) for (int x = 0; x < record.gridWidth(); x++) tiles.put(tileKey(frame, x, y), session.tile(frame, x, y));
+            Map<String, TileContainer.Range> ranges = TileContainer.write(stagingFile, tiles);
+            Files.move(stagingFile, finalFile);
             try (PreparedStatement video = connection.prepareStatement("insert into videos values(?,?,?,?,?,?,?)");
-                    PreparedStatement maps = connection.prepareStatement("insert into video_maps values(?,?,?,?)")) {
+                    PreparedStatement maps = connection.prepareStatement("insert into video_maps values(?,?,?,?)");
+                    PreparedStatement data = connection.prepareStatement("insert into video_tile_data values(?,?,?,?,?,?)")) {
+                connection.setAutoCommit(false);
                 video.setString(1, record.videoId().toString()); video.setString(2, record.ownerId().toString()); video.setLong(3, record.createdAt().toEpochMilli());
                 video.setInt(4, record.gridWidth()); video.setInt(5, record.gridHeight()); video.setInt(6, record.fps()); video.setInt(7, record.frameCount()); video.executeUpdate();
                 for (var entry : record.mapIds().entrySet()) { maps.setString(1, record.videoId().toString()); maps.setInt(2, entry.getKey().x()); maps.setInt(3, entry.getKey().y()); maps.setInt(4, entry.getValue()); maps.addBatch(); }
                 maps.executeBatch();
-            }
-            Files.move(stagingDirectory, finalDirectory);
+                for (var entry : ranges.entrySet()) { int[] key = parseTileKey(entry.getKey()); data.setString(1, record.videoId().toString()); data.setInt(2, key[0]); data.setInt(3, key[1]); data.setInt(4, key[2]); data.setLong(5, entry.getValue().offset()); data.setInt(6, entry.getValue().length()); data.addBatch(); }
+                data.executeBatch(); connection.commit();
+            } catch (SQLException exception) {
+                connection.rollback(); Files.deleteIfExists(finalFile); throw exception;
+            } finally { connection.setAutoCommit(true); }
         } catch (SQLException exception) {
-            deleteRecursively(stagingDirectory);
+            deleteRecursively(stagingFile);
             throw new IOException(exception);
         } catch (IOException exception) {
-            deleteRecursively(stagingDirectory);
+            deleteRecursively(stagingFile);
             throw exception;
         }
     }
@@ -83,18 +86,16 @@ public final class SqliteVideoRepository implements VideoRepository {
     }
 
     @Override public byte[] readTile(UUID videoId, int frameIndex, TileCoordinate coordinate) throws IOException {
-        Path path = videoDirectory.resolve(videoId.toString()).resolve(tileName(frameIndex, coordinate.x(), coordinate.y()));
-        try (InputStream input = new GZIPInputStream(Files.newInputStream(path))) {
-            byte[] tile = input.readAllBytes();
-            if (tile.length != 16_384) throw new IOException("invalid stored video tile length");
-            return tile;
-        }
+        try (PreparedStatement query = connection.prepareStatement("select offset,length from video_tile_data where video_id=? and frame=? and x=? and y=?")) {
+            query.setString(1, videoId.toString()); query.setInt(2, frameIndex); query.setInt(3, coordinate.x()); query.setInt(4, coordinate.y());
+            try (ResultSet result = query.executeQuery()) { if (!result.next()) throw new IOException("missing video tile index"); return TileContainer.read(ShardedMediaLayout.container(videoDirectory, videoId), new TileContainer.Range(result.getLong(1), result.getInt(2))); }
+        } catch (SQLException exception) { throw new IOException("could not read video tile index", exception); }
     }
 
     @Override public void close() throws IOException { try { connection.close(); } catch (SQLException exception) { throw new IOException(exception); } }
 
-    private static String tileName(int frame, int x, int y) { return frame + "-" + x + "-" + y + ".tile.gz"; }
-    private static void writeTile(Path path, byte[] tile) throws IOException { try (OutputStream output = new GZIPOutputStream(Files.newOutputStream(path))) { output.write(tile); } }
+    private static String tileKey(int frame, int x, int y) { return frame + "-" + x + "-" + y; }
+    private static int[] parseTileKey(String key) { String[] values = key.split("-", 3); return new int[] {Integer.parseInt(values[0]), Integer.parseInt(values[1]), Integer.parseInt(values[2])}; }
     private static void deleteRecursively(Path directory) throws IOException {
         if (!Files.exists(directory)) return;
         try (var paths = Files.walk(directory)) { paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> { try { Files.deleteIfExists(path); } catch (IOException exception) { throw new DeleteFailure(exception); } }); }

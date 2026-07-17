@@ -27,12 +27,6 @@ public final class TemporaryVideoRecording implements AutoCloseable {
         }
     }
 
-    public void append(BufferedImage image) throws IOException {
-        if (!Files.exists(directory)) Files.createDirectories(directory);
-        if (!ImageIO.write(image, "png", framePath(frameCount).toFile())) throw new IOException("PNG encoder unavailable");
-        frameCount++;
-    }
-
     /** PNG encoding happens on the video writer thread; callers retain ownership of the NativeImage. */
     public synchronized void appendNativeImage(NativeImage image) throws IOException {
         if (!Files.exists(directory)) Files.createDirectories(directory);

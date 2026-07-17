@@ -2,7 +2,6 @@ package dev.tobyscamera.folia.delivery;
 
 import dev.tobyscamera.folia.map.MapPhotoService;
 import dev.tobyscamera.folia.storage.PhotoRecord;
-import dev.tobyscamera.folia.storage.TileCoordinate;
 import dev.tobyscamera.folia.upload.PhotoMetadata;
 import java.io.IOException;
 import java.util.Map;
@@ -18,10 +17,8 @@ public final class MapDeliveryService {
         deliver(player, record, transientMetadata.remove(record.photoId()));
     }
     public void deliver(Player player, PhotoRecord record, PhotoMetadata metadata) throws IOException {
-        for (TileCoordinate coordinate : record.mapIds().keySet()) {
-            var leftovers = player.getInventory().addItem(maps.mapItem(record, coordinate, metadata));
-            leftovers.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
-        }
+        MapItemDelivery.deliver(java.util.List.of(maps.bag(player.getWorld(), record)),
+                player.getInventory()::addItem, item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
     }
     public void queue(Player player, PhotoRecord record, PhotoMetadata metadata) throws IOException {
         if (metadata != null) transientMetadata.put(record.photoId(), metadata);

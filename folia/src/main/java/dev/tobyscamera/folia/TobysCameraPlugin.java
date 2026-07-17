@@ -9,6 +9,8 @@ import dev.tobyscamera.folia.net.PluginPayloadGateway;
 import dev.tobyscamera.folia.map.MapPhotoService;
 import dev.tobyscamera.folia.map.CameraMapCopyMetadataListener;
 import dev.tobyscamera.folia.delivery.MapDeliveryService;
+import dev.tobyscamera.folia.delivery.MapItemDelivery;
+import dev.tobyscamera.folia.bag.PhotoBagPlacementListener;
 import dev.tobyscamera.folia.delivery.PendingDeliveryRepository;
 import dev.tobyscamera.folia.storage.PhotoRepository;
 import dev.tobyscamera.folia.storage.SqlitePhotoRepository;
@@ -46,6 +48,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     private VideoPlaybackService videoPlayback;
     private PluginPayloadGateway gateway;
     private CameraFilmInventoryListener filmListener;
+    private PhotoBagPlacementListener bagPlacement;
 
     @Override
     public void onEnable() {
@@ -58,18 +61,22 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         }
         photos = new MapPhotoService(this, repository);
         videos = new MapVideoService(videoRepository);
+        bagPlacement = new PhotoBagPlacementListener(this, photos, videos);
         try { deliveries = new MapDeliveryService(photos, new PendingDeliveryRepository(getDataFolder().toPath())); }
         catch (IOException exception) { throw new IllegalStateException("Could not initialize pending deliveries", exception); }
+        configureRuntime(PluginSettings.from(flatten(getConfig())));
         getServer().getGlobalRegionScheduler().run(this, ignored -> {
             try { photos.restore(); } catch (IOException exception) { getLogger().severe("Could not restore saved photo maps: " + exception.getMessage()); }
-            try { videos.restore(); } catch (IOException exception) { getLogger().severe("Could not restore saved video maps: " + exception.getMessage()); }
+            try { videos.restore(); }
+            catch (IOException exception) { getLogger().severe("Could not restore saved video maps: " + exception.getMessage()); }
+            finally { videoPlayback.indexLoadedFrames(); }
         });
-        configureRuntime(PluginSettings.from(flatten(getConfig())));
         gateway = new PluginPayloadGateway(this, coordinator, videoCoordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
         getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(new CameraMapCopyMetadataListener(), this);
+        getServer().getPluginManager().registerEvents(bagPlacement, this);
         getCommand("tobyscamera").setExecutor(this);
     }
 
@@ -80,12 +87,13 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         CameraFilmService films = new CameraFilmService(settings.cameraTagKey(), settings.filmTagKey(), settings.maxGridSize());
         coordinator = new UploadCoordinator(settings, films, this::send,
                 (player, session, metadata) -> createAndDeliver(player, session, metadata),
-                player -> player.playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.3f));
+                player -> player.getWorld().playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.3f));
         videoCoordinator = new VideoUploadCoordinator(settings, films, this::send, this::createAndDeliverVideo, coordinator::discardCaptureIntent);
         if (gateway != null) gateway.setCoordinators(coordinator, videoCoordinator);
         filmListener = new CameraFilmInventoryListener(films);
         getServer().getPluginManager().registerEvents(filmListener, this);
         videoPlayback = new VideoPlaybackService(this, videos, settings.videoMaxActiveMapFrames(), settings.videoMaxUpdateDistance());
+        bagPlacement.setFrameRefresher(videoPlayback::refreshFrame);
         videoPlayback.indexLoadedFrames();
         getServer().getPluginManager().registerEvents(videoPlayback, this);
         videoPlaybackTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, ignored -> videoPlayback.tick(), 1L, 1L);
@@ -120,17 +128,15 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         getServer().getGlobalRegionScheduler().run(this, ignored -> {
             try {
                 var record = videos.createMaps(player.getUniqueId(), world, session);
+                var bag = videos.bag(world, record, session);
                 getServer().getAsyncScheduler().runNow(this, task -> {
                     try {
                         videos.persist(record, session);
                         player.getScheduler().run(this, task2 -> {
                             try {
-                                var maps = record.mapIds().keySet().stream().map(coordinate -> videos.mapItem(record, coordinate, metadata)).toList();
-                                for (var map : maps) {
-                                    var leftovers = player.getInventory().addItem(map);
-                                    leftovers.values().forEach(item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
-                                }
-                                getLogger().info("Delivered " + maps.size() + " video map(s) for " + record.videoId() + " to " + player.getName() + ".");
+                                MapItemDelivery.deliver(java.util.List.of(bag), player.getInventory()::addItem,
+                                        item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
+                                getLogger().info("Delivered a video bag for " + record.videoId() + " to " + player.getName() + ".");
                                 send(player, new Packets.VideoCreated(record.videoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight(), record.fps(), record.frameCount()));
                             } catch (RuntimeException exception) {
                                 getLogger().warning("Could not deliver video maps to " + player.getName() + ": " + exception.getMessage());
@@ -165,11 +171,13 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         getServer().getGlobalRegionScheduler().run(this, ignored -> {
             try {
                 var record = photos.createMaps(player.getUniqueId(), world, session);
+                var bag = photos.bag(world, record, session);
                 getServer().getAsyncScheduler().runNow(this, asyncTask -> {
                     try {
                         photos.persist(record, session);
                         player.getScheduler().run(this, task -> {
-                            try { deliveries.deliver(player, record, metadata); } catch (IOException exception) { throw new IllegalStateException(exception); }
+                            MapItemDelivery.deliver(java.util.List.of(bag), player.getInventory()::addItem,
+                                    item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
                             send(player, new Packets.PhotoCreated(record.photoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight()));
                         }, () -> { try { deliveries.queue(player, record, metadata); } catch (IOException exception) { getLogger().warning("Could not queue photo delivery: " + exception.getMessage()); } });
                     } catch (IOException exception) {

@@ -3,13 +3,16 @@ package dev.tobyscamera.fabric.viewfinder;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.tobyscamera.fabric.camera.CapturedFrame;
 import dev.tobyscamera.fabric.camera.MapTileEncoder;
-import dev.tobyscamera.fabric.camera.NativePixelFormat;
-import dev.tobyscamera.fabric.camera.PrintCanvasProcessor;
+import dev.tobyscamera.fabric.camera.NativeImageConverter;
 import dev.tobyscamera.fabric.camera.PrintLayout;
-import java.awt.image.BufferedImage;
+import dev.tobyscamera.fabric.camera.PhotoPreviewProcessor;
 import java.util.UUID;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.CancellationException;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
@@ -20,10 +23,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
 public final class PreviewScreen extends Screen {
+    private static final ExecutorService PREVIEW_PROCESSOR = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "TobysCamera photo preview processor"); thread.setDaemon(true); return thread;
+    });
     private final CapturedFrame frame;
     private final Consumer<MapTileEncoder.EncodedPhoto> usePhoto;
     private final Runnable retake;
-    private final MapTileEncoder encoder = new MapTileEncoder();
+    private final PhotoPreviewProcessor previewProcessor = new PhotoPreviewProcessor();
     private Identifier textureId;
     private boolean released;
 
@@ -32,9 +38,12 @@ public final class PreviewScreen extends Screen {
     private MapTileEncoder.EncodedPhoto printPhoto;
     private int previewImageWidth;
     private int previewImageHeight;
+    private int previewRevision;
+    private boolean previewReady;
+    private Future<?> previewTask;
 
     public PreviewScreen(CapturedFrame frame, Consumer<MapTileEncoder.EncodedPhoto> usePhoto, Runnable retake) {
-        super(Component.literal("Camera Preview"));
+        super(Component.translatable("tobyscamera.preview.title"));
         this.frame = frame;
         this.usePhoto = usePhoto;
         this.retake = retake;
@@ -46,22 +55,27 @@ public final class PreviewScreen extends Screen {
         releaseTexture();
         textureId = Identifier.fromNamespaceAndPath("tobyscamera", "preview/" + UUID.randomUUID());
         released = false;
-        refreshPreviewTexture();
+        requestPreviewRefresh();
         int buttonY = height - 32;
         List<Integer> sizes = java.util.stream.IntStream.rangeClosed(1, frame.gridSize()).boxed().toList();
-        addRenderableWidget(CycleButton.builder(this::ditheringLabel, ditheringMode)
+        addRenderableWidget(CycleButton.builder(this::ditheringValueLabel, ditheringMode)
                 .withValues(List.of(MapTileEncoder.DitheringMode.OFF, MapTileEncoder.DitheringMode.FLOYD_STEINBERG))
-                .create(width / 2 - 100, buttonY - 48, 200, 20, Component.empty(), (button, value) -> { ditheringMode = value; refreshPreviewTexture(); }));
-        addRenderableWidget(CycleButton.builder(value -> Component.literal(printLabel(value)), printSize)
+                .create(width / 2 - 100, buttonY - 48, 200, 20, Component.translatable("tobyscamera.preview.dithering_label"), (button, value) -> { ditheringMode = value; requestPreviewRefresh(); }));
+        addRenderableWidget(CycleButton.builder(this::printValueLabel, printSize)
                 .withValues(sizes)
-                .create(width / 2 - 75, buttonY - 24, 150, 20, Component.empty(), (button, value) -> { printSize = value; refreshPreviewTexture(); }));
-        addRenderableWidget(Button.builder(Component.literal("Retake"), button -> closeForRetake()).bounds(width / 2 - 155, buttonY, 150, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Use photo"), button -> closeForUse()).bounds(width / 2 + 5, buttonY, 150, 20).build());
+                .create(width / 2 - 75, buttonY - 24, 150, 20, Component.translatable("tobyscamera.preview.print_label"), (button, value) -> { printSize = value; requestPreviewRefresh(); }));
+        addRenderableWidget(Button.builder(Component.translatable("tobyscamera.preview.retake"), button -> closeForRetake()).bounds(width / 2 - 155, buttonY, 150, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("tobyscamera.preview.use_photo"), button -> closeForUse()).bounds(width / 2 + 5, buttonY, 150, 20).build());
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderTransparentBackground(graphics);
+        if (!previewReady) {
+            graphics.drawCenteredString(font, Component.translatable("tobyscamera.preview.processing"), width / 2, height / 2, 0xFFFFFFFF);
+            super.render(graphics, mouseX, mouseY, partialTick);
+            return;
+        }
         TextureBlit blit = textureBlit(20, 20, previewImageWidth, previewImageHeight, width - 40, height - 104);
         graphics.blit(
             RenderPipelines.GUI_TEXTURED,
@@ -77,7 +91,7 @@ public final class PreviewScreen extends Screen {
             blit.textureWidth(),
             blit.textureHeight()
         );
-        graphics.drawCenteredString(font, printLabel(printSize), width / 2, blit.top() + blit.height() + 8, 0xFFFFFFFF);
+        graphics.drawCenteredString(font, localizedPrintLabel(printSize), width / 2, blit.top() + blit.height() + 8, 0xFFFFFFFF);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 
@@ -88,39 +102,48 @@ public final class PreviewScreen extends Screen {
     public boolean isPauseScreen() { return false; }
 
     @Override
-    public void removed() { releaseTexture(); }
+    public void removed() { cancelPreviewTask(); releaseTexture(); }
 
     private void closeForUse() { releaseTexture(); if (printPhoto != null) usePhoto.accept(printPhoto); }
     private void closeForRetake() { releaseTexture(); retake.run(); }
     private void releaseTexture() { if (!released && textureId != null) { minecraft.getTextureManager().release(textureId); released = true; } }
 
-    private void refreshPreviewTexture() {
-        BufferedImage canvas = new PrintCanvasProcessor().process(frame.image(), printLayout(frame, printSize));
-        printPhoto = encoder.encode(canvas, ditheringMode);
-        BufferedImage image = encoder.palettePreview(printPhoto);
+    private void requestPreviewRefresh() {
+        cancelPreviewTask();
+        int revision = ++previewRevision;
+        int requestedPrintSize = printSize;
+        MapTileEncoder.DitheringMode requestedDithering = ditheringMode;
+        previewReady = false;
+        previewTask = PREVIEW_PROCESSOR.submit(() -> {
+            try {
+            PhotoPreviewProcessor.Result result = previewProcessor.process(frame, requestedPrintSize, requestedDithering);
+            NativeImage image = NativeImageConverter.fromBufferedImage(result.image());
+            minecraft.execute(() -> publishPreview(revision, result.photo(), image));
+            } catch (CancellationException ignored) { }
+        });
+    }
+    private void cancelPreviewTask() { if (previewTask != null) { previewTask.cancel(true); previewTask = null; } }
+
+    private void publishPreview(int revision, MapTileEncoder.EncodedPhoto photo, NativeImage image) {
+        if (released || minecraft.screen != this || revision != previewRevision) { image.close(); return; }
+        printPhoto = photo;
         previewImageWidth = image.getWidth();
         previewImageHeight = image.getHeight();
-        minecraft.getTextureManager().register(textureId, new DynamicTexture(() -> "tobyscamera-preview", nativeImage(image)));
+        minecraft.getTextureManager().register(textureId, new DynamicTexture(() -> "tobyscamera-preview", image));
+        previewReady = true;
     }
 
     static PrintLayout printLayout(CapturedFrame frame, int printSize) {
         return PrintLayout.forMaximumSide(printSize, frame.composition().aspectRatio());
     }
 
-    private String printLabel(int size) {
+    private Component localizedPrintLabel(int size) {
         PrintLayout layout = printLayout(frame, size);
-        return "Print %dx (%d×%d maps)".formatted(size, layout.gridWidth(), layout.gridHeight());
+        return Component.translatable("tobyscamera.preview.print", size, layout.gridWidth(), layout.gridHeight());
     }
 
-    private Component ditheringLabel(MapTileEncoder.DitheringMode mode) {
-        return Component.literal("Color dithering: " + (mode == MapTileEncoder.DitheringMode.FLOYD_STEINBERG ? "Floyd-Steinberg" : "Off"));
-    }
-
-    private static NativeImage nativeImage(BufferedImage source) {
-        NativeImage image = new NativeImage(source.getWidth(), source.getHeight(), false);
-        for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) image.setPixel(x, y, NativePixelFormat.toAbgr(source.getRGB(x, y)));
-        return image;
-    }
+    private Component ditheringValueLabel(MapTileEncoder.DitheringMode mode) { return Component.translatable(mode == MapTileEncoder.DitheringMode.FLOYD_STEINBERG ? "tobyscamera.preview.dithering.floyd_steinberg" : "tobyscamera.preview.dithering.off"); }
+    private Component printValueLabel(int size) { return Component.literal(size + "x"); }
 
     static TextureBlit textureBlit(int availableLeft, int availableTop, int textureWidth, int textureHeight, int availableWidth, int availableHeight) {
         if (textureWidth < 1 || textureHeight < 1 || availableWidth < 1 || availableHeight < 1) throw new IllegalArgumentException("dimensions must be positive");

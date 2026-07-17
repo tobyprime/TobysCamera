@@ -41,23 +41,29 @@ public final class SqlitePhotoRepository implements PhotoRepository {
     @Override
     public synchronized void save(PhotoRecord record, Map<TileCoordinate, byte[]> tiles) throws IOException {
         validateTiles(record, tiles);
-        Path staging = temporaryDirectory.resolve(record.photoId().toString());
-        Path destination = photosDirectory.resolve(record.photoId().toString());
+        Path staging = temporaryDirectory.resolve(record.photoId() + ".tbc");
+        Path destination = ShardedMediaLayout.container(photosDirectory, record.photoId());
         try {
-            Files.createDirectories(staging);
-            for (var entry : tiles.entrySet()) {
-                Files.write(staging.resolve(entry.getKey().x() + "-" + entry.getKey().y() + ".tile"), entry.getValue());
-            }
+            Files.createDirectories(destination.getParent());
+            Map<String, byte[]> contents = new LinkedHashMap<>();
+            for (var entry : tiles.entrySet()) contents.put(tileKey(entry.getKey()), entry.getValue());
+            Map<String, TileContainer.Range> ranges = TileContainer.write(staging, contents);
             Files.move(staging, destination, StandardCopyOption.ATOMIC_MOVE);
             connection.setAutoCommit(false);
             try (PreparedStatement photo = connection.prepareStatement("insert into photos(id, owner, created, width, height) values(?,?,?,?,?)");
-                 PreparedStatement tile = connection.prepareStatement("insert into tiles(photo_id, x, y, map_id) values(?,?,?,?)")) {
+                 PreparedStatement tile = connection.prepareStatement("insert into tiles(photo_id, x, y, map_id) values(?,?,?,?)");
+                 PreparedStatement data = connection.prepareStatement("insert into photo_tile_data(photo_id,x,y,offset,length) values(?,?,?,?,?)")) {
                 photo.setString(1, record.photoId().toString()); photo.setString(2, record.ownerId().toString());
                 photo.setLong(3, record.createdAt().toEpochMilli()); photo.setInt(4, record.gridWidth()); photo.setInt(5, record.gridHeight()); photo.executeUpdate();
                 for (var entry : record.mapIds().entrySet()) {
                     tile.setString(1, record.photoId().toString()); tile.setInt(2, entry.getKey().x()); tile.setInt(3, entry.getKey().y()); tile.setInt(4, entry.getValue()); tile.addBatch();
                 }
-                tile.executeBatch(); connection.commit();
+                tile.executeBatch();
+                for (var entry : record.mapIds().entrySet()) {
+                    TileContainer.Range range = ranges.get(tileKey(entry.getKey()));
+                    data.setString(1, record.photoId().toString()); data.setInt(2, entry.getKey().x()); data.setInt(3, entry.getKey().y()); data.setLong(4, range.offset()); data.setInt(5, range.length()); data.addBatch();
+                }
+                data.executeBatch(); connection.commit();
             } catch (SQLException exception) {
                 connection.rollback(); deleteQuietly(destination); throw exception;
             } finally { connection.setAutoCommit(true); }
@@ -89,7 +95,13 @@ public final class SqlitePhotoRepository implements PhotoRepository {
 
     @Override
     public byte[] readTile(UUID photoId, TileCoordinate coordinate) throws IOException {
-        return Files.readAllBytes(photosDirectory.resolve(photoId.toString()).resolve(coordinate.x() + "-" + coordinate.y() + ".tile"));
+        try (PreparedStatement query = connection.prepareStatement("select offset,length from photo_tile_data where photo_id=? and x=? and y=?")) {
+            query.setString(1, photoId.toString()); query.setInt(2, coordinate.x()); query.setInt(3, coordinate.y());
+            try (ResultSet result = query.executeQuery()) {
+                if (!result.next()) throw new IOException("missing photo tile index");
+                return TileContainer.read(ShardedMediaLayout.container(photosDirectory, photoId), new TileContainer.Range(result.getLong(1), result.getInt(2)));
+            }
+        } catch (SQLException exception) { throw new IOException("could not read photo tile index", exception); }
     }
 
     @Override public void close() throws IOException { try { connection.close(); } catch (SQLException exception) { throw new IOException(exception); } }
@@ -98,8 +110,11 @@ public final class SqlitePhotoRepository implements PhotoRepository {
         try (Statement statement = connection.createStatement()) {
             statement.executeUpdate("create table if not exists photos (id text primary key, owner text not null, created integer not null, width integer not null, height integer not null)");
             statement.executeUpdate("create table if not exists tiles (photo_id text not null, x integer not null, y integer not null, map_id integer not null, primary key(photo_id,x,y))");
+            statement.executeUpdate("create table if not exists photo_tile_data (photo_id text not null, x integer not null, y integer not null, offset integer not null, length integer not null, primary key(photo_id,x,y))");
         }
     }
+
+    private static String tileKey(TileCoordinate coordinate) { return coordinate.x() + "-" + coordinate.y(); }
 
     private static void validateTiles(PhotoRecord record, Map<TileCoordinate, byte[]> tiles) {
         if (!tiles.keySet().equals(record.mapIds().keySet())) throw new IllegalArgumentException("tile keys must match map ids");

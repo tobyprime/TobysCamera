@@ -1,10 +1,14 @@
 package dev.tobyscamera.fabric.viewfinder;
 
 import dev.tobyscamera.fabric.camera.AspectRatio;
+import dev.tobyscamera.fabric.camera.UploadProgress;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import java.util.function.IntSupplier;
+import java.util.function.Supplier;
+import java.util.Locale;
 
 public final class ViewfinderOverlay {
     private static final int MASK_COLOR = 0xB0000000;
@@ -20,10 +24,12 @@ public final class ViewfinderOverlay {
     private final KeyMapping fpsUpKey;
     private final KeyMapping fpsDownKey;
     private final IntSupplier remainingFilm;
+    private final Supplier<UploadProgress> uploadProgress;
     private int shutterTicks;
 
     public ViewfinderOverlay(ViewfinderSession session, KeyMapping zoomIn, KeyMapping zoomOut, KeyMapping gridKey,
-            KeyMapping compositionKey, KeyMapping shutterKey, KeyMapping modeKey, KeyMapping fpsUpKey, KeyMapping fpsDownKey, IntSupplier remainingFilm) {
+            KeyMapping compositionKey, KeyMapping shutterKey, KeyMapping modeKey, KeyMapping fpsUpKey, KeyMapping fpsDownKey, IntSupplier remainingFilm,
+            Supplier<UploadProgress> uploadProgress) {
         this.session = session;
         this.zoomIn = zoomIn;
         this.zoomOut = zoomOut;
@@ -34,6 +40,7 @@ public final class ViewfinderOverlay {
         this.fpsUpKey = fpsUpKey;
         this.fpsDownKey = fpsDownKey;
         this.remainingFilm = remainingFilm;
+        this.uploadProgress = uploadProgress;
     }
 
     public void flashShutter() { shutterTicks = 3; }
@@ -56,11 +63,15 @@ public final class ViewfinderOverlay {
         drawBorder(graphics, left, top, frameWidth, frameHeight);
         drawGrid(graphics, left, top, frameWidth, frameHeight);
         int film = remainingFilm.getAsInt();
-        if (showsFilm(film)) graphics.drawString(minecraft.font, filmLabel(film), left + 6, top + 6, BORDER_COLOR, true);
-        graphics.drawString(minecraft.font, modeLabel(session.mode(), session.videoFps(), keyName(modeKey), keyName(fpsDownKey), keyName(fpsUpKey)), left + 6, top + 18, BORDER_COLOR, true);
-        graphics.drawString(minecraft.font, hintText(session.targetZoom(), session.composition().aspectRatio().toString(),
+        if (showsFilm(film)) graphics.drawString(minecraft.font, Component.translatable("tobyscamera.viewfinder.film", Math.max(0, film)), left + 6, top + 6, BORDER_COLOR, true);
+        Component mode = session.mode() == CaptureMode.VIDEO
+                ? Component.translatable("tobyscamera.viewfinder.video_mode", session.videoFps(), keyName(modeKey), keyName(fpsDownKey), keyName(fpsUpKey))
+                : Component.translatable("tobyscamera.viewfinder.photo_mode", keyName(modeKey));
+        graphics.drawString(minecraft.font, mode, left + 6, top + 18, BORDER_COLOR, true);
+        if (session.state() == ViewfinderState.UPLOADING) drawUploadProgress(graphics, minecraft, left, top, frameWidth, frameHeight);
+        else drawHint(graphics, minecraft, left, top, Component.translatable("tobyscamera.viewfinder.hint", String.format(Locale.ROOT, "%.2f", session.targetZoom()), session.composition().aspectRatio().toString(),
                 keyName(zoomIn), keyName(zoomOut), keyName(gridKey), keyName(compositionKey), keyName(shutterKey)),
-                left + 6, top + frameHeight - 14, BORDER_COLOR, true);
+                frameWidth);
         if (shutterTicks > 0) graphics.fill(left, top, left + frameWidth, top + frameHeight, 0xDD000000);
     }
 
@@ -85,6 +96,19 @@ public final class ViewfinderOverlay {
         return mode == CaptureMode.VIDEO ? "VIDEO %d FPS  [%s] mode  [%s/%s] fps".formatted(fps, modeKey, fpsDown, fpsUp) : "PHOTO  [%s] mode".formatted(modeKey);
     }
     static boolean showsFilm(int remainingFilm) { return remainingFilm >= 0; }
+
+    private void drawUploadProgress(GuiGraphics graphics, Minecraft minecraft, int left, int top, int width, int height) {
+        UploadProgress progress = uploadProgress.get();
+        int barWidth = Math.min(240, width - 24), barLeft = left + (width - barWidth) / 2, barTop = top + height / 2;
+        graphics.fill(barLeft, barTop, barLeft + barWidth, barTop + 8, 0xB0000000);
+        graphics.fill(barLeft, barTop, barLeft + (int) Math.round(barWidth * progress.fraction()), barTop + 8, 0xE0FFFFFF);
+        graphics.drawCenteredString(minecraft.font, Component.translatable("tobyscamera.viewfinder.uploading", progress.percentage()), left + width / 2, barTop - 12, BORDER_COLOR);
+    }
+    private static void drawHint(GuiGraphics graphics, Minecraft minecraft, int left, int top, Component hint, int frameWidth) {
+        int hintWidth = Math.min(frameWidth - 12, minecraft.font.width(hint) + 8);
+        graphics.fill(left + 2, top + 30, left + 2 + hintWidth, top + 44, 0x90000000);
+        graphics.drawString(minecraft.font, hint, left + 6, top + 32, BORDER_COLOR, true);
+    }
 
     private static String keyName(KeyMapping key) { return key.getTranslatedKeyMessage().getString(); }
 

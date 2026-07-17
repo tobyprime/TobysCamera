@@ -2,6 +2,9 @@ package dev.tobyscamera.folia.map;
 
 import dev.tobyscamera.common.upload.VideoUploadSession;
 import dev.tobyscamera.folia.item.RootCustomData;
+import dev.tobyscamera.folia.bag.PhotoBagFactory;
+import dev.tobyscamera.folia.bag.PhotoBagData;
+import dev.tobyscamera.folia.bag.PhotoBagKind;
 import dev.tobyscamera.folia.storage.TileCoordinate;
 import dev.tobyscamera.folia.storage.VideoRecord;
 import dev.tobyscamera.folia.storage.VideoRepository;
@@ -12,21 +15,19 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.ArrayList;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 
 public final class MapVideoService {
     private final VideoRepository repository;
     private final Map<Integer, MutableTileMapRenderer> renderers = new ConcurrentHashMap<>();
     private final Map<Integer, VideoTile> tilesByMapId = new ConcurrentHashMap<>();
     private final Map<UUID, VideoRecord> recordsById = new ConcurrentHashMap<>();
+    private final VideoTileCache tileCache = new VideoTileCache(2_048);
 
     public MapVideoService(VideoRepository repository) { this.repository = repository; }
 
@@ -47,6 +48,24 @@ public final class MapVideoService {
 
     public void persist(VideoRecord record, VideoUploadSession session) throws IOException { repository.save(record, session); }
 
+    public ItemStack bag(World world, VideoRecord record, VideoUploadSession session) {
+        return PhotoBagFactory.create(world, record.videoId(), PhotoBagKind.VIDEO, record.gridWidth(), record.gridHeight(),
+                MapPreviewEncoder.encode(record.gridWidth(), record.gridHeight(), coordinate -> session.tile(0, coordinate.x(), coordinate.y())));
+    }
+
+    /** Recreates a bag-preview palette from frame zero in durable video storage. */
+    public byte[] previewPixels(PhotoBagData bag) throws IOException {
+        if (bag.kind() != PhotoBagKind.VIDEO) throw new IllegalArgumentException("bag is not a video");
+        try {
+            return MapPreviewEncoder.encode(bag.gridWidth(), bag.gridHeight(), coordinate -> {
+                try { return repository.readTile(bag.mediaId(), 0, coordinate); }
+                catch (IOException exception) { throw new PreviewReadFailure(exception); }
+            });
+        } catch (PreviewReadFailure exception) {
+            throw exception.getCause();
+        }
+    }
+
     public void restore() throws IOException {
         for (VideoRecord record : repository.loadAll()) {
             recordsById.put(record.videoId(), record);
@@ -62,7 +81,8 @@ public final class MapVideoService {
     public MapView showFrame(VideoRecord record, int mapId, int frameIndex) throws IOException {
         VideoTile tile = tilesByMapId.get(mapId); MutableTileMapRenderer renderer = renderers.get(mapId);
         if (tile == null || renderer == null || !tile.videoId().equals(record.videoId())) return null;
-        renderer.setPixels(repository.readTile(record.videoId(), frameIndex, tile.coordinate()));
+        renderer.setPixels(tileCache.get(new VideoTileCache.Key(record.videoId(), frameIndex, tile.coordinate()),
+                () -> repository.readTile(record.videoId(), frameIndex, tile.coordinate())));
         return Bukkit.getMap(mapId);
     }
 
@@ -81,4 +101,9 @@ public final class MapVideoService {
     }
 
     public record VideoTile(UUID videoId, TileCoordinate coordinate) { }
+
+    private static final class PreviewReadFailure extends RuntimeException {
+        private PreviewReadFailure(IOException cause) { super(cause); }
+        @Override public IOException getCause() { return (IOException) super.getCause(); }
+    }
 }

@@ -47,6 +47,11 @@ class PacketCodecTest {
         invalidChunk.put(PacketCodec.VERSION).put(PacketType.UPLOAD_TILE_CHUNK.id());
         invalidChunk.putLong(0).putLong(0).putInt(0).putInt(0).putInt(0).putInt(8_193);
         assertThrows(ProtocolException.class, () -> PacketCodec.decode(invalidChunk.array()));
+
+        // Photo bag interaction is intentionally server-side.  The former client packet id
+        // must not remain part of the public camera protocol.
+        assertThrows(ProtocolException.class,
+                () -> PacketCodec.decode(ByteBuffer.wrap(new byte[] {PacketCodec.VERSION, 14})));
     }
 
     private static void assertSamePacket(CameraPacket expected, CameraPacket actual) {

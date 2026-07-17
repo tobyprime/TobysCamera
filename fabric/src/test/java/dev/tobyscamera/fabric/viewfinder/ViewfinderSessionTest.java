@@ -78,6 +78,17 @@ class ViewfinderSessionTest {
     }
 
     @Test
+    void preservesASelectedVideoFpsWhenItIsAlreadyWithinTheCameraLimit() {
+        ViewfinderSession session = new ViewfinderSession();
+        session.open();
+        session.toggleMode();
+        session.adjustVideoFps(-1, 20);
+
+        assertEquals(5, session.clampVideoFpsToMaximum(20));
+        assertEquals(5, session.videoFps());
+    }
+
+    @Test
     void secondShutterStopsVideoRecordingAndOpensConfirmation() {
         ViewfinderSession session = new ViewfinderSession();
         session.open();
@@ -91,6 +102,20 @@ class ViewfinderSessionTest {
     }
 
     @Test
+    void returnsToPreviewWhenAnUploadCannotBeStarted() {
+        ViewfinderSession session = new ViewfinderSession();
+        session.open();
+        session.toggleMode();
+        session.pressShutter(1);
+        session.pressShutter(1);
+
+        assertTrue(session.beginUpload());
+        assertEquals(ViewfinderState.UPLOADING, session.state());
+        assertTrue(session.cancelUpload());
+        assertEquals(ViewfinderState.PREVIEW, session.state());
+    }
+
+    @Test
     void keepsTheVideoHudVisibleWhileRecording() {
         ViewfinderSession session = new ViewfinderSession();
         session.open();
@@ -98,5 +123,16 @@ class ViewfinderSessionTest {
         session.pressShutter(1);
 
         assertFalse(session.captureHidden());
+    }
+
+    @Test
+    void restoresPersistedViewfinderSettingsBeforeOpening() {
+        ViewfinderSession session = new ViewfinderSession();
+        ViewfinderSettings settings = new ViewfinderSettings(CompositionGrid.CROSSHAIR, 3.0f,
+                new dev.tobyscamera.fabric.camera.CameraComposition(AspectRatio.of(16, 9), 90.0f), CaptureMode.VIDEO, 5);
+
+        session.applySettings(settings);
+
+        assertEquals(settings, session.settings());
     }
 }

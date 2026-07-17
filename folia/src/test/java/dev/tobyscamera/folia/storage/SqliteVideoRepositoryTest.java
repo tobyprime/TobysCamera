@@ -2,6 +2,7 @@ package dev.tobyscamera.folia.storage;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.tobyscamera.common.upload.UploadGrant;
 import dev.tobyscamera.common.upload.VideoUploadSession;
@@ -22,8 +23,9 @@ class SqliteVideoRepositoryTest {
             repository.save(new VideoRecord(video, player, Instant.EPOCH, 1, 1, 10, 2, maps), session);
             assertEquals(1, repository.loadAll().size());
             assertArrayEquals(filled((byte) 7), repository.readTile(video, 1, new TileCoordinate(0, 0)));
-            assertEquals(true, Files.exists(repository.root().resolve("videos").resolve(video.toString()).resolve("1-0-0.tile.gz")));
+            assertEquals(true, Files.exists(repository.root().resolve("videos").resolve(video.toString().substring(0, 2)).resolve(video + ".tbc")));
         }
     }
+
     private static byte[] filled(byte value) { byte[] result = new byte[16_384]; java.util.Arrays.fill(result, value); return result; }
 }

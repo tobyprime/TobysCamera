@@ -2,7 +2,9 @@ package dev.tobyscamera.folia.storage;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -30,10 +32,12 @@ class SqlitePhotoRepositoryTest {
         try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
             repository.save(record, pixels);
         }
+        assertTrue(Files.exists(directory.resolve("photos").resolve(photoId.toString().substring(0, 2)).resolve(photoId + ".tbc")));
         try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
             PhotoRecord restored = repository.loadAll().getFirst();
             assertEquals(record, restored);
             assertArrayEquals(pixels.get(new TileCoordinate(1, 1)), repository.readTile(photoId, new TileCoordinate(1, 1)));
         }
     }
+
 }

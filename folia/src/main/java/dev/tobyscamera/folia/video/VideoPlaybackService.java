@@ -21,12 +21,13 @@ import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.plugin.Plugin;
@@ -71,6 +72,11 @@ public final class VideoPlaybackService implements Listener {
     @EventHandler public void onPlayerMove(PlayerMoveEvent event) { indexPlayer(event.getPlayer(), event.getTo()); }
     @EventHandler public void onPlayerItemHeld(PlayerItemHeldEvent event) { refreshHeldMapsNextTick(event.getPlayer()); }
     @EventHandler public void onPlayerSwapHands(PlayerSwapHandItemsEvent event) { refreshHeldMapsNextTick(event.getPlayer()); }
+    @EventHandler public void onInventoryClick(InventoryClickEvent event) { if (event.getWhoClicked() instanceof Player player) refreshHeldMapsNextTick(player); }
+    @EventHandler public void onItemPickup(EntityPickupItemEvent event) { if (event.getEntity() instanceof Player player) refreshHeldMapsNextTick(player); }
+
+    /** Must be called after plugin code changes the map of an existing item frame. */
+    public void refreshFrame(ItemFrame frame) { index(frame, frame.getItem()); }
 
     /** Runs globally: only immutable snapshots and player scheduler handles are used here. */
     public void tick() {

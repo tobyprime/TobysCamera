@@ -13,7 +13,7 @@ class TemporaryVideoRecordingTest {
         var directory = Files.createTempDirectory("camera-video");
         try (TemporaryVideoRecording recording = TemporaryVideoRecording.create(directory)) {
             BufferedImage image = new BufferedImage(2, 1, BufferedImage.TYPE_INT_ARGB); image.setRGB(1, 0, 0xFF112233);
-            recording.append(image);
+            VideoTestImages.append(recording, image);
             assertEquals(1, recording.frameCount());
             assertEquals(0xFF112233, recording.read(0).getRGB(1, 0));
         }

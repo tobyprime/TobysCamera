@@ -4,23 +4,22 @@ import dev.tobyscamera.common.upload.UploadSession;
 import dev.tobyscamera.folia.storage.PhotoRecord;
 import dev.tobyscamera.folia.upload.PhotoMetadata;
 import dev.tobyscamera.folia.item.RootCustomData;
+import dev.tobyscamera.folia.bag.PhotoBagFactory;
+import dev.tobyscamera.folia.bag.PhotoBagData;
+import dev.tobyscamera.folia.bag.PhotoBagKind;
 import dev.tobyscamera.folia.storage.PhotoRepository;
 import dev.tobyscamera.folia.storage.TileCoordinate;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Bukkit;
-import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
 import org.bukkit.plugin.Plugin;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 
 public final class MapPhotoService {
     private final Plugin plugin;
@@ -54,6 +53,31 @@ public final class MapPhotoService {
             tiles.put(new TileCoordinate(x, y), session.tile(x, y));
         }
         repository.save(record, tiles);
+    }
+
+    public PhotoRecord record(UUID photoId) throws IOException { return repository.find(photoId); }
+
+    public ItemStack bag(World world, PhotoRecord record, UploadSession session) {
+        return PhotoBagFactory.create(world, record.photoId(), PhotoBagKind.PHOTO, record.gridWidth(), record.gridHeight(),
+                MapPreviewEncoder.encode(record.gridWidth(), record.gridHeight(), coordinate -> session.tile(coordinate.x(), coordinate.y())));
+    }
+
+    public ItemStack bag(World world, PhotoRecord record) throws IOException {
+        return PhotoBagFactory.create(world, record.photoId(), PhotoBagKind.PHOTO, record.gridWidth(), record.gridHeight(),
+                previewPixels(new PhotoBagData(record.photoId(), PhotoBagKind.PHOTO, 0, record.gridWidth(), record.gridHeight())));
+    }
+
+    /** Recreates a bag-preview palette from the durable source tiles after a server restart. */
+    public byte[] previewPixels(PhotoBagData bag) throws IOException {
+        if (bag.kind() != PhotoBagKind.PHOTO) throw new IllegalArgumentException("bag is not a photo");
+        try {
+            return MapPreviewEncoder.encode(bag.gridWidth(), bag.gridHeight(), coordinate -> {
+                try { return repository.readTile(bag.mediaId(), coordinate); }
+                catch (IOException exception) { throw new PreviewReadFailure(exception); }
+            });
+        } catch (PreviewReadFailure exception) {
+            throw exception.getCause();
+        }
     }
 
     public void restore() throws IOException {
@@ -91,5 +115,10 @@ public final class MapPhotoService {
             }
         });
         return item;
+    }
+
+    private static final class PreviewReadFailure extends RuntimeException {
+        private PreviewReadFailure(IOException cause) { super(cause); }
+        @Override public IOException getCause() { return (IOException) super.getCause(); }
     }
 }

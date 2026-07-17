@@ -71,10 +71,10 @@ public final class MapTileEncoder {
 
     private static byte[] nearestColorPixels(BufferedImage source, int targetWidth, int targetHeight) {
         byte[] pixels = new byte[targetWidth * targetHeight];
-        for (int y = 0; y < targetHeight; y++) for (int x = 0; x < targetWidth; x++) {
+        for (int y = 0; y < targetHeight; y++) { checkCancelled(); for (int x = 0; x < targetWidth; x++) {
             int argb = source.getRGB(sourceX(source, x, targetWidth), sourceY(source, y, targetHeight));
             pixels[y * targetWidth + x] = (argb >>> 24) == 0 ? 0 : nearestMapColor(argb);
-        }
+        } }
         return pixels;
     }
 
@@ -83,6 +83,7 @@ public final class MapTileEncoder {
         double[] currentRed = new double[targetWidth + 2], currentGreen = new double[targetWidth + 2], currentBlue = new double[targetWidth + 2];
         double[] nextRed = new double[targetWidth + 2], nextGreen = new double[targetWidth + 2], nextBlue = new double[targetWidth + 2];
         for (int y = 0; y < targetHeight; y++) {
+            checkCancelled();
             for (int x = 0; x < targetWidth; x++) {
                 int argb = source.getRGB(sourceX(source, x, targetWidth), sourceY(source, y, targetHeight));
                 if ((argb >>> 24) == 0) {
@@ -138,6 +139,7 @@ public final class MapTileEncoder {
     }
 
     private static int clamp(double value) { return (int) Math.max(0, Math.min(255, Math.round(value))); }
+    private static void checkCancelled() { if (Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException(); }
 
     public enum DitheringMode { OFF, FLOYD_STEINBERG }
 

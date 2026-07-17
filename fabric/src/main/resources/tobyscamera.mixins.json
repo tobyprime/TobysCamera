@@ -7,7 +7,8 @@
     "AvatarRendererMixin",
     "CameraMixin",
     "EntityRendererMixin",
-    "KeyboardHandlerMixin"
+    "KeyboardHandlerMixin",
+    "MouseHandlerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

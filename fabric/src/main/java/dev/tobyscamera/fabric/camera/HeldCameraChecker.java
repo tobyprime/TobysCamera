@@ -44,6 +44,7 @@ public final class HeldCameraChecker {
         return Math.clamp(tag.getIntOr(MAX_VIDEO_FPS_KEY, 10), 1, 20);
     }
 
+
     public static boolean supportsVideo(ItemStack stack) {
         return isCamera(stack) && stack.get(DataComponents.CUSTOM_DATA).copyTag().contains(VIDEO_KEY);
     }

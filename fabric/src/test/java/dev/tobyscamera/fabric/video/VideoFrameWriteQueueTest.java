@@ -9,10 +9,11 @@ import org.junit.jupiter.api.Test;
 
 class VideoFrameWriteQueueTest {
     @Test
-    void dropsNewFramesWhileOneDiskWriteIsStillQueued() {
+    void keepsAConfiguredNumberOfFramesBeforeApplyingBackpressure() {
         ManualExecutor executor = new ManualExecutor();
-        VideoFrameWriteQueue queue = new VideoFrameWriteQueue(executor);
+        VideoFrameWriteQueue queue = new VideoFrameWriteQueue(executor, 2);
 
+        assertTrue(queue.submit(() -> { }));
         assertTrue(queue.submit(() -> { }));
         assertFalse(queue.submit(() -> { }));
         executor.runNext();
