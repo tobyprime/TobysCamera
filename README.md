@@ -2,6 +2,8 @@
 
 Fabric 1.21.11 and 26.1 client Mod + Paper and Folia 1.21.11+ plugin. Only the photographer installs the Mod; completed pictures are ordinary `filled_map` items visible to every vanilla client.
 
+Modrinth-ready guides: [English](MODRINTH_en_US.md) | [简体中文](MODRINTH_zh_CN.md).
+
 ## Build
 
 The build requires Java 21 and Java 25 toolchains. When a local proxy is needed, set Gradle JVM properties, for example:
@@ -29,13 +31,13 @@ use normal production authentication settings when deploying it.
 
 1. Put the plugin JAR in the `plugins/` directory of either Paper or Folia, start the server once, then configure `plugins/TobysCamera/config.yml` as required.
 2. Give the photographer the Fabric jar only. Other players do not need it.
-3. Give a tagged camera item. The plugin reads Paper PDC from the item's `custom_data`; a command-compatible example is:
+3. Give a tagged camera item. The plugin reads the root fields of the item's `minecraft:custom_data` component (not Bukkit PDC); a command-compatible example is:
 
    ```mcfunction
-   /give @s minecraft:spyglass[custom_data={PublicBukkitValues:{"tobyscamera:camera":1b}}]
+   /give @s minecraft:spyglass[minecraft:custom_data={"tobyscamera:camera":1b,"tobyscamera:max_grid_size":4}]
    ```
 
-4. Hold the camera and right-click to open the square viewfinder. Use `-` / `=` to zoom, `G` to switch guides, and `Enter` to take a picture. The shutter key appears under the **TobysCamera** category in Minecraft's Controls settings and can be rebound. The server should play a shutter sound and issue a short-lived upload Token.
+4. Hold the camera and right-click to open the square viewfinder. Use `-` / `=` to zoom, `G` to switch guides, and the default left-mouse shutter to take a picture. The shutter key appears under the **TobysCamera** category in Minecraft's Controls settings and can be rebound. The server should play a shutter sound and issue a short-lived upload Token.
 5. The client captures its rendered frame and opens a preview. Select **Use photo** to upload map palette tiles or **Retake** to return to the viewfinder.
 6. Verify the resulting 1x1, 2x2 and 4x4 `filled_map` items can be held or put in item frames by an unmodded player.
 7. Restart the server and verify the same maps still render. Fill the photographer's inventory to verify overflow drops at their feet; disconnect during delivery to verify the pending delivery is retried on join.
