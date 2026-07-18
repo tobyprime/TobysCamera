@@ -20,9 +20,15 @@ public final class MutableTileMapRenderer extends MapRenderer {
         this.pixels = Arrays.copyOf(pixels, pixels.length);
     }
 
+    public void clearPixels() {
+        pixels = null;
+    }
+
     @Override
     public void render(MapView map, MapCanvas canvas, Player player) {
         byte[] current = pixels;
-        for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) canvas.setPixel(x, y, current[y * 128 + x]);
+        for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) {
+            canvas.setPixel(x, y, current == null ? 0 : current[y * 128 + x]);
+        }
     }
 }
