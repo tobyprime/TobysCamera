@@ -1,7 +1,6 @@
 package dev.tobyscamera.folia.bag;
 
 import dev.tobyscamera.folia.item.RootCustomData;
-import dev.tobyscamera.folia.map.TileMapRenderer;
 import dev.tobyscamera.folia.upload.PhotoMetadata;
 import java.time.Instant;
 import java.util.List;
@@ -50,7 +49,6 @@ public final class PhotoBagFactory {
         preview.setUnlimitedTracking(false);
         preview.setLocked(true);
         for (MapRenderer renderer : preview.getRenderers()) preview.removeRenderer(renderer);
-        preview.addRenderer(new TileMapRenderer(previewPixels));
         return create(new PhotoBagData(mediaId, kind, preview.getId(), width, height, metadata));
     }
 
@@ -105,13 +103,6 @@ public final class PhotoBagFactory {
 
     private static String shortId(UUID id) {
         return id.toString().substring(0, 8);
-    }
-
-    /** Installs the non-persistent renderer of an existing preview map after a restart. */
-    public static void restorePreview(MapView preview, byte[] previewPixels) {
-        if (previewPixels.length != 16_384) throw new IllegalArgumentException("preview must contain 16384 palette pixels");
-        for (MapRenderer renderer : preview.getRenderers()) preview.removeRenderer(renderer);
-        preview.addRenderer(new TileMapRenderer(previewPixels));
     }
 
     public static boolean isBag(ItemStack item) { return item != null && item.getType() == Material.FILLED_MAP && RootCustomData.contains(item, BAG); }

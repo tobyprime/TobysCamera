@@ -87,6 +87,25 @@ public final class SqliteVideoRepository implements VideoRepository {
         } catch (SQLException exception) { throw new IOException(exception); }
     }
 
+    @Override public synchronized VideoRecord find(UUID videoId) throws IOException {
+        try (PreparedStatement query = connection.prepareStatement("select * from videos where id=?")) {
+            query.setString(1, videoId.toString());
+            try (ResultSet result = query.executeQuery()) {
+                if (!result.next()) return null;
+                Map<TileCoordinate, Integer> mapIds = new LinkedHashMap<>();
+                try (PreparedStatement maps = connection.prepareStatement("select x,y,map_id from video_maps where video_id=?")) {
+                    maps.setString(1, videoId.toString());
+                    try (ResultSet rows = maps.executeQuery()) {
+                        while (rows.next()) mapIds.put(new TileCoordinate(rows.getInt(1), rows.getInt(2)), rows.getInt(3));
+                    }
+                }
+                return new VideoRecord(videoId, UUID.fromString(result.getString("owner")),
+                        Instant.ofEpochMilli(result.getLong("created")), result.getInt("width"), result.getInt("height"),
+                        result.getInt("fps"), result.getInt("frames"), mapIds);
+            }
+        } catch (SQLException exception) { throw new IOException("could not find video", exception); }
+    }
+
     @Override public synchronized byte[] readTile(UUID videoId, int frameIndex, TileCoordinate coordinate) throws IOException {
         try (PreparedStatement query = connection.prepareStatement("select offset,length from video_tile_data where video_id=? and frame=? and x=? and y=?")) {
             query.setString(1, videoId.toString()); query.setInt(2, frameIndex); query.setInt(3, coordinate.x()); query.setInt(4, coordinate.y());

@@ -79,6 +79,14 @@ public final class VideoPlaybackService implements Listener {
     /** Must be called after plugin code changes the map of an existing item frame. */
     public void refreshFrame(ItemFrame frame) { index(frame, frame.getItem()); }
 
+    /** Re-indexes only transient player snapshots and current loaded frames after lazy activation. */
+    public void refreshActiveMedia() {
+        for (IndexedPlayer indexed : players.values()) {
+            scheduler.runEntity(indexed.player(), () -> indexPlayer(indexed.player(), indexed.player().getLocation()), () -> { });
+        }
+        indexLoadedFrames();
+    }
+
     /** Runs globally: only immutable snapshots and player scheduler handles are used here. */
     public void tick() {
         long tick = serverTick.getAndIncrement();
@@ -87,7 +95,7 @@ public final class VideoPlaybackService implements Listener {
         for (var active : activeViewers.entrySet()) {
             int mapId = active.getKey();
             var tile = videos.tileForMap(mapId); if (tile == null) continue;
-            var record = videos.record(tile.videoId()); if (record == null) continue;
+            var record = videos.activeRecord(tile.videoId()); if (record == null) continue;
             if (!clock.shouldUpdateAtTick(record.fps(), tick)) continue;
             int frameIndex = clock.frameAtTick(record.frameCount(), record.fps(), tick);
             if (Integer.valueOf(frameIndex).equals(lastSentFrame.get(mapId))) continue;

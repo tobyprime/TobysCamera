@@ -29,8 +29,6 @@ import org.bukkit.event.hanging.HangingBreakEvent;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
-import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
 import io.papermc.paper.event.player.PlayerStopUsingItemEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -44,8 +42,6 @@ public final class PhotoBagPlacementListener implements Listener {
     private final MapVideoService videos;
     private final ServerTaskScheduler scheduler;
     private final Map<UUID, PhotoBagData> pendingUnpacks = new ConcurrentHashMap<>();
-    private final Set<Integer> restoredPreviewMaps = ConcurrentHashMap.newKeySet();
-    private final Set<Integer> restoringPreviewMaps = ConcurrentHashMap.newKeySet();
     private volatile Consumer<ItemFrame> frameRefresher = ignored -> { };
 
     public PhotoBagPlacementListener(Plugin plugin, MapPhotoService photos, MapVideoService videos, ServerTaskScheduler scheduler) {
@@ -69,7 +65,6 @@ public final class PhotoBagPlacementListener implements Listener {
                 || (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK)) return;
         ItemStack held = event.getItem();
         if (!PhotoBagFactory.isBag(held)) return;
-        restorePreview(held);
         final PhotoBagData started;
         try { started = PhotoBagFactory.read(held); }
         catch (IllegalArgumentException ignored) { return; }
@@ -86,17 +81,6 @@ public final class PhotoBagPlacementListener implements Listener {
         }, () -> { });
     }
 
-    @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        for (ItemStack item : event.getPlayer().getInventory().getContents()) restorePreview(item);
-        restorePreview(event.getPlayer().getInventory().getItemInOffHand());
-    }
-
-    @EventHandler
-    public void onSelectHotbarSlot(PlayerItemHeldEvent event) {
-        restorePreview(event.getPlayer().getInventory().getItem(event.getNewSlot()));
-    }
-
     /** Cancels a pending unpack when Paper reports that the native item use ended too early. */
     @EventHandler(ignoreCancelled = true)
     public void onStopUsingBag(PlayerStopUsingItemEvent event) {
@@ -111,7 +95,6 @@ public final class PhotoBagPlacementListener implements Listener {
         Player player = event.getPlayer();
         ItemStack held = player.getInventory().getItemInMainHand();
         if (!PhotoBagFactory.isBag(held) || !isEmpty(origin)) return;
-        restorePreview(held);
         PhotoBagData bag;
         try { bag = PhotoBagFactory.read(held); } catch (IllegalArgumentException ignored) { return; }
         List<ItemFrame> frames = findEmptyPlacement(origin, bag);
@@ -236,35 +219,6 @@ public final class PhotoBagPlacementListener implements Listener {
     }
 
     private static boolean isEmpty(ItemFrame frame) { return frame.getItem().getType() == Material.AIR; }
-
-    /** Lazily restores dynamic map rendering for bags that survived a server restart. */
-    private void restorePreview(ItemStack item) {
-        if (!PhotoBagFactory.isBag(item)) return;
-        final PhotoBagData bag;
-        try { bag = PhotoBagFactory.read(item); }
-        catch (IllegalArgumentException ignored) { return; }
-        int mapId = bag.previewMapId();
-        if (restoredPreviewMaps.contains(mapId) || !restoringPreviewMaps.add(mapId)) return;
-        scheduler.runAsync(() -> {
-            try {
-                byte[] pixels = bag.kind() == PhotoBagKind.PHOTO ? photos.previewPixels(bag) : videos.previewPixels(bag);
-                scheduler.runGlobal(() -> {
-                    try {
-                        org.bukkit.map.MapView preview = Bukkit.getMap(mapId);
-                        if (preview != null) {
-                            PhotoBagFactory.restorePreview(preview, pixels);
-                            restoredPreviewMaps.add(mapId);
-                        }
-                    } finally {
-                        restoringPreviewMaps.remove(mapId);
-                    }
-                });
-            } catch (IOException | RuntimeException exception) {
-                restoringPreviewMaps.remove(mapId);
-                plugin.getLogger().warning("Could not restore photo bag preview " + mapId + ": " + exception.getMessage());
-            }
-        });
-    }
 
     private static void consumeOne(Player player, ItemStack held) {
         if (held.getAmount() > 1) held.setAmount(held.getAmount() - 1);

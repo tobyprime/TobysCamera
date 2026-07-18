@@ -35,11 +35,9 @@ public final class MapPhotoService {
         Map<TileCoordinate, Integer> mapIds = new LinkedHashMap<>();
         for (int y = 0; y < session.height(); y++) for (int x = 0; x < session.width(); x++) {
             TileCoordinate coordinate = new TileCoordinate(x, y);
-            byte[] pixels = session.tile(x, y);
             MapView view = Bukkit.createMap(world);
             view.setTrackingPosition(false); view.setUnlimitedTracking(false); view.setLocked(true);
             for (MapRenderer renderer : view.getRenderers()) view.removeRenderer(renderer);
-            view.addRenderer(new TileMapRenderer(pixels));
             mapIds.put(coordinate, view.getId());
         }
         PhotoRecord record = new PhotoRecord(photoId, ownerId, Instant.now(), session.width(), session.height(), mapIds);
@@ -54,13 +52,8 @@ public final class MapPhotoService {
         repository.save(record, tiles, session.previewPixels());
     }
 
-    /** Removes this plugin's transient renderers from maps whose media storage failed. */
+    /** Bukkit has no API to reclaim map IDs created for a failed save. */
     public void discard(PhotoRecord record) {
-        for (int mapId : record.mapIds().values()) {
-            MapView view = Bukkit.getMap(mapId);
-            if (view == null) continue;
-            for (MapRenderer renderer : view.getRenderers()) if (renderer instanceof TileMapRenderer) view.removeRenderer(renderer);
-        }
     }
 
     public PhotoRecord record(UUID photoId) throws IOException { return repository.find(photoId); }
@@ -93,13 +86,8 @@ public final class MapPhotoService {
         return preview;
     }
 
-    public void restore() throws IOException {
-        for (PhotoRecord record : repository.loadAll()) for (var entry : record.mapIds().entrySet()) {
-            MapView view = Bukkit.getMap(entry.getValue());
-            if (view == null) continue;
-            for (MapRenderer renderer : view.getRenderers()) view.removeRenderer(renderer);
-            view.addRenderer(new TileMapRenderer(repository.readTile(record.photoId(), entry.getKey())));
-        }
+    public byte[] tilePixels(MediaMapDescriptor.PhotoTile tile) throws IOException {
+        return repository.readTile(tile.mediaId(), tile.coordinate());
     }
 
     public ItemStack mapItem(PhotoRecord record, TileCoordinate coordinate, PhotoMetadata metadata) {

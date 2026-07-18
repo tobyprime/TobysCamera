@@ -19,6 +19,7 @@ import dev.tobyscamera.folia.storage.VideoRepository;
 import dev.tobyscamera.folia.upload.UploadCoordinator;
 import dev.tobyscamera.folia.upload.VideoUploadCoordinator;
 import dev.tobyscamera.folia.map.MapVideoService;
+import dev.tobyscamera.folia.map.MediaMapActivationListener;
 import dev.tobyscamera.folia.video.VideoPlaybackService;
 import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import dev.tobyscamera.folia.scheduler.ServerTaskSchedulers;
@@ -49,10 +50,12 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     private ServerTaskScheduler scheduler;
     private ServerTaskScheduler.TaskHandle videoPlaybackTask;
     private ServerTaskScheduler.TaskHandle uploadCleanupTask;
+    private ServerTaskScheduler.TaskHandle mediaAuditTask;
     private VideoPlaybackService videoPlayback;
     private PluginPayloadGateway gateway;
     private CameraFilmInventoryListener filmListener;
     private PhotoBagPlacementListener bagPlacement;
+    private MediaMapActivationListener mediaActivation;
 
     @Override
     public void onEnable() {
@@ -70,12 +73,12 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         try { deliveries = new MapDeliveryService(photos, new PendingDeliveryRepository(getDataFolder().toPath())); }
         catch (IOException exception) { throw new IllegalStateException("Could not initialize pending deliveries", exception); }
         configureRuntime(PluginSettings.from(flatten(getConfig())));
-        scheduler.runGlobal(() -> {
-            try { photos.restore(); } catch (IOException exception) { getLogger().severe("Could not restore saved photo maps: " + exception.getMessage()); }
-            try { videos.restore(); }
-            catch (IOException exception) { getLogger().severe("Could not restore saved video maps: " + exception.getMessage()); }
-            finally { videoPlayback.indexLoadedFrames(); }
-        });
+        mediaActivation = new MediaMapActivationListener(this, scheduler, photos, videos);
+        bagPlacement.setFrameRefresher(mediaActivation::refreshFrame);
+        mediaActivation.setVideoIndexRefresh(videoPlayback::refreshActiveMedia);
+        getServer().getPluginManager().registerEvents(mediaActivation, this);
+        mediaActivation.scanLoadedFrames();
+        mediaAuditTask = scheduler.runGlobalRepeating(100L, 200L, mediaActivation::scanLoadedFrames);
         gateway = new PluginPayloadGateway(this, scheduler, coordinator, videoCoordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
         getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);
@@ -99,7 +102,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         filmListener = new CameraFilmInventoryListener(films);
         getServer().getPluginManager().registerEvents(filmListener, this);
         videoPlayback = new VideoPlaybackService(this, scheduler, videos, settings.videoMaxActiveMapFrames(), settings.videoMaxUpdateDistance());
-        bagPlacement.setFrameRefresher(videoPlayback::refreshFrame);
+        if (mediaActivation != null) mediaActivation.setVideoIndexRefresh(videoPlayback::refreshActiveMedia);
         videoPlayback.indexLoadedFrames();
         getServer().getPluginManager().registerEvents(videoPlayback, this);
         videoPlaybackTask = scheduler.runGlobalRepeating(1L, 1L, () -> videoPlayback.tick());
@@ -116,6 +119,8 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         getServer().getMessenger().unregisterOutgoingPluginChannel(this);
         if (videoPlaybackTask != null) videoPlaybackTask.cancel();
         if (uploadCleanupTask != null) uploadCleanupTask.cancel();
+        if (mediaAuditTask != null) mediaAuditTask.cancel();
+        if (mediaActivation != null) mediaActivation.clear();
         if (repository != null) try { repository.close(); } catch (IOException exception) { getLogger().warning("Could not close photo storage: " + exception.getMessage()); }
         if (videoRepository != null) try { videoRepository.close(); } catch (IOException exception) { getLogger().warning("Could not close video storage: " + exception.getMessage()); }
     }

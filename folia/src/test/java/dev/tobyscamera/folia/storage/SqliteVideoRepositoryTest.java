@@ -23,6 +23,7 @@ class SqliteVideoRepositoryTest {
         try (var repository = new SqliteVideoRepository(Files.createTempDirectory("video-repository"))) {
             repository.save(new VideoRecord(video, player, Instant.EPOCH, 1, 1, 10, 2, maps), session);
             assertEquals(1, repository.loadAll().size());
+            assertEquals(new VideoRecord(video, player, Instant.EPOCH, 1, 1, 10, 2, maps), repository.find(video));
             assertArrayEquals(filled((byte) 7), repository.readTile(video, 1, new TileCoordinate(0, 0)));
             assertArrayEquals(filled((byte) 91), repository.readPreview(video));
             assertEquals(true, Files.exists(repository.root().resolve("videos").resolve(video.toString().substring(0, 2)).resolve(video + ".tbc")));
