@@ -1,17 +1,21 @@
 # TobysCamera
 
-Fabric 1.21.11 client Mod + Folia 1.21.11+ plugin. Only the photographer installs the Mod; completed pictures are ordinary `filled_map` items visible to every vanilla client.
+Fabric 1.21.11 and 26.1 client Mod + Folia 1.21.11+ plugin. Only the photographer installs the Mod; completed pictures are ordinary `filled_map` items visible to every vanilla client.
 
 ## Build
 
-The build requires Java 21. When a local proxy is needed, set Gradle JVM properties, for example:
+The build requires Java 21 and Java 25 toolchains. When a local proxy is needed, set Gradle JVM properties, for example:
 
 ```powershell
 $env:GRADLE_OPTS='-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7890 -Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=7890'
-.\gradlew.bat clean test build --no-daemon
+.\gradlew.bat verifyModules --no-daemon
 ```
 
-The Fabric and Folia jars are generated in `fabric/build/libs` and `folia/build/libs`.
+The release artifacts are generated as:
+
+- `build/libs/1.21.11/tobyscamera-<mod_version>+mc1.21.11.jar`
+- `build/libs/26.1/tobyscamera-<mod_version>+mc26.1.jar`
+- `folia/build/libs/tobyscamera-folia-<mod_version>.jar`
 
 ## Local Paper development server
 

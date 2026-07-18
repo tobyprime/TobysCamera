@@ -28,6 +28,7 @@ tasks.processResources {
 }
 
 tasks.jar {
+    archiveFileName.set("tobyscamera-folia-${rootProject.version}.jar")
     dependsOn(":common:jar")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from({ configurations.runtimeClasspath.get().filter { it.name.endsWith(".jar") }.map { zipTree(it) } })

@@ -4,11 +4,12 @@ plugins {
 
 allprojects {
     group = "dev.tobyscamera"
-    version = "0.1.0-SNAPSHOT"
+    version = providers.gradleProperty("mod_version").get()
 }
 
 subprojects {
     plugins.withId("java") {
+        if (name.startsWith("fabric-")) return@withId
         extensions.configure<org.gradle.api.plugins.JavaPluginExtension> {
             toolchain {
                 languageVersion = JavaLanguageVersion.of(21)
@@ -18,7 +19,34 @@ subprojects {
 }
 
 tasks.register("verifyModules") {
-    dependsOn(":common:test", ":fabric:classes", ":folia:classes")
+    dependsOn(
+        ":common:test",
+        ":folia:test",
+        ":fabric-1.21.11:test",
+        ":fabric-1.21.11:buildAndCollect",
+        ":fabric-1.21.11:verifyPublishedJar",
+        ":fabric-26.1:test",
+        ":fabric-26.1:buildAndCollect",
+        ":fabric-26.1:verifyPublishedJar"
+    )
+    doLast {
+        listOf("1.21.11", "26.1").forEach { minecraftVersion ->
+            check(layout.buildDirectory.file("libs/$minecraftVersion/tobyscamera-${project.version}+mc$minecraftVersion.jar").get().asFile.isFile) {
+                "Missing collected Fabric JAR for Minecraft $minecraftVersion"
+            }
+        }
+    }
+}
+
+tasks.register("verifyFabricTargets") {
+    dependsOn(":fabric-1.21.11:remapJar", ":fabric-26.1:jar")
+    doLast {
+        listOf("1.21.11", "26.1").forEach { minecraftVersion ->
+            check(findProject(":fabric-$minecraftVersion") != null) {
+                "Missing Fabric target $minecraftVersion"
+            }
+        }
+    }
 }
 
 tasks.register("runServer") {
