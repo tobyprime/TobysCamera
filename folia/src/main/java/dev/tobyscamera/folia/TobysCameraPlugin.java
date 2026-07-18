@@ -50,7 +50,6 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     private ServerTaskScheduler scheduler;
     private ServerTaskScheduler.TaskHandle videoPlaybackTask;
     private ServerTaskScheduler.TaskHandle uploadCleanupTask;
-    private ServerTaskScheduler.TaskHandle mediaAuditTask;
     private VideoPlaybackService videoPlayback;
     private PluginPayloadGateway gateway;
     private CameraFilmInventoryListener filmListener;
@@ -77,8 +76,6 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         bagPlacement.setFrameRefresher(mediaActivation::refreshFrame);
         mediaActivation.setVideoIndexRefresh(videoPlayback::refreshActiveMedia);
         getServer().getPluginManager().registerEvents(mediaActivation, this);
-        mediaActivation.auditNearPlayers();
-        mediaAuditTask = scheduler.runGlobalRepeating(100L, 200L, mediaActivation::auditNearPlayers);
         gateway = new PluginPayloadGateway(this, scheduler, coordinator, videoCoordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
         getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);
@@ -119,7 +116,6 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         getServer().getMessenger().unregisterOutgoingPluginChannel(this);
         if (videoPlaybackTask != null) videoPlaybackTask.cancel();
         if (uploadCleanupTask != null) uploadCleanupTask.cancel();
-        if (mediaAuditTask != null) mediaAuditTask.cancel();
         if (mediaActivation != null) mediaActivation.clear();
         if (repository != null) try { repository.close(); } catch (IOException exception) { getLogger().warning("Could not close photo storage: " + exception.getMessage()); }
         if (videoRepository != null) try { videoRepository.close(); } catch (IOException exception) { getLogger().warning("Could not close video storage: " + exception.getMessage()); }
