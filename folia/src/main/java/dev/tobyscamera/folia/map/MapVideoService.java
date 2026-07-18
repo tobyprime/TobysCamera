@@ -6,6 +6,7 @@ import dev.tobyscamera.folia.bag.PhotoBagFactory;
 import dev.tobyscamera.folia.bag.PhotoBagKind;
 import dev.tobyscamera.folia.item.RootCustomData;
 import dev.tobyscamera.folia.storage.TileCoordinate;
+import dev.tobyscamera.folia.storage.MediaTileCache;
 import dev.tobyscamera.folia.storage.VideoRecord;
 import dev.tobyscamera.folia.storage.VideoRepository;
 import dev.tobyscamera.folia.upload.PhotoMetadata;
@@ -24,13 +25,21 @@ import org.bukkit.map.MapView;
 
 /** Video maps and frame bytes exist only while a tagged map item is active. */
 public final class MapVideoService {
+    private static final int RECORD_CACHE_SIZE = 256;
     private final VideoRepository repository;
+    private final MediaTileCache cache;
     private final Map<String, ActiveTile> activeBySource = new ConcurrentHashMap<>();
     private final Map<Integer, ActiveTile> activeByMapId = new ConcurrentHashMap<>();
     private final Map<UUID, VideoRecord> activeRecords = new ConcurrentHashMap<>();
-    private final Map<FrameKey, byte[]> pendingFrames = new ConcurrentHashMap<>();
+    private final Map<UUID, VideoRecord> records = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<UUID, VideoRecord> eldest) { return size() > RECORD_CACHE_SIZE; }
+    };
 
-    public MapVideoService(VideoRepository repository) { this.repository = repository; }
+    public MapVideoService(VideoRepository repository) {
+        this(repository, new MediaTileCache(64L * 1024L * 1024L));
+    }
+
+    public MapVideoService(VideoRepository repository, MediaTileCache cache) { this.repository = repository; this.cache = cache; }
 
     public VideoRecord createMaps(UUID ownerId, World world, VideoUploadSession session) {
         UUID videoId = UUID.randomUUID();
@@ -60,17 +69,18 @@ public final class MapVideoService {
 
     public byte[] previewPixels(PhotoBagData bag) throws IOException {
         if (bag.kind() != PhotoBagKind.VIDEO) throw new IllegalArgumentException("bag is not a video");
-        byte[] preview = repository.readPreview(bag.mediaId());
+        byte[] preview = cache.getOrLoad(MediaTileCache.Key.videoPreview(bag.mediaId()), () -> repository.readPreview(bag.mediaId()));
         if (preview == null || preview.length != 16_384) throw new IOException("video bag preview is unavailable");
         return preview;
     }
 
     /** Performs storage I/O and must be called only from an async scheduler. */
     public LoadedVideo load(MediaMapDescriptor.VideoTile tile) throws IOException {
-        VideoRecord record = repository.find(tile.mediaId());
+        VideoRecord record = findRecord(tile.mediaId());
         if (record == null) throw new IOException("video does not exist");
         if (!Integer.valueOf(tile.mapId()).equals(record.mapIds().get(tile.coordinate()))) throw new IOException("video map identity does not match storage");
-        return new LoadedVideo(record, repository.readTile(tile.mediaId(), 0, tile.coordinate()));
+        return new LoadedVideo(record, cache.getOrLoad(MediaTileCache.Key.videoTile(tile.mediaId(), 0, tile.coordinate()),
+                () -> repository.readTile(tile.mediaId(), 0, tile.coordinate())));
     }
 
     /** Installs one active renderer after {@link #load} completes. */
@@ -111,24 +121,24 @@ public final class MapVideoService {
         for (String source : active.sources.keySet()) activeBySource.remove(source, active);
         active.renderer.clearPixels();
         active.map.removeRenderer(active.renderer);
-        pendingFrames.keySet().removeIf(key -> key.mapId == mapId);
         if (activeByMapId.values().stream().noneMatch(other -> other.record.videoId().equals(active.record.videoId()))) {
             activeRecords.remove(active.record.videoId(), active.record);
         }
     }
 
-    /** Reads a requested active tile into a one-use handoff; call from async scheduling only. */
+    /** Reads a requested active tile into the shared cache; call from async scheduling only. */
     public void preloadFrame(VideoRecord record, int mapId, int frameIndex) throws IOException {
         ActiveTile active = activeByMapId.get(mapId);
         if (active == null || !active.record.videoId().equals(record.videoId())) return;
-        pendingFrames.put(new FrameKey(record.videoId(), mapId, frameIndex), repository.readTile(record.videoId(), frameIndex, active.tile.coordinate()));
+        cache.getOrLoad(MediaTileCache.Key.videoTile(record.videoId(), frameIndex, active.tile.coordinate()),
+                () -> repository.readTile(record.videoId(), frameIndex, active.tile.coordinate()));
     }
 
-    /** Applies and drops a previously read video frame without retaining a cache. */
+    /** Applies a previously cached video frame without performing storage I/O. */
     public MapView showCachedFrame(VideoRecord record, int mapId, int frameIndex) {
         ActiveTile active = activeByMapId.get(mapId);
         if (active == null || !active.record.videoId().equals(record.videoId())) return null;
-        byte[] pixels = pendingFrames.remove(new FrameKey(record.videoId(), mapId, frameIndex));
+        byte[] pixels = cache.find(MediaTileCache.Key.videoTile(record.videoId(), frameIndex, active.tile.coordinate()));
         if (pixels == null) return null;
         active.renderer.setPixels(pixels);
         return active.map;
@@ -140,7 +150,17 @@ public final class MapVideoService {
     }
 
     public VideoRecord activeRecord(UUID videoId) { return activeRecords.get(videoId); }
-    public VideoRecord record(UUID videoId) throws IOException { return repository.find(videoId); }
+    public VideoRecord record(UUID videoId) throws IOException { return findRecord(videoId); }
+
+    private VideoRecord findRecord(UUID videoId) throws IOException {
+        synchronized (records) {
+            VideoRecord cached = records.get(videoId);
+            if (cached != null) return cached;
+            VideoRecord loaded = repository.find(videoId);
+            if (loaded != null) records.put(videoId, loaded);
+            return loaded;
+        }
+    }
 
     public ItemStack mapItem(VideoRecord record, TileCoordinate coordinate, PhotoMetadata metadata) {
         MapView view = Bukkit.getMap(record.mapIds().get(coordinate));
@@ -163,7 +183,6 @@ public final class MapVideoService {
 
     public record VideoTile(UUID videoId, TileCoordinate coordinate) { }
     public record LoadedVideo(VideoRecord record, byte[] firstFrame) { }
-    private record FrameKey(UUID videoId, int mapId, int frameIndex) { }
     private static final class ActiveTile {
         private final int mapId;
         private final MediaMapDescriptor.VideoTile tile;

@@ -3,6 +3,7 @@ package dev.tobyscamera.folia.video;
 import com.destroystokyo.paper.event.entity.EntityAddToWorldEvent;
 import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
 import dev.tobyscamera.folia.map.MapVideoService;
+import dev.tobyscamera.folia.map.MediaMapDescriptor;
 import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import io.papermc.paper.event.player.PlayerItemFrameChangeEvent;
 import java.io.IOException;
@@ -28,7 +29,6 @@ import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.plugin.Plugin;
 
 /** Global playback uses region-owned event snapshots; it never reads entity state from the global scheduler. */
@@ -79,14 +79,6 @@ public final class VideoPlaybackService implements Listener {
     /** Must be called after plugin code changes the map of an existing item frame. */
     public void refreshFrame(ItemFrame frame) { index(frame, frame.getItem()); }
 
-    /** Re-indexes only transient player snapshots and current loaded frames after lazy activation. */
-    public void refreshActiveMedia() {
-        for (IndexedPlayer indexed : players.values()) {
-            scheduler.runEntity(indexed.player(), () -> indexPlayer(indexed.player(), indexed.player().getLocation()), () -> { });
-        }
-        indexLoadedFrames();
-    }
-
     /** Runs globally: only immutable snapshots and player scheduler handles are used here. */
     public void tick() {
         long tick = serverTick.getAndIncrement();
@@ -133,10 +125,11 @@ public final class VideoPlaybackService implements Listener {
     }
 
     private void index(ItemFrame frame, ItemStack item) {
-        if (!(item.getItemMeta() instanceof MapMeta meta) || !meta.hasMapView()) { index.removeFrame(frame.getUniqueId()); return; }
-        int mapId = meta.getMapView().getId();
-        if (videos.tileForMap(mapId) == null) { index.removeFrame(frame.getUniqueId()); return; }
-        index.upsertFrame(frame.getUniqueId(), mapId, frame.getWorld().getUID(), frame.getX(), frame.getY(), frame.getZ());
+        if (MediaMapDescriptor.from(item).orElse(null) instanceof MediaMapDescriptor.VideoTile video) {
+            index.upsertFrame(frame.getUniqueId(), video.mapId(), frame.getWorld().getUID(), frame.getX(), frame.getY(), frame.getZ());
+        } else {
+            index.removeFrame(frame.getUniqueId());
+        }
     }
 
     private void indexPlayer(Player player, Location location) {
@@ -164,7 +157,7 @@ public final class VideoPlaybackService implements Listener {
     }
 
     private void addHeldMap(Set<Integer> maps, ItemStack item) {
-        if (item.getItemMeta() instanceof MapMeta meta && meta.hasMapView() && videos.tileForMap(meta.getMapView().getId()) != null) maps.add(meta.getMapView().getId());
+        if (MediaMapDescriptor.from(item).orElse(null) instanceof MediaMapDescriptor.VideoTile video) maps.add(video.mapId());
     }
 
     private record IndexedPlayer(Player player, UUID worldId, double x, double y, double z, Set<Integer> heldMapIds) { }

@@ -16,6 +16,7 @@ import dev.tobyscamera.folia.storage.PhotoRepository;
 import dev.tobyscamera.folia.storage.SqlitePhotoRepository;
 import dev.tobyscamera.folia.storage.SqliteVideoRepository;
 import dev.tobyscamera.folia.storage.VideoRepository;
+import dev.tobyscamera.folia.storage.MediaTileCache;
 import dev.tobyscamera.folia.upload.UploadCoordinator;
 import dev.tobyscamera.folia.upload.VideoUploadCoordinator;
 import dev.tobyscamera.folia.map.MapVideoService;
@@ -66,15 +67,15 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         } catch (IOException exception) {
             throw new IllegalStateException("Could not initialize camera storage", exception);
         }
-        photos = new MapPhotoService(this, repository);
-        videos = new MapVideoService(videoRepository);
+        MediaTileCache mediaCache = new MediaTileCache(64L * 1024L * 1024L);
+        photos = new MapPhotoService(this, repository, mediaCache);
+        videos = new MapVideoService(videoRepository, mediaCache);
         bagPlacement = new PhotoBagPlacementListener(this, photos, videos, scheduler);
         try { deliveries = new MapDeliveryService(photos, new PendingDeliveryRepository(getDataFolder().toPath())); }
         catch (IOException exception) { throw new IllegalStateException("Could not initialize pending deliveries", exception); }
         configureRuntime(PluginSettings.from(flatten(getConfig())));
         mediaActivation = new MediaMapActivationListener(this, scheduler, photos, videos);
         bagPlacement.setFrameRefresher(mediaActivation::refreshFrame);
-        mediaActivation.setVideoIndexRefresh(videoPlayback::refreshActiveMedia);
         getServer().getPluginManager().registerEvents(mediaActivation, this);
         gateway = new PluginPayloadGateway(this, scheduler, coordinator, videoCoordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
@@ -99,7 +100,6 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         filmListener = new CameraFilmInventoryListener(films);
         getServer().getPluginManager().registerEvents(filmListener, this);
         videoPlayback = new VideoPlaybackService(this, scheduler, videos, settings.videoMaxActiveMapFrames(), settings.videoMaxUpdateDistance());
-        if (mediaActivation != null) mediaActivation.setVideoIndexRefresh(videoPlayback::refreshActiveMedia);
         videoPlayback.indexLoadedFrames();
         getServer().getPluginManager().registerEvents(videoPlayback, this);
         videoPlaybackTask = scheduler.runGlobalRepeating(1L, 1L, () -> videoPlayback.tick());

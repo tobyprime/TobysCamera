@@ -18,8 +18,13 @@ public final class VideoPlaybackIndex {
     private final Map<UUID, Viewer> viewers = new HashMap<>();
     private final Map<UUID, Map<ChunkPosition, Map<UUID, Frame>>> framesByChunk = new HashMap<>();
     private final Map<UUID, Map<ChunkPosition, Set<UUID>>> viewersByChunk = new HashMap<>();
+    private Map<Integer, Set<UUID>> visibleSnapshot = Map.of();
+    private int snapshotActiveLimit = -1;
+    private int snapshotMaximumDistance = -1;
+    private boolean visibleSnapshotDirty = true;
 
     public synchronized void upsertFrame(UUID frameId, int mapId, UUID worldId, double x, double y, double z) {
+        invalidateVisibleSnapshot();
         removeFrame(frameId);
         Frame frame = new Frame(frameId, mapId, worldId, x, y, z);
         frames.put(frameId, frame);
@@ -28,6 +33,7 @@ public final class VideoPlaybackIndex {
     }
 
     public synchronized void removeFrame(UUID frameId) {
+        invalidateVisibleSnapshot();
         Frame existing = frames.remove(frameId);
         if (existing == null) return;
         Map<ChunkPosition, Map<UUID, Frame>> world = framesByChunk.get(existing.worldId());
@@ -42,6 +48,10 @@ public final class VideoPlaybackIndex {
     }
 
     public synchronized void upsertViewer(UUID viewerId, UUID worldId, double x, double y, double z, Set<Integer> heldMapIds) {
+        Viewer existing = viewers.get(viewerId);
+        if (existing != null && existing.worldId().equals(worldId) && existing.heldMapIds().equals(heldMapIds)
+                && distanceSquared(existing.x(), existing.y(), existing.z(), x, y, z) < 4.0) return;
+        invalidateVisibleSnapshot();
         removeViewer(viewerId);
         Viewer viewer = new Viewer(viewerId, worldId, x, y, z, Set.copyOf(heldMapIds));
         viewers.put(viewerId, viewer);
@@ -50,6 +60,7 @@ public final class VideoPlaybackIndex {
     }
 
     public synchronized void removeViewer(UUID viewerId) {
+        invalidateVisibleSnapshot();
         Viewer existing = viewers.remove(viewerId);
         if (existing == null) return;
         Map<ChunkPosition, Set<UUID>> world = viewersByChunk.get(existing.worldId());
@@ -65,7 +76,8 @@ public final class VideoPlaybackIndex {
 
     /** Returns each selected map and exactly the indexed viewers that should receive it. */
     public synchronized Map<Integer, Set<UUID>> activeViewers(int activeLimit, int maximumDistance) {
-        if (activeLimit < 1 || maximumDistance < 0 || viewers.isEmpty()) return Map.of();
+        if (!visibleSnapshotDirty && snapshotActiveLimit == activeLimit && snapshotMaximumDistance == maximumDistance) return visibleSnapshot;
+        if (activeLimit < 1 || maximumDistance < 0 || viewers.isEmpty()) return cacheVisibleSnapshot(activeLimit, maximumDistance, Map.of());
         double maximumDistanceSquared = (double) maximumDistance * maximumDistance;
         int chunkRadius = (maximumDistance + CHUNK_SIZE - 1) / CHUNK_SIZE;
         Map<Integer, Candidate> nearest = new HashMap<>();
@@ -100,7 +112,16 @@ public final class VideoPlaybackIndex {
         }
         Map<Integer, Set<UUID>> immutable = new LinkedHashMap<>();
         for (var entry : result.entrySet()) immutable.put(entry.getKey(), Set.copyOf(entry.getValue()));
-        return Map.copyOf(immutable);
+        return cacheVisibleSnapshot(activeLimit, maximumDistance, Map.copyOf(immutable));
+    }
+
+    private void invalidateVisibleSnapshot() { visibleSnapshotDirty = true; }
+    private Map<Integer, Set<UUID>> cacheVisibleSnapshot(int activeLimit, int maximumDistance, Map<Integer, Set<UUID>> snapshot) {
+        snapshotActiveLimit = activeLimit;
+        snapshotMaximumDistance = maximumDistance;
+        visibleSnapshot = snapshot;
+        visibleSnapshotDirty = false;
+        return snapshot;
     }
 
     private static Candidate nearest(Candidate left, Candidate right) { return left.distanceSquared() <= right.distanceSquared() ? left : right; }

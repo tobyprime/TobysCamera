@@ -1,6 +1,7 @@
 package dev.tobyscamera.folia.video;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.util.Map;
 import java.util.Set;
@@ -8,6 +9,29 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class VideoPlaybackIndexTest {
+    @Test
+    void reusesTheVisibleMapSnapshotUntilTheIndexChanges() {
+        VideoPlaybackIndex index = new VideoPlaybackIndex();
+        UUID world = UUID.randomUUID();
+        index.upsertViewer(UUID.randomUUID(), world, 0, 64, 0, Set.of(99));
+
+        Map<Integer, Set<UUID>> first = index.activeViewers(8, 32);
+
+        assertSame(first, index.activeViewers(8, 32));
+    }
+
+    @Test
+    void keepsTheVisibleMapSnapshotForSubTwoBlockViewerMovement() {
+        VideoPlaybackIndex index = new VideoPlaybackIndex();
+        UUID world = UUID.randomUUID(), viewer = UUID.randomUUID();
+        index.upsertViewer(viewer, world, 0, 64, 0, Set.of(99));
+        Map<Integer, Set<UUID>> first = index.activeViewers(8, 32);
+
+        index.upsertViewer(viewer, world, 1, 64, 0, Set.of(99));
+
+        assertSame(first, index.activeViewers(8, 32));
+    }
+
     @Test
     void selectsFrameAcrossChunkBoundaryAndOnlyItsNearbyViewer() {
         VideoPlaybackIndex index = new VideoPlaybackIndex();

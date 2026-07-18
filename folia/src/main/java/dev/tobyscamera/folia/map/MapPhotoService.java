@@ -8,6 +8,7 @@ import dev.tobyscamera.folia.bag.PhotoBagFactory;
 import dev.tobyscamera.folia.bag.PhotoBagData;
 import dev.tobyscamera.folia.bag.PhotoBagKind;
 import dev.tobyscamera.folia.storage.PhotoRepository;
+import dev.tobyscamera.folia.storage.MediaTileCache;
 import dev.tobyscamera.folia.storage.TileCoordinate;
 import java.io.IOException;
 import java.time.Instant;
@@ -24,10 +25,16 @@ import org.bukkit.plugin.Plugin;
 public final class MapPhotoService {
     private final Plugin plugin;
     private final PhotoRepository repository;
+    private final MediaTileCache cache;
 
     public MapPhotoService(Plugin plugin, PhotoRepository repository) {
+        this(plugin, repository, new MediaTileCache(64L * 1024L * 1024L));
+    }
+
+    public MapPhotoService(Plugin plugin, PhotoRepository repository, MediaTileCache cache) {
         this.plugin = plugin;
         this.repository = repository;
+        this.cache = cache;
     }
 
     public PhotoRecord createMaps(UUID ownerId, World world, UploadSession session) {
@@ -81,13 +88,14 @@ public final class MapPhotoService {
     /** Reads the client-generated preview persisted with the photo. Legacy bags are unsupported. */
     public byte[] previewPixels(PhotoBagData bag) throws IOException {
         if (bag.kind() != PhotoBagKind.PHOTO) throw new IllegalArgumentException("bag is not a photo");
-        byte[] preview = repository.readPreview(bag.mediaId());
+        byte[] preview = cache.getOrLoad(MediaTileCache.Key.photoPreview(bag.mediaId()), () -> repository.readPreview(bag.mediaId()));
         if (preview == null || preview.length != 16_384) throw new IOException("photo bag preview is unavailable");
         return preview;
     }
 
     public byte[] tilePixels(MediaMapDescriptor.PhotoTile tile) throws IOException {
-        return repository.readTile(tile.mediaId(), tile.coordinate());
+        return cache.getOrLoad(MediaTileCache.Key.photoTile(tile.mediaId(), tile.coordinate()),
+                () -> repository.readTile(tile.mediaId(), tile.coordinate()));
     }
 
     public ItemStack mapItem(PhotoRecord record, TileCoordinate coordinate, PhotoMetadata metadata) {

@@ -40,7 +40,6 @@ public final class MediaMapActivationListener implements Listener {
     private final Map<String, MediaMapDescriptor.VideoTile> pendingVideos = new ConcurrentHashMap<>();
     private final ChunkFrameViewerTracker frameViewers = new ChunkFrameViewerTracker();
     private final Set<String> frameSources = ConcurrentHashMap.newKeySet();
-    private volatile Runnable videoIndexRefresh = () -> { };
 
     public MediaMapActivationListener(Plugin plugin, ServerTaskScheduler scheduler, MapPhotoService photos, MapVideoService videos) {
         this.plugin = plugin;
@@ -53,7 +52,6 @@ public final class MediaMapActivationListener implements Listener {
 
     /** Reconciles a changed frame for only clients whose loaded chunks currently contain it. */
     public void refreshFrame(ItemFrame frame) { refreshFrame(frame, frame.getItem()); }
-    public void setVideoIndexRefresh(Runnable videoIndexRefresh) { this.videoIndexRefresh = videoIndexRefresh; }
 
     public void clear() {
         pendingVideos.clear();
@@ -184,7 +182,6 @@ public final class MediaMapActivationListener implements Listener {
                 scheduler.runGlobal(() -> {
                     if (!tile.equals(pendingVideos.get(source))) return;
                     videos.attach(source, tile, loaded);
-                    videoIndexRefresh.run();
                 });
             } catch (IOException exception) {
                 if (tile.equals(pendingVideos.remove(source))) plugin.getLogger().warning("Could not lazily load video " + tile.mediaId() + ": " + exception.getMessage());
