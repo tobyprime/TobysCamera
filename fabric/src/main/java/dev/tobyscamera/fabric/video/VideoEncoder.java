@@ -16,6 +16,8 @@ public final class VideoEncoder {
     private final MapTileEncoder.DitheringMode dithering;
     private int cachedFrameIndex = -1;
     private MapTileEncoder.EncodedPhoto cachedFrame;
+    private int cachedPreviewFrameIndex = -1;
+    private byte[] cachedPreview;
     private final MapTileEncoder tileEncoder = new MapTileEncoder();
     private final PrintCanvasProcessor canvasProcessor = new PrintCanvasProcessor();
     private final CompositionCropProcessor cropProcessor = new CompositionCropProcessor();
@@ -31,13 +33,30 @@ public final class VideoEncoder {
     public MapTileEncoder.EncodedPhoto frame(int retainedIndex) throws IOException {
         if (retainedIndex < 0 || retainedIndex >= frameCount()) throw new IndexOutOfBoundsException(retainedIndex);
         if (cachedFrameIndex == retainedIndex) return cachedFrame;
+        var canvas = printCanvas(retainedIndex);
+        var result = tileEncoder.encode(canvas, dithering);
+        cachedFrameIndex = retainedIndex;
+        cachedFrame = result;
+        cachedPreviewFrameIndex = retainedIndex;
+        cachedPreview = tileEncoder.bagPreview(canvas, dithering);
+        return result;
+    }
+
+    /** Renders a retained source frame directly into the one-tile photo-bag preview. */
+    public byte[] bagPreview(int retainedIndex) throws IOException {
+        if (retainedIndex < 0 || retainedIndex >= frameCount()) throw new IndexOutOfBoundsException(retainedIndex);
+        if (cachedPreviewFrameIndex != retainedIndex) {
+            cachedPreview = tileEncoder.bagPreview(printCanvas(retainedIndex), dithering);
+            cachedPreviewFrameIndex = retainedIndex;
+        }
+        return cachedPreview.clone();
+    }
+
+    private java.awt.image.BufferedImage printCanvas(int retainedIndex) throws IOException {
+        if (retainedIndex < 0 || retainedIndex >= frameCount()) throw new IndexOutOfBoundsException(retainedIndex);
         var captured = new CapturedFrame(recording.read(range.startInclusive() + retainedIndex), 1,
                 new CameraComposition(layout.aspectRatio(), 0.0f));
         var cropped = cropProcessor.process(captured).image();
-        var processed = canvasProcessor.process(cropped, layout);
-        var result = tileEncoder.encode(processed, dithering);
-        cachedFrameIndex = retainedIndex;
-        cachedFrame = result;
-        return result;
+        return canvasProcessor.process(cropped, layout);
     }
 }

@@ -1,6 +1,7 @@
 package dev.tobyscamera.fabric.camera;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.awt.image.BufferedImage;
@@ -76,14 +77,17 @@ class MapTileEncoderTest {
     }
 
     @Test
-    void bagPreviewDownsamplesTheEntireEncodedTileGridToOneMapTile() {
-        var encoded = new MapTileEncoder.EncodedPhoto(2, 1, java.util.List.of(filled((byte) 11), filled((byte) 22)));
+    void bagPreviewRendersTheCompleteSourceImageAtOneByOne() {
+        BufferedImage source = new BufferedImage(256, 128, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 128; y++) for (int x = 0; x < 256; x++) {
+            int shade = (x + y) / 3;
+            source.setRGB(x, y, 0xff000000 | shade << 16 | shade << 8 | shade);
+        }
 
-        byte[] preview = encoder.bagPreview(encoded);
+        byte[] preview = encoder.bagPreview(source, MapTileEncoder.DitheringMode.FLOYD_STEINBERG);
 
         assertEquals(16_384, preview.length);
-        assertEquals(11, Byte.toUnsignedInt(preview[0]));
-        assertEquals(22, Byte.toUnsignedInt(preview[127]));
+        assertFalse(Arrays.equals(downsampleEncodedTiles(encoder.encode(source, MapTileEncoder.DitheringMode.FLOYD_STEINBERG)), preview));
     }
 
     @Test
@@ -121,9 +125,17 @@ class MapTileEncoderTest {
         return 0xff000000 | MapColor.getColorFromPackedId(Byte.toUnsignedInt(packedId)) & 0x00ffffff;
     }
 
-    private static byte[] filled(byte value) {
-        byte[] pixels = new byte[16_384];
-        Arrays.fill(pixels, value);
-        return pixels;
+    private static byte[] downsampleEncodedTiles(MapTileEncoder.EncodedPhoto photo) {
+        byte[] preview = new byte[16_384];
+        int sourceWidth = photo.gridWidth() * 128;
+        int sourceHeight = photo.gridHeight() * 128;
+        for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) {
+            int sourceX = Math.min(sourceWidth - 1, x * sourceWidth / 128);
+            int sourceY = Math.min(sourceHeight - 1, y * sourceHeight / 128);
+            byte[] tile = photo.tiles().get((sourceY / 128) * photo.gridWidth() + sourceX / 128);
+            preview[y * 128 + x] = tile[(sourceY % 128) * 128 + sourceX % 128];
+        }
+        return preview;
     }
+
 }

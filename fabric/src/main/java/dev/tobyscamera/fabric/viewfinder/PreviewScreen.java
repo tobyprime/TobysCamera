@@ -27,7 +27,7 @@ public final class PreviewScreen extends Screen {
         Thread thread = new Thread(runnable, "TobysCamera photo preview processor"); thread.setDaemon(true); return thread;
     });
     private final CapturedFrame frame;
-    private final Consumer<MapTileEncoder.EncodedPhoto> usePhoto;
+    private final Consumer<PhotoPreviewProcessor.Result> usePhoto;
     private final Runnable retake;
     private final PhotoPreviewProcessor previewProcessor = new PhotoPreviewProcessor();
     private Identifier textureId;
@@ -35,14 +35,14 @@ public final class PreviewScreen extends Screen {
 
     private int printSize;
     private MapTileEncoder.DitheringMode ditheringMode = MapTileEncoder.DEFAULT_DITHERING;
-    private MapTileEncoder.EncodedPhoto printPhoto;
+    private PhotoPreviewProcessor.Result printPhoto;
     private int previewImageWidth;
     private int previewImageHeight;
     private int previewRevision;
     private boolean previewReady;
     private Future<?> previewTask;
 
-    public PreviewScreen(CapturedFrame frame, Consumer<MapTileEncoder.EncodedPhoto> usePhoto, Runnable retake) {
+    public PreviewScreen(CapturedFrame frame, Consumer<PhotoPreviewProcessor.Result> usePhoto, Runnable retake) {
         super(Component.translatable("tobyscamera.preview.title"));
         this.frame = frame;
         this.usePhoto = usePhoto;
@@ -119,13 +119,13 @@ public final class PreviewScreen extends Screen {
             try {
             PhotoPreviewProcessor.Result result = previewProcessor.process(frame, requestedPrintSize, requestedDithering);
             NativeImage image = NativeImageConverter.fromBufferedImage(result.image());
-            minecraft.execute(() -> publishPreview(revision, result.photo(), image));
+            minecraft.execute(() -> publishPreview(revision, result, image));
             } catch (CancellationException ignored) { }
         });
     }
     private void cancelPreviewTask() { if (previewTask != null) { previewTask.cancel(true); previewTask = null; } }
 
-    private void publishPreview(int revision, MapTileEncoder.EncodedPhoto photo, NativeImage image) {
+    private void publishPreview(int revision, PhotoPreviewProcessor.Result photo, NativeImage image) {
         if (released || minecraft.screen != this || revision != previewRevision) { image.close(); return; }
         printPhoto = photo;
         previewImageWidth = image.getWidth();

@@ -9,8 +9,8 @@ public final class PhotoPreviewProcessor {
     public Result process(CapturedFrame frame, int printSize, MapTileEncoder.DitheringMode dithering) {
         BufferedImage canvas = new PrintCanvasProcessor().process(frame.image(), PrintLayout.forMaximumSide(printSize, frame.composition().aspectRatio()));
         MapTileEncoder.EncodedPhoto photo = encoder.encode(canvas, dithering);
-        return new Result(photo, encoder.palettePreview(photo));
+        return new Result(photo, encoder.palettePreview(photo), encoder.bagPreview(canvas, dithering));
     }
 
-    public record Result(MapTileEncoder.EncodedPhoto photo, BufferedImage image) { }
+    public record Result(MapTileEncoder.EncodedPhoto photo, BufferedImage image, byte[] bagPreview) { }
 }

@@ -1,6 +1,7 @@
 package dev.tobyscamera.fabric.video;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 
@@ -54,6 +55,22 @@ class VideoEncoderTest {
             BufferedImage preview = new MapTileEncoder().palettePreview(encoder.frame(0));
             assertNotEquals(0xFFFF0000, preview.getRGB(0, 64));
             assertNotEquals(0xFFFF0000, preview.getRGB(127, 64));
+        }
+    }
+
+    @Test
+    void rendersTheFirstRetainedFrameAsTheCompleteOneByOneBagPreview() throws Exception {
+        BufferedImage raw = new BufferedImage(256, 128, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < raw.getHeight(); y++) for (int x = 0; x < raw.getWidth(); x++) {
+            int shade = (x + y) / 3;
+            raw.setRGB(x, y, 0xff000000 | shade << 16 | shade << 8 | shade);
+        }
+        try (TemporaryVideoRecording recording = TemporaryVideoRecording.create(Files.createTempDirectory("camera-video"))) {
+            VideoTestImages.append(recording, raw);
+            VideoEncoder encoder = new VideoEncoder(recording, new VideoFrameRange(0, 0, 1),
+                    new PrintLayout(2, 1, new AspectRatio(2, 1)), MapTileEncoder.DitheringMode.FLOYD_STEINBERG);
+
+            assertArrayEquals(new MapTileEncoder().bagPreview(raw, MapTileEncoder.DitheringMode.FLOYD_STEINBERG), encoder.bagPreview(0));
         }
     }
 }

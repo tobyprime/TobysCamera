@@ -1,6 +1,7 @@
 package dev.tobyscamera.fabric.video;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import dev.tobyscamera.common.protocol.CameraPacket;
 import dev.tobyscamera.common.protocol.Packets;
@@ -101,6 +102,35 @@ class VideoUploadControllerTest {
             assertEquals(6, sent.stream().filter(Packets.VideoTileChunk.class::isInstance).count());
             assertEquals(8, controller.progress().completedChunks());
             assertEquals(12, controller.progress().totalChunks());
+        }
+    }
+
+    @Test
+    void uploadsTheFirstFrameRenderedDirectlyAsTheOneByOnePreview() throws Exception {
+        List<CameraPacket> sent = new ArrayList<>();
+        BufferedImage first = new BufferedImage(256, 128, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage selected = new BufferedImage(256, 128, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < selected.getHeight(); y++) for (int x = 0; x < selected.getWidth(); x++) {
+            int shade = (x + y) / 3;
+            selected.setRGB(x, y, 0xff000000 | shade << 16 | shade << 8 | shade);
+        }
+        try (TemporaryVideoRecording recording = TemporaryVideoRecording.create(Files.createTempDirectory("camera-video"))) {
+            VideoTestImages.append(recording, first);
+            VideoTestImages.append(recording, selected);
+            VideoEncoder encoder = new VideoEncoder(recording, new VideoFrameRange(1, 1, 2),
+                    new PrintLayout(2, 1, new AspectRatio(2, 1)), MapTileEncoder.DitheringMode.FLOYD_STEINBERG);
+            var queued = new ArrayDeque<Runnable>();
+            VideoUploadController controller = new VideoUploadController(sent::add, () -> 1_000L, ignored -> { }, queued::add);
+            controller.begin(encoder, recording, 10);
+            controller.handleServerPacket(new Packets.VideoGranted(UUID.randomUUID(), 2_000L, 16_384, 100));
+
+            controller.tick();
+            queued.remove().run();
+            recording.close();
+            controller.tick();
+
+            byte[] expected = new MapTileEncoder().bagPreview(selected, MapTileEncoder.DitheringMode.FLOYD_STEINBERG);
+            assertArrayEquals(java.util.Arrays.copyOf(expected, 8_192), ((Packets.VideoPreviewChunk) sent.get(1)).data());
         }
     }
 

@@ -35,10 +35,11 @@ public final class PhotoUploadController {
         if (packet instanceof Packets.RateLimited || packet instanceof Packets.UploadRejected || packet instanceof Packets.PhotoCreated) clearPending();
     }
 
-    public boolean confirm(MapTileEncoder.EncodedPhoto photo) {
+    public boolean confirm(MapTileEncoder.EncodedPhoto photo, byte[] preview) {
         if (pendingPhoto != null || photo == null || photo.gridWidth() < 1 || photo.gridHeight() < 1 || photo.tiles().size() != photo.gridWidth() * photo.gridHeight()) return false;
+        if (preview == null || preview.length != 16_384) return false;
         pendingPhoto = photo;
-        previewPixels = new MapTileEncoder().bagPreview(photo);
+        previewPixels = preview.clone();
         totalChunks = photo.tiles().size() * 2 + 2;
         completedChunks = previewOffset = tile = offset = 0;
         finishSent = false;

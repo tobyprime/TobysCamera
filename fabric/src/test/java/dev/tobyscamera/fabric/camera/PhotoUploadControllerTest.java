@@ -15,7 +15,7 @@ class PhotoUploadControllerTest {
         java.util.List<CameraPacket> sent = new java.util.ArrayList<>();
         java.util.concurrent.atomic.AtomicLong now = new java.util.concurrent.atomic.AtomicLong(1_000L);
         PhotoUploadController controller = new PhotoUploadController(sent::add, now::get);
-        controller.confirm(new MapTileEncoder.EncodedPhoto(1, 1, java.util.List.of(new byte[16_384])));
+        controller.confirm(new MapTileEncoder.EncodedPhoto(1, 1, java.util.List.of(new byte[16_384])), new byte[16_384]);
         controller.handleServerPacket(new Packets.UploadGranted(UUID.randomUUID(), Long.MAX_VALUE, 16_384, 1));
 
         controller.tick();
@@ -29,8 +29,9 @@ class PhotoUploadControllerTest {
         List<CameraPacket> sent = new ArrayList<>();
         PhotoUploadController controller = new PhotoUploadController(sent::add);
         MapTileEncoder.EncodedPhoto photo = new MapTileEncoder.EncodedPhoto(1, 1, List.of(filled((byte) 43)));
+        byte[] preview = filled((byte) 19);
 
-        controller.confirm(photo);
+        controller.confirm(photo, preview);
         controller.handleServerPacket(new Packets.UploadGranted(UUID.randomUUID(), Long.MAX_VALUE, 16_384, 120));
         controller.tick();
 
@@ -38,6 +39,7 @@ class PhotoUploadControllerTest {
         assertEquals(Packets.UploadPreviewChunk.class, sent.get(1).getClass());
         assertEquals(Packets.UploadPreviewChunk.class, sent.get(2).getClass());
         assertEquals(Packets.UploadTileChunk.class, sent.get(3).getClass());
+        assertEquals(19, Byte.toUnsignedInt(((Packets.UploadPreviewChunk) sent.get(1)).data()[0]));
     }
 
     private static byte[] filled(byte value) {

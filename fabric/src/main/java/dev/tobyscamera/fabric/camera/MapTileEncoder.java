@@ -43,25 +43,9 @@ public final class MapTileEncoder {
         return preview;
     }
 
-    /** Downsamples encoded map-palette tiles to the single tile used by a photo bag. */
-    public byte[] bagPreview(EncodedPhoto photo) {
-        if (photo == null || photo.gridWidth() < 1 || photo.gridHeight() < 1
-                || photo.tiles().size() != photo.gridWidth() * photo.gridHeight()) {
-            throw new IllegalArgumentException("encoded photo dimensions are invalid");
-        }
-        byte[] preview = new byte[16_384];
-        int sourceWidth = photo.gridWidth() * 128;
-        int sourceHeight = photo.gridHeight() * 128;
-        for (int y = 0; y < 128; y++) {
-            int sourceY = Math.min(sourceHeight - 1, y * sourceHeight / 128);
-            for (int x = 0; x < 128; x++) {
-                int sourceX = Math.min(sourceWidth - 1, x * sourceWidth / 128);
-                byte[] tile = photo.tiles().get((sourceY / 128) * photo.gridWidth() + sourceX / 128);
-                if (tile == null || tile.length != 16_384) throw new IllegalArgumentException("encoded tile is invalid");
-                preview[y * 128 + x] = tile[(sourceY % 128) * 128 + sourceX % 128];
-            }
-        }
-        return preview;
+    /** Renders the complete source image directly to the single map tile used by a photo bag. */
+    public byte[] bagPreview(BufferedImage source, DitheringMode ditheringMode) {
+        return encode(source, 1, 1, ditheringMode).tiles().getFirst();
     }
 
     private EncodedPhoto encode(BufferedImage source, int gridSize, DitheringMode ditheringMode) {

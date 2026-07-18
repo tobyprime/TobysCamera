@@ -118,8 +118,8 @@ public final class VideoUploadController {
         return true;
     }
 
-    private void sendPreviewChunk() {
-        if (previewPixels == null) previewPixels = new MapTileEncoder().bagPreview(encodedFrame);
+    private void sendPreviewChunk() throws IOException {
+        if (previewPixels == null) previewPixels = encoder.bagPreview(frame);
         int length = Math.min(8_192, previewPixels.length - previewOffset);
         sender.accept(new Packets.VideoPreviewChunk(token, previewOffset,
                 java.util.Arrays.copyOfRange(previewPixels, previewOffset, previewOffset + length)));
