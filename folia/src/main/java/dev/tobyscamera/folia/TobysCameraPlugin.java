@@ -20,6 +20,8 @@ import dev.tobyscamera.folia.upload.UploadCoordinator;
 import dev.tobyscamera.folia.upload.VideoUploadCoordinator;
 import dev.tobyscamera.folia.map.MapVideoService;
 import dev.tobyscamera.folia.video.VideoPlaybackService;
+import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
+import dev.tobyscamera.folia.scheduler.ServerTaskSchedulers;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,8 +46,9 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     private MapPhotoService photos;
     private MapVideoService videos;
     private MapDeliveryService deliveries;
-    private io.papermc.paper.threadedregions.scheduler.ScheduledTask videoPlaybackTask;
-    private io.papermc.paper.threadedregions.scheduler.ScheduledTask uploadCleanupTask;
+    private ServerTaskScheduler scheduler;
+    private ServerTaskScheduler.TaskHandle videoPlaybackTask;
+    private ServerTaskScheduler.TaskHandle uploadCleanupTask;
     private VideoPlaybackService videoPlayback;
     private PluginPayloadGateway gateway;
     private CameraFilmInventoryListener filmListener;
@@ -54,6 +57,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        scheduler = ServerTaskSchedulers.create(this);
         try {
             repository = new SqlitePhotoRepository(getDataFolder().toPath());
             videoRepository = new SqliteVideoRepository(getDataFolder().toPath());
@@ -62,17 +66,17 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         }
         photos = new MapPhotoService(this, repository);
         videos = new MapVideoService(videoRepository);
-        bagPlacement = new PhotoBagPlacementListener(this, photos, videos);
+        bagPlacement = new PhotoBagPlacementListener(this, photos, videos, scheduler);
         try { deliveries = new MapDeliveryService(photos, new PendingDeliveryRepository(getDataFolder().toPath())); }
         catch (IOException exception) { throw new IllegalStateException("Could not initialize pending deliveries", exception); }
         configureRuntime(PluginSettings.from(flatten(getConfig())));
-        getServer().getGlobalRegionScheduler().run(this, ignored -> {
+        scheduler.runGlobal(() -> {
             try { photos.restore(); } catch (IOException exception) { getLogger().severe("Could not restore saved photo maps: " + exception.getMessage()); }
             try { videos.restore(); }
             catch (IOException exception) { getLogger().severe("Could not restore saved video maps: " + exception.getMessage()); }
             finally { videoPlayback.indexLoadedFrames(); }
         });
-        gateway = new PluginPayloadGateway(this, coordinator, videoCoordinator);
+        gateway = new PluginPayloadGateway(this, scheduler, coordinator, videoCoordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
         getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);
         getServer().getPluginManager().registerEvents(this, this);
@@ -94,16 +98,16 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         if (gateway != null) gateway.setCoordinators(coordinator, videoCoordinator);
         filmListener = new CameraFilmInventoryListener(films);
         getServer().getPluginManager().registerEvents(filmListener, this);
-        videoPlayback = new VideoPlaybackService(this, videos, settings.videoMaxActiveMapFrames(), settings.videoMaxUpdateDistance());
+        videoPlayback = new VideoPlaybackService(this, scheduler, videos, settings.videoMaxActiveMapFrames(), settings.videoMaxUpdateDistance());
         bagPlacement.setFrameRefresher(videoPlayback::refreshFrame);
         videoPlayback.indexLoadedFrames();
         getServer().getPluginManager().registerEvents(videoPlayback, this);
-        videoPlaybackTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, ignored -> videoPlayback.tick(), 1L, 1L);
-        uploadCleanupTask = getServer().getGlobalRegionScheduler().runAtFixedRate(this, ignored -> {
+        videoPlaybackTask = scheduler.runGlobalRepeating(1L, 1L, () -> videoPlayback.tick());
+        uploadCleanupTask = scheduler.runGlobalRepeating(20L, 20L, () -> {
             var now = java.time.Instant.now();
             coordinator.expireSessions(now);
             videoCoordinator.expireSessions(now);
-        }, 20L, 20L);
+        });
     }
 
     @Override
@@ -133,15 +137,15 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
 
     private void createAndDeliverVideo(Player player, dev.tobyscamera.common.upload.VideoUploadSession session, dev.tobyscamera.folia.upload.PhotoMetadata metadata) {
         var world = player.getWorld();
-        getServer().getGlobalRegionScheduler().run(this, ignored -> {
+        scheduler.runGlobal(() -> {
             try {
                 var record = videos.createMaps(player.getUniqueId(), world, session);
-                getServer().getAsyncScheduler().runNow(this, task -> {
+                scheduler.runAsync(() -> {
                     try {
                         videos.persist(record, session);
-                        getServer().getGlobalRegionScheduler().run(this, ignored2 -> {
+                        scheduler.runGlobal(() -> {
                             var bag = videos.bag(world, record, session, metadata);
-                            player.getScheduler().run(this, task2 -> {
+                            scheduler.runEntity(player, () -> {
                                 try {
                                     MapItemDelivery.deliver(java.util.List.of(bag), player.getInventory()::addItem,
                                             item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
@@ -154,12 +158,12 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
                             }, () -> { });
                         });
                     } catch (IOException exception) {
-                        getServer().getGlobalRegionScheduler().run(this, ignored2 -> videos.discard(record));
-                        player.getScheduler().run(this, task2 -> send(player, new Packets.UploadRejected("Could not save video maps")), () -> { });
+                        scheduler.runGlobal(() -> videos.discard(record));
+                        scheduler.runEntity(player, () -> send(player, new Packets.UploadRejected("Could not save video maps")), () -> { });
                     }
                 });
             } catch (RuntimeException exception) {
-                player.getScheduler().run(this, task -> send(player, new Packets.UploadRejected("Could not create video maps")), () -> { });
+                scheduler.runEntity(player, () -> send(player, new Packets.UploadRejected("Could not create video maps")), () -> { });
             }
         });
     }
@@ -179,27 +183,27 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     private void createAndDeliver(Player player, dev.tobyscamera.common.upload.UploadSession session,
             dev.tobyscamera.folia.upload.PhotoMetadata metadata) {
         var world = player.getWorld();
-        getServer().getGlobalRegionScheduler().run(this, ignored -> {
+        scheduler.runGlobal(() -> {
             try {
                 var record = photos.createMaps(player.getUniqueId(), world, session);
-                getServer().getAsyncScheduler().runNow(this, asyncTask -> {
+                scheduler.runAsync(() -> {
                     try {
                         photos.persist(record, session);
-                        getServer().getGlobalRegionScheduler().run(this, ignored2 -> {
+                        scheduler.runGlobal(() -> {
                             var bag = photos.bag(world, record, session, metadata);
-                            player.getScheduler().run(this, task -> {
+                            scheduler.runEntity(player, () -> {
                                 MapItemDelivery.deliver(java.util.List.of(bag), player.getInventory()::addItem,
                                         item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
                                 send(player, new Packets.PhotoCreated(record.photoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight()));
                             }, () -> { try { deliveries.queue(player, record, metadata); } catch (IOException exception) { getLogger().warning("Could not queue photo delivery: " + exception.getMessage()); } });
                         });
                     } catch (IOException exception) {
-                        getServer().getGlobalRegionScheduler().run(this, ignored2 -> photos.discard(record));
-                        player.getScheduler().run(this, task -> send(player, new Packets.UploadRejected("Could not save photo maps")), () -> { });
+                        scheduler.runGlobal(() -> photos.discard(record));
+                        scheduler.runEntity(player, () -> send(player, new Packets.UploadRejected("Could not save photo maps")), () -> { });
                     }
                 });
             } catch (RuntimeException exception) {
-                player.getScheduler().run(this, task -> send(player, new Packets.UploadRejected("Could not create photo maps")), () -> { });
+                scheduler.runEntity(player, () -> send(player, new Packets.UploadRejected("Could not create photo maps")), () -> { });
                 getLogger().warning("Could not create photo map: " + exception.getMessage());
             }
         });
@@ -208,7 +212,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        player.getScheduler().run(this, task -> {
+        scheduler.runEntity(player, () -> {
             try {
                 for (var photoId : new PendingDeliveryRepository(getDataFolder().toPath()).take(player.getUniqueId())) {
                     var record = repository.find(photoId);

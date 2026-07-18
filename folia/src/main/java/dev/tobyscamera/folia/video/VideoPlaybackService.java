@@ -3,6 +3,7 @@ package dev.tobyscamera.folia.video;
 import com.destroystokyo.paper.event.entity.EntityAddToWorldEvent;
 import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
 import dev.tobyscamera.folia.map.MapVideoService;
+import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import io.papermc.paper.event.player.PlayerItemFrameChangeEvent;
 import java.io.IOException;
 import java.util.List;
@@ -33,6 +34,7 @@ import org.bukkit.plugin.Plugin;
 /** Global playback uses region-owned event snapshots; it never reads entity state from the global scheduler. */
 public final class VideoPlaybackService implements Listener {
     private final Plugin plugin;
+    private final ServerTaskScheduler scheduler;
     private final MapVideoService videos;
     private final int activeLimit;
     private final int maximumDistance;
@@ -45,15 +47,15 @@ public final class VideoPlaybackService implements Listener {
     private final Map<UUID, Long> lastReadErrorAt = new ConcurrentHashMap<>();
     private final AtomicLong serverTick = new AtomicLong();
 
-    public VideoPlaybackService(Plugin plugin, MapVideoService videos, int activeLimit, int maximumDistance) {
-        this.plugin = plugin; this.videos = videos; this.activeLimit = activeLimit; this.maximumDistance = maximumDistance; this.mapUpdates = new MapUpdateDispatcher(plugin);
+    public VideoPlaybackService(Plugin plugin, ServerTaskScheduler scheduler, MapVideoService videos, int activeLimit, int maximumDistance) {
+        this.plugin = plugin; this.scheduler = scheduler; this.videos = videos; this.activeLimit = activeLimit; this.maximumDistance = maximumDistance; this.mapUpdates = new MapUpdateDispatcher(scheduler);
     }
 
     /** Schedules each loaded chunk on its owning region before touching its entities. */
     public void indexLoadedFrames() {
         for (var world : Bukkit.getWorlds()) for (Chunk chunk : world.getLoadedChunks()) {
             int chunkX = chunk.getX(), chunkZ = chunk.getZ();
-            Bukkit.getRegionScheduler().run(plugin, world, chunkX, chunkZ, ignored -> {
+            scheduler.runRegion(world, chunkX, chunkZ, () -> {
                 for (Entity entity : world.getChunkAt(chunkX, chunkZ).getEntities()) if (entity instanceof ItemFrame frame) index(frame, frame.getItem());
             });
         }
@@ -102,7 +104,7 @@ public final class VideoPlaybackService implements Listener {
     private void preload(dev.tobyscamera.folia.storage.VideoRecord record, int mapId, int frameIndex) {
         VideoFrameLoadRequests.Key key = new VideoFrameLoadRequests.Key(record.videoId(), mapId, frameIndex);
         if (!frameLoads.begin(key)) return;
-        plugin.getServer().getAsyncScheduler().runNow(plugin, ignored -> {
+        scheduler.runAsync(() -> {
             try {
                 videos.preloadFrame(record, mapId, frameIndex);
             } catch (IOException exception) {
@@ -132,18 +134,18 @@ public final class VideoPlaybackService implements Listener {
     private void indexPlayer(Player player, Location location) {
         if (location == null || location.getWorld() == null) return;
         Set<Integer> heldMaps = heldVideoMaps(player);
-        IndexedPlayer previous = players.put(player.getUniqueId(), new IndexedPlayer(player, player.getScheduler(), location.getWorld().getUID(), location.getX(), location.getY(), location.getZ(), heldMaps));
+        IndexedPlayer previous = players.put(player.getUniqueId(), new IndexedPlayer(player, location.getWorld().getUID(), location.getX(), location.getY(), location.getZ(), heldMaps));
         index.upsertViewer(player.getUniqueId(), location.getWorld().getUID(), location.getX(), location.getY(), location.getZ(), heldMaps);
         if (previous == null || !previous.heldMapIds().equals(heldMaps)) for (int mapId : heldMaps) lastSentFrame.remove(mapId);
     }
 
     private void refreshHeldMapsNextTick(Player player) {
-        player.getScheduler().runDelayed(plugin, ignored -> indexPlayer(player, player.getLocation()), () -> { }, 1L);
+        scheduler.runEntityDelayed(player, 1L, () -> indexPlayer(player, player.getLocation()), () -> { });
     }
 
-    private List<MapUpdateDispatcher.Viewer> viewers(Set<UUID> viewerIds) {
+    private List<Player> viewers(Set<UUID> viewerIds) {
         return viewerIds.stream().map(players::get).filter(java.util.Objects::nonNull)
-                .map(player -> new MapUpdateDispatcher.Viewer(player.player(), player.scheduler())).toList();
+                .map(IndexedPlayer::player).toList();
     }
 
     private Set<Integer> heldVideoMaps(Player player) {
@@ -157,5 +159,5 @@ public final class VideoPlaybackService implements Listener {
         if (item.getItemMeta() instanceof MapMeta meta && meta.hasMapView() && videos.tileForMap(meta.getMapView().getId()) != null) maps.add(meta.getMapView().getId());
     }
 
-    private record IndexedPlayer(Player player, io.papermc.paper.threadedregions.scheduler.EntityScheduler scheduler, UUID worldId, double x, double y, double z, Set<Integer> heldMapIds) { }
+    private record IndexedPlayer(Player player, UUID worldId, double x, double y, double z, Set<Integer> heldMapIds) { }
 }

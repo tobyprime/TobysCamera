@@ -22,6 +22,7 @@ tasks.register("verifyModules") {
     dependsOn(
         ":common:test",
         ":folia:test",
+        ":folia:jar",
         ":fabric-1.21.11:test",
         ":fabric-1.21.11:buildAndCollect",
         ":fabric-1.21.11:verifyPublishedJar",
@@ -34,6 +35,9 @@ tasks.register("verifyModules") {
             check(layout.buildDirectory.file("libs/$minecraftVersion/tobyscamera-${project.version}+mc$minecraftVersion.jar").get().asFile.isFile) {
                 "Missing collected Fabric JAR for Minecraft $minecraftVersion"
             }
+        }
+        check(project(":folia").layout.buildDirectory.file("libs/tobyscamera-plugin-${project.version}.jar").get().asFile.isFile) {
+            "Missing published Paper/Folia plugin JAR"
         }
     }
 }
@@ -51,6 +55,6 @@ tasks.register("verifyFabricTargets") {
 
 tasks.register("runServer") {
     group = "application"
-    description = "Starts the Paper development server with the TobysCamera plugin."
+    description = "Starts a Paper development server with the Paper/Folia-compatible TobysCamera plugin."
     dependsOn(":folia:runServer")
 }
