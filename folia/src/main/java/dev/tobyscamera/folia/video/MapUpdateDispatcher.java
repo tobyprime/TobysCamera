@@ -1,20 +1,17 @@
 package dev.tobyscamera.folia.video;
 
-import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
+import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import java.util.Collection;
 import org.bukkit.entity.Player;
 import org.bukkit.map.MapView;
-import org.bukkit.plugin.Plugin;
 
 /** Uses Bukkit's normal map packet path after a dynamic renderer has changed pixels. */
 public final class MapUpdateDispatcher {
-    private final Plugin plugin;
+    private final ServerTaskScheduler scheduler;
 
-    public MapUpdateDispatcher(Plugin plugin) { this.plugin = plugin; }
+    public MapUpdateDispatcher(ServerTaskScheduler scheduler) { this.scheduler = scheduler; }
 
-    public void send(MapView map, Collection<Viewer> viewers) {
-        for (Viewer viewer : viewers) viewer.scheduler().run(plugin, ignored -> viewer.player().sendMap(map), () -> { });
+    public void send(MapView map, Collection<Player> viewers) {
+        for (Player viewer : viewers) scheduler.runEntity(viewer, () -> viewer.sendMap(map), () -> { });
     }
-
-    public record Viewer(Player player, EntityScheduler scheduler) { }
 }

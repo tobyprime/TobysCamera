@@ -6,6 +6,7 @@ import dev.tobyscamera.folia.map.MapVideoService;
 import dev.tobyscamera.folia.storage.PhotoRecord;
 import dev.tobyscamera.folia.storage.TileCoordinate;
 import dev.tobyscamera.folia.storage.VideoRecord;
+import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,15 +42,17 @@ public final class PhotoBagPlacementListener implements Listener {
     private final Plugin plugin;
     private final MapPhotoService photos;
     private final MapVideoService videos;
+    private final ServerTaskScheduler scheduler;
     private final Map<UUID, PhotoBagData> pendingUnpacks = new ConcurrentHashMap<>();
     private final Set<Integer> restoredPreviewMaps = ConcurrentHashMap.newKeySet();
     private final Set<Integer> restoringPreviewMaps = ConcurrentHashMap.newKeySet();
     private volatile Consumer<ItemFrame> frameRefresher = ignored -> { };
 
-    public PhotoBagPlacementListener(Plugin plugin, MapPhotoService photos, MapVideoService videos) {
+    public PhotoBagPlacementListener(Plugin plugin, MapPhotoService photos, MapVideoService videos, ServerTaskScheduler scheduler) {
         this.plugin = plugin;
         this.photos = photos;
         this.videos = videos;
+        this.scheduler = scheduler;
     }
 
     /** Connects direct item-frame changes to the video playback index. */
@@ -72,7 +75,7 @@ public final class PhotoBagPlacementListener implements Listener {
         catch (IllegalArgumentException ignored) { return; }
         Player player = event.getPlayer();
         pendingUnpacks.put(player.getUniqueId(), started);
-        player.getScheduler().runDelayed(plugin, ignored -> {
+        scheduler.runEntityDelayed(player, UNPACK_DELAY_TICKS, () -> {
             if (!pendingUnpacks.remove(player.getUniqueId(), started)) return;
             ItemStack current = player.getInventory().getItemInMainHand();
             try {
@@ -80,7 +83,7 @@ public final class PhotoBagPlacementListener implements Listener {
             } catch (IllegalArgumentException ignored1) {
                 // The item was replaced or its server metadata was invalidated while waiting.
             }
-        }, () -> { }, UNPACK_DELAY_TICKS);
+        }, () -> { });
     }
 
     @EventHandler
@@ -242,10 +245,10 @@ public final class PhotoBagPlacementListener implements Listener {
         catch (IllegalArgumentException ignored) { return; }
         int mapId = bag.previewMapId();
         if (restoredPreviewMaps.contains(mapId) || !restoringPreviewMaps.add(mapId)) return;
-        plugin.getServer().getAsyncScheduler().runNow(plugin, ignored -> {
+        scheduler.runAsync(() -> {
             try {
                 byte[] pixels = bag.kind() == PhotoBagKind.PHOTO ? photos.previewPixels(bag) : videos.previewPixels(bag);
-                plugin.getServer().getGlobalRegionScheduler().run(plugin, ignored1 -> {
+                scheduler.runGlobal(() -> {
                     try {
                         org.bukkit.map.MapView preview = Bukkit.getMap(mapId);
                         if (preview != null) {

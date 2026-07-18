@@ -1,6 +1,6 @@
 # TobysCamera
 
-Fabric 1.21.11 and 26.1 client Mod + Folia 1.21.11+ plugin. Only the photographer installs the Mod; completed pictures are ordinary `filled_map` items visible to every vanilla client.
+Fabric 1.21.11 and 26.1 client Mod + Paper and Folia 1.21.11+ plugin. Only the photographer installs the Mod; completed pictures are ordinary `filled_map` items visible to every vanilla client.
 
 ## Build
 
@@ -15,20 +15,19 @@ The release artifacts are generated as:
 
 - `build/libs/1.21.11/tobyscamera-<mod_version>+mc1.21.11.jar`
 - `build/libs/26.1/tobyscamera-<mod_version>+mc26.1.jar`
-- `folia/build/libs/tobyscamera-folia-<mod_version>.jar`
+- `folia/build/libs/tobyscamera-plugin-<mod_version>.jar`
 
 ## Local Paper development server
 
 Run `./gradlew runServer` (or `./gradlew.bat runServer` on Windows) to build the
 plugin and start a local Paper 1.21.11 server. This development server automatically
 loads the plugin JAR, accepts the EULA for this local project run, and sets
-`online-mode=false`. It is for local testing only; deploy the generated
-Folia-compatible JAR to Folia in production, with its production authentication
-settings.
+`online-mode=false`. The generated JAR is the same artifact for both Paper and Folia;
+use normal production authentication settings when deploying it.
 
 ## Server setup and manual verification
 
-1. Put the Folia jar in `plugins/`, start the server once, then configure `plugins/TobysCamera/config.yml` as required.
+1. Put the plugin JAR in the `plugins/` directory of either Paper or Folia, start the server once, then configure `plugins/TobysCamera/config.yml` as required.
 2. Give the photographer the Fabric jar only. Other players do not need it.
 3. Give a tagged camera item. The plugin reads Paper PDC from the item's `custom_data`; a command-compatible example is:
 
@@ -63,7 +62,7 @@ Each retained frame costs one film for every final map tile: a 12-frame 2×3 vid
 
 ### Magic photo camera
 
-A camera tagged with `tobyscamera:magic_photo` is film-free but can be used for only one valid photo upload. The Folia server removes one held magic camera as soon as it accepts that upload; failed validation does not consume it. The behavior is server-side only, so no client mod update or extra item component is required.
+A camera tagged with `tobyscamera:magic_photo` is film-free but can be used for only one valid photo upload. The server removes one held magic camera as soon as it accepts that upload; failed validation does not consume it. The behavior is server-side only, so no client mod update or extra item component is required.
 
 ### Video manual verification
 
