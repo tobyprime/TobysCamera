@@ -14,7 +14,9 @@ import org.joml.Matrix4f;
 abstract class CameraMixin {
     @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
     private void tobyscamera$applyViewfinderZoom(Camera camera, float partialTick, boolean useFovSetting, CallbackInfoReturnable<Float> callback) {
-        callback.setReturnValue(callback.getReturnValueF() / TobysCameraClient.viewfinderZoom());
+        float zoom = TobysCameraClient.viewfinderZoom();
+        if (zoom == 1.0f) return;
+        callback.setReturnValue(callback.getReturnValueF() / zoom);
     }
 
     @Inject(method = "getProjectionMatrix", at = @At("RETURN"), cancellable = true)
