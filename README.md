@@ -41,6 +41,8 @@ use normal production authentication settings when deploying it.
 7. Restart the server and verify the same maps still render. Fill the photographer's inventory to verify overflow drops at their feet; disconnect during delivery to verify the pending delivery is retried on join.
 8. Press `P` twice quickly to verify the rate-limit response. Use a packet-debug client to submit an unknown, expired, reused, or foreign Token and verify the player is disconnected.
 
+Run the same verification workflow on both Paper and Folia with the identical plugin JAR.
+
 ## Video maps
 
 Only cameras with the `tobyscamera:video` component can record video. `tobyscamera:video_max_grid_size` and `tobyscamera:video_max_frames` independently limit a video's map size and retained frame count; `tobyscamera:max_video_fps` limits its frame rate. While holding one, `V` (rebindable in **TobysCamera** controls) switches between photo and video modes. In video mode, `]` cycles only tick-aligned `1 / 5 / 10 / 20 FPS` rates. Press the shutter once to start and again to stop. The confirmation screen trims the retained frame range, chooses the final rectangular map layout and dithering, then uploads exactly the palette bytes that it previews. Floyd–Steinberg dithering is enabled by default.
