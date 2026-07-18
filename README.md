@@ -57,6 +57,10 @@ After editing `plugins/TobysCamera/config.yml`, run `/tobyscamera reload` (permi
 
 Each retained frame costs one film for every final map tile: a 12-frame 2×3 video costs 72 film. Cameras marked `tobyscamera:no_film_required` remain free. Placed video maps loop independently at their own FPS; each server pass updates at most the nearest 128 individual maps and only sends display-frame updates within `video.max-update-distance` blocks (default: 128). A held video map also receives its updates directly.
 
+### Magic photo camera
+
+A camera tagged with `tobyscamera:magic_photo` is film-free but can be used for only one valid photo upload. The Folia server removes one held magic camera as soon as it accepts that upload; failed validation does not consume it. The behavior is server-side only, so no client mod update or extra item component is required.
+
 ### Video manual verification
 
 1. Give yourself a tagged camera with `tobyscamera:video`, enough film (or `tobyscamera:no_film_required`), and optionally `tobyscamera:max_video_fps`. Hold it, right-click, press `V`, choose an FPS with `]`, then press the configured shutter key to start and stop a short recording.
