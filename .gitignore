@@ -7,3 +7,4 @@ fabric/run/
 *.jar
 plugins/TobysCamera/
 **/logs/
+.worktrees/
