@@ -108,6 +108,10 @@ tasks.withType<AbstractArchiveTask>().configureEach {
     }
 }
 
+tasks.named("sourcesJar") {
+    dependsOn(syncVersionedMainSources)
+}
+
 tasks.jar {
     from(project(":common").the<SourceSetContainer>()["main"].output)
 }
