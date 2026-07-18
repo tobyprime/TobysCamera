@@ -56,6 +56,44 @@ class UploadCoordinatorTest {
     }
 
     @Test
+    void beginConsumesMagicPhotoCameraThenGrantsToken() {
+        Player player = player();
+        List<CameraPacket> sent = new ArrayList<>();
+        CameraFilmService films = mock(CameraFilmService.class);
+        ItemStack camera = mock(ItemStack.class);
+        when(films.heldCamera(player)).thenReturn(camera);
+        when(films.maximumForFilm(camera, 4)).thenReturn(1);
+        when(films.isMagicPhoto(camera)).thenReturn(true);
+        when(films.consumeMagicPhoto(camera)).thenReturn(true);
+        UploadCoordinator coordinator = coordinator(sent, films, (ignored, session, metadata) -> { });
+
+        coordinator.handle(player, new Packets.UploadBegin(1, 1));
+
+        assertEquals(Packets.UploadGranted.class, sent.getFirst().getClass());
+        verify(films).consumeMagicPhoto(camera);
+        org.mockito.Mockito.verify(films, org.mockito.Mockito.never()).consume(camera, 1);
+    }
+
+    @Test
+    void rejectedMagicPhotoUploadDoesNotConsumeCamera() {
+        Player player = player();
+        List<CameraPacket> sent = new ArrayList<>();
+        CameraFilmService films = mock(CameraFilmService.class);
+        ItemStack camera = mock(ItemStack.class);
+        when(films.heldCamera(player)).thenReturn(camera);
+        when(films.maximumForFilm(camera, 4)).thenReturn(1);
+        when(films.isMagicPhoto(camera)).thenReturn(true);
+        UploadCoordinator coordinator = new UploadCoordinator(PluginSettings.from(java.util.Map.of("upload.max-active-upload-bytes", 16_384L)), films,
+                (ignored, packet) -> sent.add(packet), (ignored, session, metadata) -> { }, ignored -> { });
+
+        coordinator.handle(player, new Packets.UploadBegin(1, 1));
+
+        assertEquals(Packets.UploadRejected.class, sent.getFirst().getClass());
+        org.mockito.Mockito.verify(films, org.mockito.Mockito.never()).consumeMagicPhoto(camera);
+        org.mockito.Mockito.verify(films, org.mockito.Mockito.never()).consume(camera, 1);
+    }
+
+    @Test
     void kicksInvalidUploadTokenBeforeCreatingSession() {
         Player player = player();
         UploadCoordinator coordinator = coordinator(new ArrayList<>(), mock(CameraFilmService.class), (ignored, session, coordinates) -> { });

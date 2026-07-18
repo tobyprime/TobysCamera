@@ -17,6 +17,7 @@ public final class CameraFilmService {
     private final NamespacedKey remainingKey;
     private final NamespacedKey maximumKey;
     private final NamespacedKey noFilmRequiredKey;
+    private final NamespacedKey magicPhotoKey;
     private final NamespacedKey maximumVideoFpsKey;
     private final NamespacedKey videoKey;
     private final NamespacedKey maximumVideoGridSizeKey;
@@ -30,6 +31,7 @@ public final class CameraFilmService {
         remainingKey = new NamespacedKey(cameraKey.getNamespace(), "film_remaining");
         maximumKey = new NamespacedKey(cameraKey.getNamespace(), "max_grid_size");
         noFilmRequiredKey = new NamespacedKey(cameraKey.getNamespace(), "no_film_required");
+        magicPhotoKey = new NamespacedKey(cameraKey.getNamespace(), "magic_photo");
         maximumVideoFpsKey = new NamespacedKey(cameraKey.getNamespace(), "max_video_fps");
         videoKey = new NamespacedKey(cameraKey.getNamespace(), "video");
         maximumVideoGridSizeKey = new NamespacedKey(cameraKey.getNamespace(), "video_max_grid_size");
@@ -39,7 +41,8 @@ public final class CameraFilmService {
 
     public boolean isCamera(ItemStack item) { return !item.isEmpty() && RootCustomData.contains(item, cameraKey); }
     public boolean isFilm(ItemStack item) { return !item.isEmpty() && RootCustomData.contains(item, filmKey); }
-    public boolean isFilmFree(ItemStack camera) { return isCamera(camera) && RootCustomData.contains(camera, noFilmRequiredKey); }
+    public boolean isMagicPhoto(ItemStack camera) { return isCamera(camera) && RootCustomData.contains(camera, magicPhotoKey); }
+    public boolean isFilmFree(ItemStack camera) { return isCamera(camera) && (RootCustomData.contains(camera, noFilmRequiredKey) || isMagicPhoto(camera)); }
     public boolean supportsVideo(ItemStack camera) { return isCamera(camera) && RootCustomData.contains(camera, videoKey); }
     public ItemStack heldCamera(Player player) {
         ItemStack mainHand = player.getInventory().getItemInMainHand();
@@ -75,6 +78,11 @@ public final class CameraFilmService {
             tag.putInt(remainingKey.toString(), remaining - maps);
         });
         updateLore(camera, remaining - maps);
+        return true;
+    }
+    public boolean consumeMagicPhoto(ItemStack camera) {
+        if (!isMagicPhoto(camera) || camera.getAmount() < 1) return false;
+        camera.setAmount(camera.getAmount() - 1);
         return true;
     }
 

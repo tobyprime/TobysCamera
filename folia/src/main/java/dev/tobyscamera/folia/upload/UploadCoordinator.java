@@ -97,7 +97,12 @@ public final class UploadCoordinator {
             return;
         }
         int filmCost = Math.multiplyExact(begin.gridWidth(), begin.gridHeight());
-        if (!films.consume(camera, filmCost)) {
+        boolean magicPhoto = films.isMagicPhoto(camera);
+        if (magicPhoto && !films.consumeMagicPhoto(camera)) {
+            sender.send(player, new Packets.UploadRejected("Magic photo camera is no longer available"));
+            return;
+        }
+        if (!magicPhoto && !films.consume(camera, filmCost)) {
             sender.send(player, new Packets.UploadRejected("Camera does not have enough film"));
             return;
         }
