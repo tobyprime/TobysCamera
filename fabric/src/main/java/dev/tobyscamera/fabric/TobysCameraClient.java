@@ -40,7 +40,6 @@ import java.awt.image.BufferedImage;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
@@ -87,24 +86,24 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static long settingsSaveAfterMillis;
     private static final ViewfinderInputController INPUTS = new ViewfinderInputController(
             VIEWFINDER, TobysCameraClient::heldCameraCaptureGridSize, TobysCameraClient::heldCameraSupportsVideo, TobysCameraClient::startLocalCapture);
-    private static final KeyMapping VIEWFINDER_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+    private static final KeyMapping VIEWFINDER_KEY = ClientPlatform.registerKeyMapping(new KeyMapping(
             "key.tobyscamera.viewfinder", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P,
             CameraKeyCategory.value()));
-    private static final KeyMapping GRID_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+    private static final KeyMapping GRID_KEY = ClientPlatform.registerKeyMapping(new KeyMapping(
             "key.tobyscamera.grid", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G,
             CameraKeyCategory.value()));
-    private static final KeyMapping ZOOM_IN_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+    private static final KeyMapping ZOOM_IN_KEY = ClientPlatform.registerKeyMapping(new KeyMapping(
             "key.tobyscamera.zoom_in", InputConstants.Type.KEYSYM, CameraKeyBindings.defaultZoomInKey(),
             CameraKeyCategory.value()));
-    private static final KeyMapping ZOOM_OUT_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+    private static final KeyMapping ZOOM_OUT_KEY = ClientPlatform.registerKeyMapping(new KeyMapping(
             "key.tobyscamera.zoom_out", InputConstants.Type.KEYSYM, CameraKeyBindings.defaultZoomOutKey(),
             CameraKeyCategory.value()));
-    private static final KeyMapping SHUTTER_KEY = KeyBindingHelper.registerKeyBinding(CameraKeyBindings.shutter());
-    private static final KeyMapping COMPOSITION_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+    private static final KeyMapping SHUTTER_KEY = ClientPlatform.registerKeyMapping(CameraKeyBindings.shutter());
+    private static final KeyMapping COMPOSITION_KEY = ClientPlatform.registerKeyMapping(new KeyMapping(
             "key.tobyscamera.composition", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, CameraKeyCategory.value()));
-    private static final KeyMapping MODE_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+    private static final KeyMapping MODE_KEY = ClientPlatform.registerKeyMapping(new KeyMapping(
             "key.tobyscamera.mode", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, CameraKeyCategory.value()));
-    private static final KeyMapping FPS_KEY = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+    private static final KeyMapping FPS_KEY = ClientPlatform.registerKeyMapping(new KeyMapping(
             "key.tobyscamera.fps", InputConstants.Type.KEYSYM, CameraKeyBindings.defaultVideoFpsKey(), CameraKeyCategory.value()));
     private static final ViewfinderOverlay OVERLAY = new ViewfinderOverlay(VIEWFINDER, ZOOM_IN_KEY, ZOOM_OUT_KEY,
             GRID_KEY, COMPOSITION_KEY, SHUTTER_KEY, MODE_KEY, FPS_KEY, TobysCameraClient::heldCameraFilm, TobysCameraClient::uploadProgress);
@@ -116,9 +115,8 @@ public final class TobysCameraClient implements ClientModInitializer {
         VIEWFINDER.setSettingsListener(settings -> { pendingSettings = settings; settingsSaveAfterMillis = System.currentTimeMillis() + 300L; });
         try { TemporaryVideoRecording.cleanupAbandoned(videoDirectory()); }
         catch (IOException exception) { LOGGER.warn("Could not clear abandoned camera video recordings", exception); }
-        PayloadTypeRegistry.playC2S().register(CameraPayload.TYPE, CameraPayload.CODEC);
-        PayloadTypeRegistry.playS2C().register(CameraPayload.TYPE, CameraPayload.CODEC);
-        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("tobyscamera", "viewfinder"), (graphics, delta) -> OVERLAY.render(graphics));
+        ClientPlatform.registerPayloads();
+        ClientPlatform.registerViewfinderHud(OVERLAY);
         UseItemCallback.EVENT.register((player, level, hand) -> {
             if (!level.isClientSide()) return InteractionResult.PASS;
             if (!HeldCameraChecker.isCamera(player.getItemInHand(hand))) return InteractionResult.PASS;
