@@ -5,7 +5,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
-/** Preserves Folia's global, entity, and region ownership requirements. */
+/** Uses Paper's fallback schedulers on Paper and region ownership on Folia-compatible servers. */
 public final class FoliaTaskScheduler implements ServerTaskScheduler {
     private final Plugin plugin;
 
