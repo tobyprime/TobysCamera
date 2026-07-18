@@ -7,13 +7,21 @@ import org.junit.jupiter.api.Test;
 
 class ServerTaskSchedulersTest {
     @Test
-    void recognizesFoliaByItsServerName() {
-        assertTrue(ServerTaskSchedulers.isFolia("Folia"));
-        assertTrue(ServerTaskSchedulers.isFolia("folia"));
+    void recognizesTheFoliaRuntimeMarkerRegardlessOfServerBrand() {
+        ClassLoader markerLoader = new ClassLoader(null) {
+            @Override
+            public java.net.URL getResource(String name) {
+                return name.equals("io/papermc/paper/threadedregions/RegionizedServer.class")
+                        ? ServerTaskSchedulersTest.class.getResource("ServerTaskSchedulersTest.class")
+                        : null;
+            }
+        };
+
+        assertTrue(ServerTaskSchedulers.isFolia(markerLoader));
     }
 
     @Test
-    void treatsPaperAsNonFolia() {
-        assertFalse(ServerTaskSchedulers.isFolia("Paper"));
+    void treatsAMarkerlessRuntimeAsPaper() {
+        assertFalse(ServerTaskSchedulers.isFolia(new ClassLoader(null) { }));
     }
 }
