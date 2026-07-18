@@ -77,8 +77,8 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         bagPlacement.setFrameRefresher(mediaActivation::refreshFrame);
         mediaActivation.setVideoIndexRefresh(videoPlayback::refreshActiveMedia);
         getServer().getPluginManager().registerEvents(mediaActivation, this);
-        mediaActivation.scanLoadedFrames();
-        mediaAuditTask = scheduler.runGlobalRepeating(100L, 200L, mediaActivation::scanLoadedFrames);
+        mediaActivation.auditNearPlayers();
+        mediaAuditTask = scheduler.runGlobalRepeating(100L, 200L, mediaActivation::auditNearPlayers);
         gateway = new PluginPayloadGateway(this, scheduler, coordinator, videoCoordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
         getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);

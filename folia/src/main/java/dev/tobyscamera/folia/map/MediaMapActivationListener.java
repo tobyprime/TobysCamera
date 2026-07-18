@@ -7,7 +7,7 @@ import dev.tobyscamera.folia.bag.PhotoBagKind;
 import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import io.papermc.paper.event.player.PlayerItemFrameChangeEvent;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
+import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.Player;
@@ -44,15 +44,10 @@ public final class MediaMapActivationListener implements Listener {
                 failure -> plugin.getLogger().warning("Could not lazily load camera media: " + failure.getMessage()));
     }
 
-    public void scanLoadedFrames() {
-        for (var world : Bukkit.getWorlds()) for (Chunk chunk : world.getLoadedChunks()) {
-            int chunkX = chunk.getX();
-            int chunkZ = chunk.getZ();
-            scheduler.runRegion(world, chunkX, chunkZ, () -> {
-                for (Entity entity : world.getChunkAt(chunkX, chunkZ).getEntities()) {
-                    if (entity instanceof ItemFrame frame) reconcileFrame(frame, frame.getItem());
-                }
-            });
+    /** Audits only chunks within 128 blocks of online players; entity reads stay on each chunk's region thread. */
+    public void auditNearPlayers() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            scheduler.runEntity(player, () -> auditNearPlayer(player), () -> { });
         }
     }
 
@@ -61,7 +56,7 @@ public final class MediaMapActivationListener implements Listener {
 
     public void clear() { pendingVideos.clear(); stills.clear(); videos.clear(); }
 
-    @EventHandler public void onPlayerJoin(PlayerJoinEvent event) { reconcileHandsNextTick(event.getPlayer()); }
+    @EventHandler public void onPlayerJoin(PlayerJoinEvent event) { reconcileHandsNextTick(event.getPlayer()); auditNearPlayers(); }
     @EventHandler public void onPlayerQuit(PlayerQuitEvent event) { detachHands(event.getPlayer()); }
     @EventHandler public void onPlayerItemHeld(PlayerItemHeldEvent event) { reconcileHandsNextTick(event.getPlayer()); }
     @EventHandler public void onPlayerSwapHands(PlayerSwapHandItemsEvent event) { reconcileHandsNextTick(event.getPlayer()); }
@@ -83,6 +78,29 @@ public final class MediaMapActivationListener implements Listener {
     private void reconcileHands(Player player) {
         reconcile(playerSource(player, "main"), player.getInventory().getItemInMainHand());
         reconcile(playerSource(player, "off"), player.getInventory().getItemInOffHand());
+    }
+
+    private void auditNearPlayer(Player player) {
+        Location location = player.getLocation();
+        var world = location.getWorld();
+        if (world == null) return;
+        double playerX = location.getX();
+        double playerY = location.getY();
+        double playerZ = location.getZ();
+        int blockX = location.getBlockX();
+        int blockZ = location.getBlockZ();
+        for (PlayerLocalChunkRange.Chunk chunk : PlayerLocalChunkRange.around(blockX, blockZ, 128)) {
+            scheduler.runRegion(world, chunk.x(), chunk.z(),
+                    () -> reconcileChunk(world, chunk.x(), chunk.z(), playerX, playerY, playerZ));
+        }
+    }
+
+    private void reconcileChunk(org.bukkit.World world, int chunkX, int chunkZ, double playerX, double playerY, double playerZ) {
+        if (!world.isChunkLoaded(chunkX, chunkZ)) return;
+        for (Entity entity : world.getChunkAt(chunkX, chunkZ).getEntities()) {
+            if (entity instanceof ItemFrame frame && PlayerLocalChunkRange.withinRadius(playerX, playerY, playerZ,
+                    frame.getX(), frame.getY(), frame.getZ(), 128)) reconcileFrame(frame, frame.getItem());
+        }
     }
 
     private void detachHands(Player player) {
