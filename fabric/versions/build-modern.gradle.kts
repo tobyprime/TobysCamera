@@ -15,7 +15,9 @@ val minecraftVersionRange = property("minecraft_version_range").toString()
 val fabricLoaderVersion = property("fabric_loader_version").toString()
 val fabricApiVersion = property("fabric_api_version").toString()
 val targetJavaVersion = property("java_version").toString().toInt()
-val modrinthGameVersions = providers.gradleProperty("modrinth_game_versions")
+val modrinthGameVersions = rootProject.providers.gradleProperty(
+    "modrinth_game_versions_${targetMinecraftVersion.replace('.', '_')}"
+)
     .orElse(targetMinecraftVersion)
     .get()
     .split(',')
