@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-      MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID }}
+      MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
 
     steps:
       - name: Check out tagged commit
