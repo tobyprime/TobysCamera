@@ -7,6 +7,7 @@ import org.gradle.api.tasks.bundling.AbstractArchiveTask
 
 plugins {
     id("fabric-loom")
+    id("com.modrinth.minotaur")
 }
 
 val targetMinecraftVersion = property("minecraft_version").toString()
@@ -16,6 +17,17 @@ val fabricApiVersion = property("fabric_api_version").toString()
 val targetJavaVersion = property("java_version").toString().toInt()
 val artifactVersion = providers.gradleProperty("artifact_version").orElse(rootProject.version.toString()).get()
 val artifactFileName = "tobyscamera-$artifactVersion+mc$targetMinecraftVersion.jar"
+
+modrinth {
+    token.set(providers.environmentVariable("MODRINTH_TOKEN"))
+    projectId.set(providers.environmentVariable("MODRINTH_PROJECT_ID"))
+    versionNumber.set(artifactFileName.removeSuffix(".jar"))
+    versionName.set(artifactFileName.removeSuffix(".jar"))
+    versionType.set("release")
+    uploadFile.set(tasks.named("remapJar"))
+    gameVersions.add(targetMinecraftVersion)
+    loaders.add("fabric")
+}
 
 loom {
     mixin {

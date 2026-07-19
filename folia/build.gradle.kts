@@ -4,9 +4,21 @@ plugins {
     `java-library`
     id("io.papermc.paperweight.userdev")
     id("xyz.jpenilla.run-paper") version "3.0.2"
+    id("com.modrinth.minotaur")
 }
 
 val artifactVersion = providers.gradleProperty("artifact_version").orElse(rootProject.version.toString()).get()
+
+modrinth {
+    token.set(providers.environmentVariable("MODRINTH_TOKEN"))
+    projectId.set(providers.environmentVariable("MODRINTH_PROJECT_ID"))
+    versionNumber.set("tobyscamera-plugin-$artifactVersion")
+    versionName.set("tobyscamera-plugin-$artifactVersion")
+    versionType.set("release")
+    uploadFile.set(tasks.named("jar"))
+    gameVersions.add("1.21.11")
+    loaders.addAll("paper", "folia")
+}
 
 dependencies {
     implementation(project(":common"))

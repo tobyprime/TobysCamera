@@ -13,6 +13,9 @@ jobs:
   publish:
     name: Build and publish release artifacts
     runs-on: ubuntu-latest
+    env:
+      MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+      MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID }}
 
     steps:
       - name: Check out tagged commit
@@ -79,6 +82,24 @@ jobs:
           done
 
           find "$release_dir" -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Publish selected artifacts to Modrinth
+        env:
+          RELEASE_KIND: ${{ steps.metadata.outputs.kind }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_KIND" in
+            mod)
+              bash ./gradlew publishModrinthMod
+              ;;
+            plugin)
+              bash ./gradlew publishModrinthPlugin
+              ;;
+            *)
+              printf 'Unknown release kind: %s\n' "$RELEASE_KIND" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Create GitHub release
         env:
