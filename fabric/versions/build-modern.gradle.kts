@@ -31,7 +31,7 @@ modrinth {
     versionName.set(artifactFileName.removeSuffix(".jar"))
     versionType.set("release")
     uploadFile.set(tasks.named("jar"))
-    gameVersions.addAll(modrinthGameVersions)
+    gameVersions.set(modrinthGameVersions)
     loaders.add("fabric")
 }
 
