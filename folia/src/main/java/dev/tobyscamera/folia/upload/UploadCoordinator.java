@@ -59,6 +59,10 @@ public final class UploadCoordinator {
     }
 
     private void capture(Player player) {
+        if (!player.hasPermission("tobyscamera.upload")) {
+            sender.send(player, new Packets.UploadRejected("You do not have permission to upload photos"));
+            return;
+        }
         if (films.heldCamera(player) == null) {
             sender.send(player, new Packets.UploadRejected("A tagged camera must be held"));
             return;
@@ -68,6 +72,10 @@ public final class UploadCoordinator {
     }
 
     private void begin(Player player, Packets.UploadBegin begin) {
+        if (!player.hasPermission("tobyscamera.upload")) {
+            sender.send(player, new Packets.UploadRejected("You do not have permission to upload photos"));
+            return;
+        }
         var camera = films.heldCamera(player);
         if (camera == null) {
             sender.send(player, new Packets.UploadRejected("A tagged camera must be held"));

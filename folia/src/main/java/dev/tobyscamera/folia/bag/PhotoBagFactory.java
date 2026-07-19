@@ -69,12 +69,8 @@ public final class PhotoBagFactory {
 
     public static List<Component> lore(PhotoBagData data) {
         String type = typeName(data.kind());
-        String idLabel = data.kind() == PhotoBagKind.PHOTO ? "\u76f8\u7247ID" : "\u5f55\u50cfID";
         java.util.ArrayList<Component> lore = new java.util.ArrayList<>();
-        lore.add(Component.text("\u7c7b\u578b: " + type, NamedTextColor.GRAY));
         lore.add(Component.text("\u5c3a\u5bf8: " + data.gridWidth() + "\u00d7" + data.gridHeight(), NamedTextColor.GRAY));
-        lore.add(Component.text(idLabel + ": " + shortId(data.mediaId()), NamedTextColor.GRAY));
-        lore.add(Component.text("\u9884\u89c8\u5730\u56fe: #" + data.previewMapId(), NamedTextColor.GRAY));
         PhotoMetadata metadata = data.metadata();
         if (metadata != null) {
             lore.add(Component.text("\u62cd\u6444\u8005: " + metadata.photographer(), NamedTextColor.GRAY));
@@ -87,12 +83,15 @@ public final class PhotoBagFactory {
         return List.copyOf(lore);
     }
 
-    private static String typeName(PhotoBagKind kind) {
-        return kind == PhotoBagKind.PHOTO ? "\u76f8\u7247" : "\u5f55\u50cf";
+    public static List<Component> adminDetails(PhotoBagData data) {
+        String idLabel = data.kind() == PhotoBagKind.PHOTO ? "\u76f8\u7247ID" : "\u5f55\u50cfID";
+        return List.of(Component.text("\u7c7b\u578b: " + typeName(data.kind())), Component.text(idLabel + ": " + data.mediaId()),
+                Component.text("\u9884\u89c8\u5730\u56fe: #" + data.previewMapId()),
+                Component.text("\u5c3a\u5bf8: " + data.gridWidth() + "\u00d7" + data.gridHeight()));
     }
 
-    private static String shortId(UUID id) {
-        return id.toString().substring(0, 8);
+    private static String typeName(PhotoBagKind kind) {
+        return kind == PhotoBagKind.PHOTO ? "\u76f8\u7247" : "\u5f55\u50cf";
     }
 
     public static boolean isBag(ItemStack item) { return item != null && item.getType() == Material.FILLED_MAP && RootCustomData.contains(item, BAG); }
