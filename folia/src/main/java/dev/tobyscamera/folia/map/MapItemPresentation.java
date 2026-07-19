@@ -21,7 +21,7 @@ public final class MapItemPresentation {
             if (!metadata.presentation().description().isEmpty()) lore.add(Component.text(metadata.presentation().description(), NamedTextColor.GRAY));
             if (metadata.presentation().publicPhotographer()) lore.add(Component.text("拍摄者: " + metadata.photographer(), NamedTextColor.GRAY));
             if (metadata.presentation().publicAddress()) lore.add(Component.text("拍摄坐标: " + metadata.coordinates(), NamedTextColor.GRAY));
-            lore.add(Component.text("拍摄时间: " + metadata.capturedTime(), NamedTextColor.GRAY));
+            if (metadata.presentation().publicCapturedTime()) lore.add(Component.text("拍摄时间: " + metadata.capturedTime(), NamedTextColor.GRAY));
         }
         return new Presentation(Component.text(displayName), List.copyOf(lore));
     }

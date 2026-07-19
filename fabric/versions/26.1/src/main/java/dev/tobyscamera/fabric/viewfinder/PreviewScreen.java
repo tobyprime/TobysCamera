@@ -33,6 +33,7 @@ public final class PreviewScreen extends Screen {
     private final Runnable retake;
     private final java.util.function.Consumer<Boolean> publicAddressChanged;
     private final java.util.function.Consumer<Boolean> publicPhotographerChanged;
+    private final java.util.function.Consumer<Boolean> publicCapturedTimeChanged;
     private final PhotoPreviewProcessor previewProcessor = new PhotoPreviewProcessor();
     private Identifier textureId;
     private boolean released;
@@ -48,19 +49,22 @@ public final class PreviewScreen extends Screen {
     private String description = "";
     private boolean publicAddress;
     private boolean publicPhotographer;
+    private boolean publicCapturedTime;
 
-    public PreviewScreen(CapturedFrame frame, int defaultPrintSize, boolean publicAddress, boolean publicPhotographer,
+    public PreviewScreen(CapturedFrame frame, int defaultPrintSize, boolean publicAddress, boolean publicPhotographer, boolean publicCapturedTime,
             BiConsumer<PhotoPreviewProcessor.Result, PhotoPresentation> usePhoto, Runnable retake,
             java.util.function.Consumer<Boolean> publicAddressChanged,
-            java.util.function.Consumer<Boolean> publicPhotographerChanged) {
+            java.util.function.Consumer<Boolean> publicPhotographerChanged, java.util.function.Consumer<Boolean> publicCapturedTimeChanged) {
         super(Component.translatable("tobyscamera.preview.title"));
         this.frame = frame;
         this.usePhoto = usePhoto;
         this.retake = retake;
         this.publicAddress = publicAddress;
         this.publicPhotographer = publicPhotographer;
+        this.publicCapturedTime = publicCapturedTime;
         this.publicAddressChanged = publicAddressChanged;
         this.publicPhotographerChanged = publicPhotographerChanged;
+        this.publicCapturedTimeChanged = publicCapturedTimeChanged;
         this.printSize = Math.clamp(defaultPrintSize, 1, frame.gridSize());
     }
 
@@ -93,13 +97,21 @@ public final class PreviewScreen extends Screen {
         descriptionInput.setResponder(value -> description = value);
         addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.preview.public_address_value", value ? Component.translatable("options.on") : Component.translatable("options.off")), publicAddress)
                 .withValues(List.of(true, false))
-                .create(width / 2 - 100, buttonY - 72, 99, 20, Component.empty(), (button, value) -> {
+                .displayOnlyValue()
+                .create(width / 2 - 150, buttonY - 72, 99, 20, Component.empty(), (button, value) -> {
                     publicAddress = value; publicAddressChanged.accept(value);
                 }));
         addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.preview.public_photographer_value", value ? Component.translatable("options.on") : Component.translatable("options.off")), publicPhotographer)
                 .withValues(List.of(true, false))
-                .create(width / 2 + 1, buttonY - 72, 99, 20, Component.empty(), (button, value) -> {
+                .displayOnlyValue()
+                .create(width / 2 - 49, buttonY - 72, 99, 20, Component.empty(), (button, value) -> {
                     publicPhotographer = value; publicPhotographerChanged.accept(value);
+                }));
+        addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.preview.public_time_value", value ? Component.translatable("options.on") : Component.translatable("options.off")), publicCapturedTime)
+                .withValues(List.of(true, false))
+                .displayOnlyValue()
+                .create(width / 2 + 52, buttonY - 72, 99, 20, Component.empty(), (button, value) -> {
+                    publicCapturedTime = value; publicCapturedTimeChanged.accept(value);
                 }));
         addRenderableWidget(Button.builder(Component.translatable("tobyscamera.preview.retake"), button -> closeForRetake()).bounds(width / 2 - 155, buttonY, 150, 20).build());
         usePhotoButton = addRenderableWidget(Button.builder(Component.translatable("tobyscamera.preview.use_photo"), button -> closeForUse()).bounds(width / 2 + 5, buttonY, 150, 20).build());
@@ -147,7 +159,7 @@ public final class PreviewScreen extends Screen {
         PhotoPreviewProcessor.Result photo = previewResult.result();
         if (photo == null) return;
         releaseTexture();
-        usePhoto.accept(photo, new PhotoPresentation(photoName, description, publicAddress, publicPhotographer));
+        usePhoto.accept(photo, new PhotoPresentation(photoName, description, publicAddress, publicPhotographer, publicCapturedTime));
     }
     private void closeForRetake() { releaseTexture(); retake.run(); }
     private void releaseTexture() { if (!released && textureId != null) { minecraft.getTextureManager().release(textureId); released = true; } }

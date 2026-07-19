@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 public final class PacketCodec {
-    public static final byte VERSION = 3;
+    public static final byte VERSION = 4;
     public static final int MAX_CHUNK_BYTES = 8_192;
     private static final int MAX_STRING_BYTES = 512;
 
@@ -40,6 +40,7 @@ public final class PacketCodec {
                     writeString(out, value.presentation().description());
                     out.writeBoolean(value.presentation().publicAddress());
                     out.writeBoolean(value.presentation().publicPhotographer());
+                    out.writeBoolean(value.presentation().publicCapturedTime());
                 }
                 case Packets.UploadPreviewChunk value -> writePreviewChunk(out, value.token(), value.offset(), value.data());
                 case Packets.UploadTileChunk value -> {
@@ -76,7 +77,7 @@ public final class PacketCodec {
                 case RATE_LIMITED -> new Packets.RateLimited(in.getLong());
                 case UPLOAD_BEGIN -> new Packets.UploadBegin(
                         in.getInt(), in.getInt(),
-                        new PhotoPresentation(readString(in), readString(in), in.get() != 0, in.get() != 0));
+                        new PhotoPresentation(readString(in), readString(in), in.get() != 0, in.get() != 0, in.get() != 0));
                 case UPLOAD_PREVIEW_CHUNK -> readUploadPreviewChunk(in);
                 case UPLOAD_TILE_CHUNK -> readChunk(in);
                 case UPLOAD_FINISH -> new Packets.UploadFinish(readUuid(in));

@@ -16,6 +16,7 @@ public final class ViewfinderSession {
     private int printSize = 1;
     private boolean publicAddress = true;
     private boolean publicPhotographer = true;
+    private boolean publicCapturedTime = true;
     private Consumer<ViewfinderSettings> settingsListener = ignored -> { };
 
     public boolean open() {
@@ -68,11 +69,11 @@ public final class ViewfinderSession {
         printSize = Math.clamp(value, 1, Math.max(1, cameraMaximum));
         settingsChanged();
     }
-    public ViewfinderSettings settings() { return new ViewfinderSettings(grid, targetZoom, composition, printSize, publicAddress, publicPhotographer); }
+    public ViewfinderSettings settings() { return new ViewfinderSettings(grid, targetZoom, composition, printSize, publicAddress, publicPhotographer, publicCapturedTime); }
     public void applySettings(ViewfinderSettings settings) {
         settings = Objects.requireNonNull(settings, "settings");
         grid = settings.grid(); targetZoom = settings.zoom(); composition = settings.composition(); printSize = settings.printSize();
-        publicAddress = settings.publicAddress(); publicPhotographer = settings.publicPhotographer();
+        publicAddress = settings.publicAddress(); publicPhotographer = settings.publicPhotographer(); publicCapturedTime = settings.publicCapturedTime();
     }
     public void setSettingsListener(Consumer<ViewfinderSettings> listener) { settingsListener = Objects.requireNonNull(listener, "listener"); }
     private void settingsChanged() { settingsListener.accept(settings()); }
@@ -84,8 +85,10 @@ public final class ViewfinderSession {
     public int printSize() { return printSize; }
     public boolean publicAddress() { return publicAddress; }
     public boolean publicPhotographer() { return publicPhotographer; }
+    public boolean publicCapturedTime() { return publicCapturedTime; }
     public void setPublicAddress(boolean value) { publicAddress = value; settingsChanged(); }
     public void setPublicPhotographer(boolean value) { publicPhotographer = value; settingsChanged(); }
+    public void setPublicCapturedTime(boolean value) { publicCapturedTime = value; settingsChanged(); }
     public boolean captureHidden() { return state == ViewfinderState.CAPTURING; }
     public boolean zoomActive() { return state == ViewfinderState.VIEWFINDER || state == ViewfinderState.CAPTURING; }
 }

@@ -128,6 +128,7 @@ public final class MapPhotoService {
                 if (!photoPresentation.description().isEmpty()) tag.putString("tobyscamera:description", photoPresentation.description());
                 tag.putBoolean("tobyscamera:public_address", photoPresentation.publicAddress());
                 tag.putBoolean("tobyscamera:public_photographer", photoPresentation.publicPhotographer());
+                tag.putBoolean("tobyscamera:public_captured_time", photoPresentation.publicCapturedTime());
             }
         });
         return item;
