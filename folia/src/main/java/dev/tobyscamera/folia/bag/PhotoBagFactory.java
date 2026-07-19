@@ -85,9 +85,15 @@ public final class PhotoBagFactory {
 
     public static List<Component> adminDetails(PhotoBagData data) {
         String idLabel = data.kind() == PhotoBagKind.PHOTO ? "\u76f8\u7247ID" : "\u5f55\u50cfID";
-        return List.of(Component.text("\u7c7b\u578b: " + typeName(data.kind())), Component.text(idLabel + ": " + data.mediaId()),
+        var details = new java.util.ArrayList<Component>(List.of(Component.text("\u7c7b\u578b: " + typeName(data.kind())), Component.text(idLabel + ": " + data.mediaId()),
                 Component.text("\u9884\u89c8\u5730\u56fe: #" + data.previewMapId()),
-                Component.text("\u5c3a\u5bf8: " + data.gridWidth() + "\u00d7" + data.gridHeight()));
+                Component.text("\u5c3a\u5bf8: " + data.gridWidth() + "\u00d7" + data.gridHeight())));
+        if (data.metadata() != null) {
+            details.add(Component.text("\u62cd\u6444\u8005: " + data.metadata().photographer()));
+            details.add(Component.text("\u62cd\u6444\u5750\u6807: " + data.metadata().coordinates()));
+            details.add(Component.text("\u62cd\u6444\u65f6\u95f4: " + data.metadata().capturedTime()));
+        }
+        return List.copyOf(details);
     }
 
     private static String typeName(PhotoBagKind kind) {

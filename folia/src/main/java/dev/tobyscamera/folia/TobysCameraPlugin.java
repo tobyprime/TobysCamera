@@ -191,8 +191,20 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         if (!(sender instanceof Player player)) { sender.sendMessage(Component.text("This command must be run by a player holding a photo bag.")); return true; }
         var item = PhotoBagFactory.isBag(player.getInventory().getItemInMainHand()) ? player.getInventory().getItemInMainHand() : player.getInventory().getItemInOffHand();
         if (!PhotoBagFactory.isBag(item)) { sender.sendMessage(Component.text("Hold a TobysCamera photo bag in either hand.")); return true; }
-        try { for (var line : PhotoBagFactory.adminDetails(PhotoBagFactory.read(item))) sender.sendMessage(line); }
-        catch (IllegalArgumentException exception) { sender.sendMessage(Component.text("The held photo bag has invalid data.")); }
+        try {
+            var bag = PhotoBagFactory.read(item);
+            for (var line : PhotoBagFactory.adminDetails(bag)) sender.sendMessage(line);
+            var record = repository.find(bag.mediaId());
+            if (record == null) { sender.sendMessage(Component.text("Stored photo record: missing")); return true; }
+            sender.sendMessage(Component.text("Storage owner UUID: " + record.ownerId()));
+            sender.sendMessage(Component.text("Storage created: " + record.createdAt()));
+            String mapIds = record.mapIds().entrySet().stream()
+                    .sorted(java.util.Comparator.comparingInt((java.util.Map.Entry<dev.tobyscamera.folia.storage.TileCoordinate, Integer> entry) -> entry.getKey().y())
+                            .thenComparingInt(entry -> entry.getKey().x()))
+                    .map(entry -> "(" + entry.getKey().x() + "," + entry.getKey().y() + ")=#" + entry.getValue()).collect(java.util.stream.Collectors.joining(", "));
+            sender.sendMessage(Component.text("Printed map IDs: " + mapIds));
+        } catch (IllegalArgumentException exception) { sender.sendMessage(Component.text("The held photo bag has invalid data.")); }
+        catch (IOException exception) { sender.sendMessage(Component.text("Could not read the stored photo record.")); }
         return true;
     }
 
