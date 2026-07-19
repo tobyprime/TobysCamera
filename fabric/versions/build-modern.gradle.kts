@@ -15,6 +15,12 @@ val minecraftVersionRange = property("minecraft_version_range").toString()
 val fabricLoaderVersion = property("fabric_loader_version").toString()
 val fabricApiVersion = property("fabric_api_version").toString()
 val targetJavaVersion = property("java_version").toString().toInt()
+val modrinthGameVersions = providers.gradleProperty("modrinth_game_versions")
+    .orElse(targetMinecraftVersion)
+    .get()
+    .split(',')
+    .map(String::trim)
+    .filter(String::isNotEmpty)
 val artifactVersion = providers.gradleProperty("artifact_version").orElse(rootProject.version.toString()).get()
 val artifactFileName = "tobyscamera-$artifactVersion+mc$targetMinecraftVersion.jar"
 
@@ -25,7 +31,7 @@ modrinth {
     versionName.set(artifactFileName.removeSuffix(".jar"))
     versionType.set("release")
     uploadFile.set(tasks.named("jar"))
-    gameVersions.add(targetMinecraftVersion)
+    gameVersions.addAll(modrinthGameVersions)
     loaders.add("fabric")
 }
 
