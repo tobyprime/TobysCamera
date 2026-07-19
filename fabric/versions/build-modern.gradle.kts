@@ -14,7 +14,8 @@ val minecraftVersionRange = property("minecraft_version_range").toString()
 val fabricLoaderVersion = property("fabric_loader_version").toString()
 val fabricApiVersion = property("fabric_api_version").toString()
 val targetJavaVersion = property("java_version").toString().toInt()
-val artifactFileName = "tobyscamera-${rootProject.version}+mc$targetMinecraftVersion.jar"
+val artifactVersion = providers.gradleProperty("artifact_version").orElse(rootProject.version.toString()).get()
+val artifactFileName = "tobyscamera-$artifactVersion+mc$targetMinecraftVersion.jar"
 
 val generatedRoot = layout.buildDirectory.dir("generated/versionedSrc/$targetMinecraftVersion")
 val generatedMainRoot = generatedRoot.map { it.dir("main") }

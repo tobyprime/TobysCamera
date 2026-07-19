@@ -52,18 +52,20 @@ readonly FEATURE_COMMIT="$(git -C "$REPOSITORY" rev-parse HEAD)"
 pushd "$REPOSITORY" >/dev/null
 
 mod_output="$(GITHUB_SHA="$MAIN_COMMIT" "$SCRIPT" 'mod-v1.2.3')"
-assert_equals $'kind=mod\nversion=1.2.3\nprerelease=false' "$mod_output" 'mod tag metadata should be emitted'
+assert_equals $'kind=mod\nversion=1.2.3' "$mod_output" 'mod tag metadata should be emitted'
 
-plugin_output="$(GITHUB_SHA="$MAIN_COMMIT" GITHUB_REF_NAME='plugin-v1.2.3-rc.1' "$SCRIPT")"
-assert_equals $'kind=plugin\nversion=1.2.3-rc.1\nprerelease=true' "$plugin_output" 'plugin prerelease metadata should be emitted'
+plugin_output="$(GITHUB_SHA="$MAIN_COMMIT" GITHUB_REF_NAME='plugin-v0.0.1' "$SCRIPT")"
+assert_equals $'kind=plugin\nversion=0.0.1' "$plugin_output" 'plugin tag metadata should be emitted'
 
 assert_fails 'invalid tag should fail' env GITHUB_SHA="$MAIN_COMMIT" "$SCRIPT" 'mod-v1.2'
 assert_fails 'unknown tag kind should fail' env GITHUB_SHA="$MAIN_COMMIT" "$SCRIPT" 'server-v1.2.3'
+assert_fails 'prerelease suffix should fail' env GITHUB_SHA="$MAIN_COMMIT" "$SCRIPT" 'mod-v1.2.3-rc.1'
+assert_fails 'build suffix should fail' env GITHUB_SHA="$MAIN_COMMIT" "$SCRIPT" 'plugin-v1.2.3+build.1'
 assert_fails 'feature-only commit should fail' env GITHUB_SHA="$FEATURE_COMMIT" "$SCRIPT" 'mod-v1.2.3'
 
 github_output="$TEMP_DIR/github-output"
 GITHUB_SHA="$MAIN_COMMIT" GITHUB_OUTPUT="$github_output" "$SCRIPT" 'mod-v1.2.3' >/dev/null
-assert_equals $'kind=mod\nversion=1.2.3\nprerelease=false' "$(<"$github_output")" 'GitHub Actions output should be appended'
+assert_equals $'kind=mod\nversion=1.2.3' "$(<"$github_output")" 'GitHub Actions output should be appended'
 
 popd >/dev/null
 printf 'release metadata tests passed\n'

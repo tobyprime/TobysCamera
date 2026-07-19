@@ -23,12 +23,12 @@ The release artifacts are generated as:
 
 ## GitHub releases
 
-GitHub Actions creates releases only from tags whose commits are on `main`.
+GitHub Actions creates normal GitHub Releases only from tags whose commits are on `main`.
 
 - Push `mod-vX.Y.Z` to publish the two Fabric Mod JARs (for Minecraft 1.21.11 and 26.1).
 - Push `plugin-vX.Y.Z` to publish the Paper/Folia plugin JAR.
 
-The version after the `v` is written into the selected artifacts and their metadata. Tags may use a SemVer prerelease suffix, such as `mod-v1.2.0-rc.1`; those releases are marked as prereleases. Each release also includes a SHA-256 file for every JAR.
+`X.Y.Z` must be a numeric version with no prerelease or build suffix. CI writes this version into Mod and plugin metadata, then appends `+build.<GitHub run number>` only to the JAR filenames. For example, `mod-v1.2.3` can produce `tobyscamera-1.2.3+build.42+mc1.21.11.jar`. Each release also includes a SHA-256 file for every JAR.
 
 For example, after pushing the intended commit to `main`:
 

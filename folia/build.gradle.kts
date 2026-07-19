@@ -6,6 +6,8 @@ plugins {
     id("xyz.jpenilla.run-paper") version "3.0.2"
 }
 
+val artifactVersion = providers.gradleProperty("artifact_version").orElse(rootProject.version.toString()).get()
+
 dependencies {
     implementation(project(":common"))
     paperweight.paperDevBundle("1.21.11-R0.1-SNAPSHOT")
@@ -28,7 +30,7 @@ tasks.processResources {
 }
 
 tasks.jar {
-    archiveFileName.set("tobyscamera-plugin-${rootProject.version}.jar")
+    archiveFileName.set("tobyscamera-plugin-$artifactVersion.jar")
     dependsOn(":common:jar")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from({ configurations.runtimeClasspath.get().filter { it.name.endsWith(".jar") }.map { zipTree(it) } })

@@ -7,6 +7,10 @@ allprojects {
     version = providers.gradleProperty("mod_version").get()
 }
 
+val artifactVersion = providers.gradleProperty("artifact_version")
+    .orElse(providers.gradleProperty("mod_version"))
+    .get()
+
 subprojects {
     plugins.withId("java") {
         if (name.startsWith("fabric-")) return@withId
@@ -32,11 +36,11 @@ tasks.register("verifyModules") {
     )
     doLast {
         listOf("1.21.11", "26.1").forEach { minecraftVersion ->
-            check(layout.buildDirectory.file("libs/$minecraftVersion/tobyscamera-${project.version}+mc$minecraftVersion.jar").get().asFile.isFile) {
+            check(layout.buildDirectory.file("libs/$minecraftVersion/tobyscamera-$artifactVersion+mc$minecraftVersion.jar").get().asFile.isFile) {
                 "Missing collected Fabric JAR for Minecraft $minecraftVersion"
             }
         }
-        check(project(":folia").layout.buildDirectory.file("libs/tobyscamera-plugin-${project.version}.jar").get().asFile.isFile) {
+        check(project(":folia").layout.buildDirectory.file("libs/tobyscamera-plugin-$artifactVersion.jar").get().asFile.isFile) {
             "Missing published Paper/Folia plugin JAR"
         }
     }
