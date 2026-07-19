@@ -21,6 +21,22 @@ The release artifacts are generated as:
 - `build/libs/26.1/tobyscamera-<mod_version>+mc26.1.jar`
 - `folia/build/libs/tobyscamera-plugin-<mod_version>.jar`
 
+## GitHub releases
+
+GitHub Actions creates releases only from tags whose commits are on `main`.
+
+- Push `mod-vX.Y.Z` to publish the two Fabric Mod JARs (for Minecraft 1.21.11 and 26.1).
+- Push `plugin-vX.Y.Z` to publish the Paper/Folia plugin JAR.
+
+The version after the `v` is written into the selected artifacts and their metadata. Tags may use a SemVer prerelease suffix, such as `mod-v1.2.0-rc.1`; those releases are marked as prereleases. Each release also includes a SHA-256 file for every JAR.
+
+For example, after pushing the intended commit to `main`:
+
+```bash
+git tag -a mod-v1.2.3 -m "Mod 1.2.3"
+git push origin mod-v1.2.3
+```
+
 ## Local Paper development server
 
 Run `./gradlew runServer` (or `./gradlew.bat runServer` on Windows) to build the
