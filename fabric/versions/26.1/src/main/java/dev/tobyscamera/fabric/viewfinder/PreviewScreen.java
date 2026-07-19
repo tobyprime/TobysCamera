@@ -95,20 +95,23 @@ public final class PreviewScreen extends Screen {
         descriptionInput.setMaxLength(128);
         descriptionInput.setValue(description);
         descriptionInput.setResponder(value -> description = value);
-        addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.preview.public_address_value", value ? Component.translatable("options.on") : Component.translatable("options.off")), publicAddress)
-                .withValues(List.of(true, false))
+        addRenderableWidget(CycleButton.booleanBuilder(
+                        Component.translatable("tobyscamera.preview.public_address_value", Component.translatable("options.on")),
+                        Component.translatable("tobyscamera.preview.public_address_value", Component.translatable("options.off")), publicAddress)
                 .displayOnlyValue()
                 .create(width / 2 - 150, buttonY - 72, 99, 20, Component.empty(), (button, value) -> {
                     publicAddress = value; publicAddressChanged.accept(value);
                 }));
-        addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.preview.public_photographer_value", value ? Component.translatable("options.on") : Component.translatable("options.off")), publicPhotographer)
-                .withValues(List.of(true, false))
+        addRenderableWidget(CycleButton.booleanBuilder(
+                        Component.translatable("tobyscamera.preview.public_photographer_value", Component.translatable("options.on")),
+                        Component.translatable("tobyscamera.preview.public_photographer_value", Component.translatable("options.off")), publicPhotographer)
                 .displayOnlyValue()
                 .create(width / 2 - 49, buttonY - 72, 99, 20, Component.empty(), (button, value) -> {
                     publicPhotographer = value; publicPhotographerChanged.accept(value);
                 }));
-        addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.preview.public_time_value", value ? Component.translatable("options.on") : Component.translatable("options.off")), publicCapturedTime)
-                .withValues(List.of(true, false))
+        addRenderableWidget(CycleButton.booleanBuilder(
+                        Component.translatable("tobyscamera.preview.public_time_value", Component.translatable("options.on")),
+                        Component.translatable("tobyscamera.preview.public_time_value", Component.translatable("options.off")), publicCapturedTime)
                 .displayOnlyValue()
                 .create(width / 2 + 52, buttonY - 72, 99, 20, Component.empty(), (button, value) -> {
                     publicCapturedTime = value; publicCapturedTimeChanged.accept(value);
