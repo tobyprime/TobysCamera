@@ -86,14 +86,20 @@ jobs:
       - name: Publish selected artifacts to Modrinth
         env:
           RELEASE_KIND: ${{ steps.metadata.outputs.kind }}
+          RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
+          ARTIFACT_VERSION: ${{ steps.metadata.outputs.version }}+build.${{ github.run_number }}
         run: |
           set -euo pipefail
           case "$RELEASE_KIND" in
             mod)
-              bash ./gradlew publishModrinthMod
+              bash ./gradlew publishModrinthMod \
+                "-Pmod_version=$RELEASE_VERSION" \
+                "-Partifact_version=$ARTIFACT_VERSION"
               ;;
             plugin)
-              bash ./gradlew publishModrinthPlugin
+              bash ./gradlew publishModrinthPlugin \
+                "-Pmod_version=$RELEASE_VERSION" \
+                "-Partifact_version=$ARTIFACT_VERSION"
               ;;
             *)
               printf 'Unknown release kind: %s\n' "$RELEASE_KIND" >&2
