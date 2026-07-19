@@ -69,7 +69,8 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static final KeyMapping COMPOSITION_KEY = ClientPlatform.registerKeyMapping(new KeyMapping(
             "key.tobyscamera.composition", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_R, CameraKeyCategory.value()));
     private static final ViewfinderOverlay OVERLAY = new ViewfinderOverlay(VIEWFINDER, ZOOM_IN_KEY, ZOOM_OUT_KEY,
-            GRID_KEY, COMPOSITION_KEY, SHUTTER_KEY, TobysCameraClient::heldCameraFilm, TobysCameraClient::uploadProgress);
+            GRID_KEY, COMPOSITION_KEY, SHUTTER_KEY, TobysCameraClient::heldCameraFilm, TobysCameraClient::heldCameraGridSize,
+            TobysCameraClient::uploadProgress);
 
     @Override
     public void onInitializeClient() {
@@ -143,7 +144,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     private static void toggleCompositionEditor(net.minecraft.client.Minecraft client) {
         if (VIEWFINDER.state() != ViewfinderState.VIEWFINDER) return;
         if (client.screen instanceof ViewfinderControlsScreen) client.setScreen(null);
-        else client.setScreen(new ViewfinderControlsScreen(VIEWFINDER, COMPOSITION_KEY));
+        else client.setScreen(new ViewfinderControlsScreen(VIEWFINDER, COMPOSITION_KEY, TobysCameraClient::heldCameraGridSize));
     }
 
     private static int heldCameraGridSize() {
@@ -186,7 +187,7 @@ public final class TobysCameraClient implements ClientModInitializer {
 
     private static void openPreview(net.minecraft.client.Minecraft client, CapturedFrame frame) {
         if (!VIEWFINDER.captureComplete()) return;
-        client.setScreen(new PreviewScreen(frame,
+        client.setScreen(new PreviewScreen(frame, VIEWFINDER.printSize(),
                 photo -> { if (VIEWFINDER.beginUpload() && !UPLOADS.confirm(photo.photo(), photo.bagPreview())) VIEWFINDER.retake(); client.setScreen(null); },
                 () -> { VIEWFINDER.retake(); client.setScreen(null); }));
     }

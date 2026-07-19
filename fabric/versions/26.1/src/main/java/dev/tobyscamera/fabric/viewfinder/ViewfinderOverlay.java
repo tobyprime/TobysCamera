@@ -1,6 +1,7 @@
 package dev.tobyscamera.fabric.viewfinder;
 
 import dev.tobyscamera.fabric.camera.AspectRatio;
+import dev.tobyscamera.fabric.camera.PrintLayout;
 import dev.tobyscamera.fabric.camera.UploadProgress;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.KeyMapping;
@@ -26,12 +27,13 @@ public final class ViewfinderOverlay {
     private final KeyMapping compositionKey;
     private final KeyMapping shutterKey;
     private final IntSupplier remainingFilm;
+    private final IntSupplier maximumGridSize;
     private final Supplier<UploadProgress> uploadProgress;
     private int shutterTicks;
 
     public ViewfinderOverlay(ViewfinderSession session, KeyMapping zoomIn, KeyMapping zoomOut, KeyMapping gridKey,
             KeyMapping compositionKey, KeyMapping shutterKey, IntSupplier remainingFilm,
-            Supplier<UploadProgress> uploadProgress) {
+            IntSupplier maximumGridSize, Supplier<UploadProgress> uploadProgress) {
         this.session = session;
         this.zoomIn = zoomIn;
         this.zoomOut = zoomOut;
@@ -39,6 +41,7 @@ public final class ViewfinderOverlay {
         this.compositionKey = compositionKey;
         this.shutterKey = shutterKey;
         this.remainingFilm = remainingFilm;
+        this.maximumGridSize = maximumGridSize;
         this.uploadProgress = uploadProgress;
     }
 
@@ -97,6 +100,15 @@ public final class ViewfinderOverlay {
     }
     static String zoomLabel(float zoom) { return String.format(Locale.ROOT, "x%.2f", zoom); }
     static String aspectLabel(String aspectRatio) { return "AR " + aspectRatio; }
+    static PreflightReadout preflightReadout(int side, int maximum, AspectRatio ratio, int remainingFilm) {
+        int selectedSide = Math.clamp(side, 1, Math.max(1, maximum));
+        PrintLayout layout = PrintLayout.forMaximumSide(selectedSide, ratio);
+        int maps = layout.gridWidth() * layout.gridHeight();
+        return new PreflightReadout("%dx%d maps".formatted(layout.gridWidth(), layout.gridHeight()),
+                remainingFilm < 0 ? "no film required" : "%d film".formatted(maps),
+                remainingFilm < 0 ? "max %dx%d".formatted(maximum, maximum)
+                        : "film %d · %d shots · max %dx%d".formatted(Math.max(0, remainingFilm), Math.max(0, remainingFilm) / maps, maximum, maximum));
+    }
 
     private void drawUploadProgress(GuiGraphicsExtractor graphics, Minecraft minecraft, int left, int top, int width, int height) {
         UploadProgress progress = uploadProgress.get();
@@ -108,14 +120,13 @@ public final class ViewfinderOverlay {
 
     private void drawCameraHud(GuiGraphicsExtractor graphics, Minecraft minecraft, int left, int top, int width, int height) {
         HudLayout layout = hudLayout(left, top, width, height, 0);
-        String status = statusLabel(session.state());
-        drawReadout(graphics, minecraft, Component.literal(status), layout.statusLeft(), layout.statusTop(), HUD_ACCENT);
-        graphics.text(minecraft.font, Component.literal("PHOTO"), layout.statusLeft(), layout.statusTop() + 18, HUD_MUTED_TEXT, true);
         int film = remainingFilm.getAsInt();
-        if (showsFilm(film)) drawReadoutRight(graphics, minecraft, Component.literal(filmLabel(film)), layout.safeRight(), layout.statusTop(), HUD_TEXT);
+        PreflightReadout preflight = preflightReadout(session.printSize(), maximumGridSize.getAsInt(), session.composition().aspectRatio(), film);
+        drawReadout(graphics, minecraft, Component.literal(preflight.layout()), layout.statusLeft(), layout.statusTop(), HUD_ACCENT);
+        drawReadoutRight(graphics, minecraft, Component.literal(preflight.capacity()), layout.safeRight(), layout.statusTop(), HUD_TEXT);
         String bottomLeft = zoomLabel(session.targetZoom()) + "  " + aspectLabel(session.composition().aspectRatio().toString());
         drawReadout(graphics, minecraft, Component.literal(bottomLeft), layout.safeLeft(), layout.exposureTop(), HUD_TEXT);
-        graphics.text(minecraft.font, Component.literal(gridLabel(session.grid())), layout.safeLeft(), layout.gridTop(), HUD_MUTED_TEXT, true);
+        graphics.text(minecraft.font, Component.literal(preflight.cost()), layout.safeLeft(), layout.gridTop(), HUD_MUTED_TEXT, true);
     }
 
     private static String gridLabel(CompositionGrid grid) {
@@ -217,4 +228,5 @@ public final class ViewfinderOverlay {
             int hintLeft, int hintTop, int hintWidth, int exposureTop, int gridTop) { }
     record LensBorderLayout(int rim, int outerLeft, int outerTop, int outerRight, int outerBottom,
             int bracketLeft, int bracketTop, int bracketWidth, int bracketHeight) { }
+    record PreflightReadout(String layout, String cost, String capacity) { }
 }
