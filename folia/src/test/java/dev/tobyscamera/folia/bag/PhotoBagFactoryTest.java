@@ -37,10 +37,11 @@ class PhotoBagFactoryTest {
 
     @Test
     void exposesTechnicalIdentifiersOnlyInAdminDetail() {
-        PhotoBagData data = new PhotoBagData(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"), PhotoBagKind.PHOTO, 42, 3, 2);
+        PhotoMetadata metadata = new PhotoMetadata("Toby", "world", 1, 64, -2, Instant.parse("2026-07-17T00:00:00Z"));
+        PhotoBagData data = new PhotoBagData(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"), PhotoBagKind.PHOTO, 42, 3, 2, metadata);
         var text = PlainTextComponentSerializer.plainText();
 
-        assertEquals(List.of("\u7c7b\u578b: \u76f8\u7247", "\u76f8\u7247ID: 123e4567-e89b-12d3-a456-426614174000", "\u9884\u89c8\u5730\u56fe: #42", "\u5c3a\u5bf8: 3\u00d72"),
+        assertEquals(List.of("\u7c7b\u578b: \u76f8\u7247", "\u76f8\u7247ID: 123e4567-e89b-12d3-a456-426614174000", "\u9884\u89c8\u5730\u56fe: #42", "\u5c3a\u5bf8: 3\u00d72", "\u62cd\u6444\u8005: Toby", "\u62cd\u6444\u5750\u6807: world 1, 64, -2", "\u62cd\u6444\u65f6\u95f4: " + metadata.capturedTime()),
                 PhotoBagFactory.adminDetails(data).stream().map(text::serialize).toList());
     }
 }
