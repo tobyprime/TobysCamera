@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 class PacketCodecTest {
     private static final UUID TOKEN = UUID.fromString("11111111-2222-3333-4444-555555555555");
     private static final UUID PHOTO = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-    private static final UUID VIDEO = UUID.fromString("99999999-8888-7777-6666-555555555555");
 
     @Test
     void roundTripsEveryProtocolPacket() {
@@ -26,12 +25,6 @@ class PacketCodecTest {
                 new Packets.UploadTileChunk(TOKEN, 1, 0, 8_192, new byte[8_192]),
                 new Packets.UploadFinish(TOKEN),
                 new Packets.PhotoCreated(PHOTO, List.of(10, 11, 12, 13), 2, 2),
-                new Packets.VideoBegin(3, 4, 10, 20),
-                new Packets.VideoGranted(TOKEN, 1_700_000_000_000L, 16_384, 120),
-                new Packets.VideoPreviewChunk(TOKEN, 8_192, new byte[8_192]),
-                new Packets.VideoTileChunk(TOKEN, 19, 2, 3, 8_192, new byte[8_192]),
-                new Packets.VideoFinish(TOKEN),
-                new Packets.VideoCreated(VIDEO, List.of(20, 21), 2, 1, 10, 20),
                 new Packets.UploadRejected("tile is incomplete"));
 
         for (CameraPacket packet : packets) {
@@ -52,28 +45,21 @@ class PacketCodecTest {
 
         assertThrows(ProtocolException.class,
                 () -> PacketCodec.encode(new Packets.UploadPreviewChunk(TOKEN, 0, new byte[8_193])));
-        assertThrows(ProtocolException.class,
-                () -> PacketCodec.encode(new Packets.VideoPreviewChunk(TOKEN, 0, new byte[8_193])));
-
-        // Photo bag interaction is intentionally server-side.  The former client packet id
-        // must not remain part of the public camera protocol.
-        assertThrows(ProtocolException.class,
-                () -> PacketCodec.decode(ByteBuffer.wrap(new byte[] {PacketCodec.VERSION, 16})));
+        for (int removedId : new int[] {9, 10, 11, 12, 13, 15}) {
+            assertThrows(ProtocolException.class,
+                    () -> PacketCodec.decode(ByteBuffer.wrap(new byte[] {PacketCodec.VERSION, (byte) removedId})));
+        }
     }
 
     @Test
     void previewChunksDefensivelyCopyTheirPayloads() {
         byte[] pixels = {1, 2};
         Packets.UploadPreviewChunk photo = new Packets.UploadPreviewChunk(TOKEN, 0, pixels);
-        Packets.VideoPreviewChunk video = new Packets.VideoPreviewChunk(TOKEN, 0, pixels);
 
         pixels[0] = 9;
         assertArrayEquals(new byte[] {1, 2}, photo.data());
-        assertArrayEquals(new byte[] {1, 2}, video.data());
         photo.data()[1] = 9;
-        video.data()[1] = 9;
         assertArrayEquals(new byte[] {1, 2}, photo.data());
-        assertArrayEquals(new byte[] {1, 2}, video.data());
     }
 
     private static void assertSamePacket(CameraPacket expected, CameraPacket actual) {
@@ -88,20 +74,6 @@ class PacketCodecTest {
         }
         if (expected instanceof Packets.UploadPreviewChunk chunk) {
             Packets.UploadPreviewChunk decoded = assertInstanceOf(Packets.UploadPreviewChunk.class, actual);
-            assertEquals(chunk.token(), decoded.token());
-            assertEquals(chunk.offset(), decoded.offset());
-            assertArrayEquals(chunk.data(), decoded.data());
-            return;
-        }
-        if (expected instanceof Packets.VideoTileChunk chunk) {
-            Packets.VideoTileChunk decoded = assertInstanceOf(Packets.VideoTileChunk.class, actual);
-            assertEquals(chunk.token(), decoded.token()); assertEquals(chunk.frameIndex(), decoded.frameIndex());
-            assertEquals(chunk.tileX(), decoded.tileX()); assertEquals(chunk.tileY(), decoded.tileY());
-            assertEquals(chunk.offset(), decoded.offset()); assertArrayEquals(chunk.data(), decoded.data());
-            return;
-        }
-        if (expected instanceof Packets.VideoPreviewChunk chunk) {
-            Packets.VideoPreviewChunk decoded = assertInstanceOf(Packets.VideoPreviewChunk.class, actual);
             assertEquals(chunk.token(), decoded.token());
             assertEquals(chunk.offset(), decoded.offset());
             assertArrayEquals(chunk.data(), decoded.data());

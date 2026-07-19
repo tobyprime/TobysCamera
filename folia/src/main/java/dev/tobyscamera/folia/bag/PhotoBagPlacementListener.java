@@ -2,10 +2,8 @@ package dev.tobyscamera.folia.bag;
 
 import dev.tobyscamera.folia.delivery.MapItemDelivery;
 import dev.tobyscamera.folia.map.MapPhotoService;
-import dev.tobyscamera.folia.map.MapVideoService;
 import dev.tobyscamera.folia.storage.PhotoRecord;
 import dev.tobyscamera.folia.storage.TileCoordinate;
-import dev.tobyscamera.folia.storage.VideoRecord;
 import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,20 +37,22 @@ public final class PhotoBagPlacementListener implements Listener {
     private static final long UNPACK_DELAY_TICKS = 20L;
     private final Plugin plugin;
     private final MapPhotoService photos;
-    private final MapVideoService videos;
     private final ServerTaskScheduler scheduler;
     private final Map<UUID, PhotoBagData> pendingUnpacks = new ConcurrentHashMap<>();
     private volatile Consumer<ItemFrame> frameRefresher = ignored -> { };
+    private volatile Consumer<Player> heldMapRefresher = ignored -> { };
 
-    public PhotoBagPlacementListener(Plugin plugin, MapPhotoService photos, MapVideoService videos, ServerTaskScheduler scheduler) {
+    public PhotoBagPlacementListener(Plugin plugin, MapPhotoService photos, ServerTaskScheduler scheduler) {
         this.plugin = plugin;
         this.photos = photos;
-        this.videos = videos;
         this.scheduler = scheduler;
     }
 
-    /** Connects direct item-frame changes to the video playback index. */
+    /** Connects direct item-frame changes to map attachment refreshes. */
     public void setFrameRefresher(Consumer<ItemFrame> frameRefresher) { this.frameRefresher = frameRefresher; }
+
+    /** Connects server-side inventory mutations to the hand-map activation pass. */
+    public void setHeldMapRefresher(Consumer<Player> heldMapRefresher) { this.heldMapRefresher = heldMapRefresher; }
 
     /**
      * The bag is a server-only item: Fabric does not inspect its components or send an
@@ -129,6 +129,7 @@ public final class PhotoBagPlacementListener implements Listener {
         consumeOne(player, held);
         MapItemDelivery.deliver(maps, player.getInventory()::addItem,
                 item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
+        heldMapRefresher.accept(player);
     }
 
     @EventHandler
@@ -167,15 +168,9 @@ public final class PhotoBagPlacementListener implements Listener {
 
     private List<ItemStack> memberMaps(PhotoBagData bag) throws IOException {
         List<ItemStack> maps = new ArrayList<>(bag.gridWidth() * bag.gridHeight());
-        if (bag.kind() == PhotoBagKind.PHOTO) {
-            PhotoRecord record = photos.record(bag.mediaId());
-            if (record == null || record.gridWidth() != bag.gridWidth() || record.gridHeight() != bag.gridHeight()) throw new IllegalArgumentException("photo bag does not match stored photo");
-            for (int y = 0; y < bag.gridHeight(); y++) for (int x = 0; x < bag.gridWidth(); x++) maps.add(photos.mapItem(record, new TileCoordinate(x, y), bag.metadata()));
-        } else {
-            VideoRecord record = videos.record(bag.mediaId());
-            if (record == null || record.gridWidth() != bag.gridWidth() || record.gridHeight() != bag.gridHeight()) throw new IllegalArgumentException("video bag does not match stored video");
-            for (int y = 0; y < bag.gridHeight(); y++) for (int x = 0; x < bag.gridWidth(); x++) maps.add(videos.mapItem(record, new TileCoordinate(x, y), bag.metadata()));
-        }
+        PhotoRecord record = photos.record(bag.mediaId());
+        if (record == null || record.gridWidth() != bag.gridWidth() || record.gridHeight() != bag.gridHeight()) throw new IllegalArgumentException("photo bag does not match stored photo");
+        for (int y = 0; y < bag.gridHeight(); y++) for (int x = 0; x < bag.gridWidth(); x++) maps.add(photos.mapItem(record, new TileCoordinate(x, y), bag.metadata()));
         return maps;
     }
 

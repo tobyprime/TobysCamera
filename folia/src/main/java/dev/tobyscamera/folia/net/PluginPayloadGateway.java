@@ -2,9 +2,9 @@ package dev.tobyscamera.folia.net;
 
 import dev.tobyscamera.common.protocol.CameraPacket;
 import dev.tobyscamera.common.protocol.PacketCodec;
+import dev.tobyscamera.common.protocol.Packets;
 import dev.tobyscamera.common.protocol.ProtocolException;
 import dev.tobyscamera.folia.upload.UploadCoordinator;
-import dev.tobyscamera.folia.upload.VideoUploadCoordinator;
 import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -16,18 +16,15 @@ public final class PluginPayloadGateway implements PluginMessageListener {
     private final Plugin plugin;
     private final ServerTaskScheduler scheduler;
     private volatile UploadCoordinator coordinator;
-    private volatile VideoUploadCoordinator videoCoordinator;
 
-    public PluginPayloadGateway(Plugin plugin, ServerTaskScheduler scheduler, UploadCoordinator coordinator, VideoUploadCoordinator videoCoordinator) {
+    public PluginPayloadGateway(Plugin plugin, ServerTaskScheduler scheduler, UploadCoordinator coordinator) {
         this.plugin = plugin;
         this.scheduler = scheduler;
         this.coordinator = coordinator;
-        this.videoCoordinator = videoCoordinator;
     }
 
-    public void setCoordinators(UploadCoordinator coordinator, VideoUploadCoordinator videoCoordinator) {
+    public void setCoordinator(UploadCoordinator coordinator) {
         this.coordinator = coordinator;
-        this.videoCoordinator = videoCoordinator;
     }
 
     @Override
@@ -42,11 +39,11 @@ public final class PluginPayloadGateway implements PluginMessageListener {
             packet = PacketCodec.decode(message);
         } catch (ProtocolException exception) {
             plugin.getLogger().warning("Rejected malformed camera payload from " + player.getName() + ": " + exception.getMessage());
+            send(player, new Packets.UploadRejected("Unsupported camera client packet"));
             return;
         }
         scheduler.runEntity(player, () -> new CameraPacketRouter(
-                photoPacket -> coordinator.handle(player, photoPacket),
-                videoPacket -> videoCoordinator.handle(player, videoPacket)).route(packet), () -> { });
+                photoPacket -> coordinator.handle(player, photoPacket)).route(packet), () -> { });
     }
 
     public void send(Player player, CameraPacket packet) {

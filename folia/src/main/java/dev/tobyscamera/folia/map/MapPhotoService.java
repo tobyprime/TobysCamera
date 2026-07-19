@@ -15,26 +15,33 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.map.MapRenderer;
-import org.bukkit.map.MapView;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.craftbukkit.CraftWorld;
 
 public final class MapPhotoService {
     private final Plugin plugin;
     private final PhotoRepository repository;
     private final MediaTileCache cache;
+    private final VirtualMapIdAllocator virtualMapIds;
 
     public MapPhotoService(Plugin plugin, PhotoRepository repository) {
-        this(plugin, repository, new MediaTileCache(64L * 1024L * 1024L));
+        this(plugin, repository, new MediaTileCache(64L * 1024L * 1024L),
+                () -> ((CraftWorld) plugin.getServer().getWorlds().getFirst()).getHandle().getFreeMapId().id());
     }
 
     public MapPhotoService(Plugin plugin, PhotoRepository repository, MediaTileCache cache) {
+        this(plugin, repository, cache,
+                () -> ((CraftWorld) plugin.getServer().getWorlds().getFirst()).getHandle().getFreeMapId().id());
+    }
+
+    MapPhotoService(Plugin plugin, PhotoRepository repository, MediaTileCache cache,
+            java.util.function.IntSupplier nextVanillaMapId) {
         this.plugin = plugin;
         this.repository = repository;
         this.cache = cache;
+        this.virtualMapIds = new VirtualMapIdAllocator(nextVanillaMapId);
     }
 
     public PhotoRecord createMaps(UUID ownerId, World world, UploadSession session) {
@@ -42,10 +49,7 @@ public final class MapPhotoService {
         Map<TileCoordinate, Integer> mapIds = new LinkedHashMap<>();
         for (int y = 0; y < session.height(); y++) for (int x = 0; x < session.width(); x++) {
             TileCoordinate coordinate = new TileCoordinate(x, y);
-            MapView view = Bukkit.createMap(world);
-            view.setTrackingPosition(false); view.setUnlimitedTracking(false); view.setLocked(true);
-            for (MapRenderer renderer : view.getRenderers()) view.removeRenderer(renderer);
-            mapIds.put(coordinate, view.getId());
+            mapIds.put(coordinate, virtualMapIds.allocate());
         }
         PhotoRecord record = new PhotoRecord(photoId, ownerId, Instant.now(), session.width(), session.height(), mapIds);
         return record;
@@ -70,7 +74,7 @@ public final class MapPhotoService {
     }
 
     public ItemStack bag(World world, PhotoRecord record, UploadSession session, PhotoMetadata metadata) {
-        return PhotoBagFactory.create(world, record.photoId(), PhotoBagKind.PHOTO, record.gridWidth(), record.gridHeight(),
+        return PhotoBagFactory.create(virtualMapIds.allocate(), record.photoId(), PhotoBagKind.PHOTO, record.gridWidth(), record.gridHeight(),
                 metadata,
                 session.previewPixels());
     }
@@ -80,7 +84,7 @@ public final class MapPhotoService {
     }
 
     public ItemStack bag(World world, PhotoRecord record, PhotoMetadata metadata) throws IOException {
-        return PhotoBagFactory.create(world, record.photoId(), PhotoBagKind.PHOTO, record.gridWidth(), record.gridHeight(),
+        return PhotoBagFactory.create(virtualMapIds.allocate(), record.photoId(), PhotoBagKind.PHOTO, record.gridWidth(), record.gridHeight(),
                 metadata,
                 previewPixels(new PhotoBagData(record.photoId(), PhotoBagKind.PHOTO, 0, record.gridWidth(), record.gridHeight())));
     }
@@ -99,11 +103,9 @@ public final class MapPhotoService {
     }
 
     public ItemStack mapItem(PhotoRecord record, TileCoordinate coordinate, PhotoMetadata metadata) {
-        MapView view = Bukkit.getMap(record.mapIds().get(coordinate));
-        if (view == null) throw new IllegalStateException("map no longer exists");
         ItemStack item = new ItemStack(org.bukkit.Material.FILLED_MAP);
         var meta = (org.bukkit.inventory.meta.MapMeta) item.getItemMeta();
-        meta.setMapView(view);
+        meta.setMapId(record.mapIds().get(coordinate));
         var presentation = MapItemPresentation.photo(coordinate, metadata);
         meta.displayName(presentation.name());
         meta.lore(presentation.lore());

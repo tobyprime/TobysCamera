@@ -1,2 +1,0 @@
-package dev.tobyscamera.fabric.video;
-public final class VideoCaptureService { private long intervalMillis; private long nextFrameAt=-1; public void start(int fps,long now){if(fps<1)throw new IllegalArgumentException("fps must be positive");intervalMillis=Math.max(1,1_000L/fps);nextFrameAt=now;} public boolean captureDue(long now){if(nextFrameAt<0||now<nextFrameAt)return false;do{nextFrameAt+=intervalMillis;}while(nextFrameAt<=now);return true;} public void stop(){nextFrameAt=-1;} public boolean recording(){return nextFrameAt>=0;} }

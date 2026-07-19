@@ -77,10 +77,8 @@ public final class MediaTileCache {
 
     public record Key(Kind kind, UUID mediaId, int frameIndex, TileCoordinate coordinate) {
         public static Key photoTile(UUID photoId, TileCoordinate coordinate) { return new Key(Kind.PHOTO_TILE, photoId, 0, coordinate); }
-        public static Key videoTile(UUID videoId, int frameIndex, TileCoordinate coordinate) { return new Key(Kind.VIDEO_TILE, videoId, frameIndex, coordinate); }
         public static Key photoPreview(UUID photoId) { return new Key(Kind.PHOTO_PREVIEW, photoId, 0, null); }
-        public static Key videoPreview(UUID videoId) { return new Key(Kind.VIDEO_PREVIEW, videoId, 0, null); }
     }
 
-    public enum Kind { PHOTO_TILE, VIDEO_TILE, PHOTO_PREVIEW, VIDEO_PREVIEW }
+    public enum Kind { PHOTO_TILE, PHOTO_PREVIEW }
 }

@@ -12,7 +12,6 @@ public final class MapItemPresentation {
     private MapItemPresentation() { }
 
     public static Presentation photo(TileCoordinate coordinate, PhotoMetadata metadata) { return presentation("照片", coordinate, metadata); }
-    public static Presentation video(TileCoordinate coordinate, PhotoMetadata metadata) { return presentation("录像", coordinate, metadata); }
 
     private static Presentation presentation(String name, TileCoordinate coordinate, PhotoMetadata metadata) {
         List<Component> lore = new ArrayList<>();

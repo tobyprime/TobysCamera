@@ -1,6 +1,5 @@
 package dev.tobyscamera.fabric.viewfinder;
 
-import java.util.function.IntSupplier;
 import java.util.Locale;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.input.KeyEvent;
@@ -18,14 +17,12 @@ public final class ViewfinderControlsScreen extends Screen {
     private static final int PANEL_HEIGHT = 72;
     private final ViewfinderSession session;
     private final ViewfinderControlModel controls;
-    private final IntSupplier videoFpsMaximum;
     private final KeyMapping toggleKey;
 
-    public ViewfinderControlsScreen(ViewfinderSession session, IntSupplier videoFpsMaximum, KeyMapping toggleKey) {
+    public ViewfinderControlsScreen(ViewfinderSession session, KeyMapping toggleKey) {
         super(Component.translatable("tobyscamera.viewfinder.controls.title"));
         this.session = session;
         this.controls = new ViewfinderControlModel(session);
-        this.videoFpsMaximum = videoFpsMaximum;
         this.toggleKey = toggleKey;
     }
 
@@ -51,12 +48,6 @@ public final class ViewfinderControlsScreen extends Screen {
         addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.viewfinder.controls.grid", gridName(value)), session.grid())
                 .withValues(CompositionGrid.values())
                 .create(left + 6, rowTwo, 135, 20, Component.empty(), (button, value) -> setGrid(value)));
-        if (controls.showsVideoFps()) {
-            int maximum = Math.max(1, videoFpsMaximum.getAsInt());
-            addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.viewfinder.controls.fps", value), session.videoFps())
-                    .withValues(dev.tobyscamera.common.video.VideoFrameRate.valuesUpTo(maximum))
-                    .create(left + 147, rowTwo, 110, 20, Component.empty(), (button, value) -> controls.setVideoFps(value, maximum)));
-        }
         addRenderableWidget(Button.builder(Component.translatable("tobyscamera.viewfinder.controls.done"), button -> onClose())
                 .bounds(left + panelWidth - 70, rowTwo, 64, 20).build());
     }

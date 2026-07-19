@@ -18,7 +18,6 @@ public final class ViewfinderOverlay {
     private static final int HUD_TEXT = 0xE8F5FFF4;
     private static final int HUD_MUTED_TEXT = 0xB8D8E4D6;
     private static final int HUD_ACCENT = 0xE0D6FF74;
-    private static final int HUD_RECORDING = 0xE0FF2F2F;
     private static final int GRID_COLOR = 0x68FFFFFF;
     private final ViewfinderSession session;
     private final KeyMapping zoomIn;
@@ -26,14 +25,12 @@ public final class ViewfinderOverlay {
     private final KeyMapping gridKey;
     private final KeyMapping compositionKey;
     private final KeyMapping shutterKey;
-    private final KeyMapping modeKey;
-    private final KeyMapping fpsKey;
     private final IntSupplier remainingFilm;
     private final Supplier<UploadProgress> uploadProgress;
     private int shutterTicks;
 
     public ViewfinderOverlay(ViewfinderSession session, KeyMapping zoomIn, KeyMapping zoomOut, KeyMapping gridKey,
-            KeyMapping compositionKey, KeyMapping shutterKey, KeyMapping modeKey, KeyMapping fpsKey, IntSupplier remainingFilm,
+            KeyMapping compositionKey, KeyMapping shutterKey, IntSupplier remainingFilm,
             Supplier<UploadProgress> uploadProgress) {
         this.session = session;
         this.zoomIn = zoomIn;
@@ -41,8 +38,6 @@ public final class ViewfinderOverlay {
         this.gridKey = gridKey;
         this.compositionKey = compositionKey;
         this.shutterKey = shutterKey;
-        this.modeKey = modeKey;
-        this.fpsKey = fpsKey;
         this.remainingFilm = remainingFilm;
         this.uploadProgress = uploadProgress;
     }
@@ -93,15 +88,12 @@ public final class ViewfinderOverlay {
     }
 
     static String filmLabel(int remainingFilm) { return "FILM %02d".formatted(Math.max(0, remainingFilm)); }
-    static String modeLabel(CaptureMode mode, int fps, String modeKey, String fpsKey) {
-        return mode == CaptureMode.VIDEO ? "VIDEO %dFPS  [%s] mode  %s fps".formatted(fps, modeKey, fpsKey) : "PHOTO  [%s] mode".formatted(modeKey);
-    }
     static boolean showsFilm(int remainingFilm) { return remainingFilm >= 0; }
-    static String statusLabel(ViewfinderState state, CaptureMode mode) {
+    static String statusLabel(ViewfinderState state) {
         if (state == ViewfinderState.UPLOADING) return "UPL";
-        if (state == ViewfinderState.CAPTURING) return mode == CaptureMode.VIDEO ? "REC" : "CAP";
+        if (state == ViewfinderState.CAPTURING) return "CAP";
         if (state == ViewfinderState.AWAITING_GRANT) return "WAIT";
-        return mode == CaptureMode.VIDEO ? "VIDEO" : "PHOTO";
+        return "PHOTO";
     }
     static String zoomLabel(float zoom) { return String.format(Locale.ROOT, "x%.2f", zoom); }
     static String aspectLabel(String aspectRatio) { return "AR " + aspectRatio; }
@@ -116,13 +108,9 @@ public final class ViewfinderOverlay {
 
     private void drawCameraHud(GuiGraphicsExtractor graphics, Minecraft minecraft, int left, int top, int width, int height) {
         HudLayout layout = hudLayout(left, top, width, height, 0);
-        String status = statusLabel(session.state(), session.mode());
-        int statusColor = status.equals("REC") ? HUD_RECORDING : HUD_ACCENT;
-        drawReadout(graphics, minecraft, Component.literal(status), layout.statusLeft(), layout.statusTop(), statusColor);
-        if (status.equals("REC")) graphics.fill(layout.statusLeft() + minecraft.font.width(status) + 14, layout.statusTop() + 5,
-                layout.statusLeft() + minecraft.font.width(status) + 20, layout.statusTop() + 11, HUD_RECORDING);
-        Component mode = Component.literal(modeLabel(session.mode(), session.videoFps(), keyName(modeKey), keyName(fpsKey)));
-        graphics.text(minecraft.font, mode, layout.statusLeft(), layout.statusTop() + 18, HUD_MUTED_TEXT, true);
+        String status = statusLabel(session.state());
+        drawReadout(graphics, minecraft, Component.literal(status), layout.statusLeft(), layout.statusTop(), HUD_ACCENT);
+        graphics.text(minecraft.font, Component.literal("PHOTO"), layout.statusLeft(), layout.statusTop() + 18, HUD_MUTED_TEXT, true);
         int film = remainingFilm.getAsInt();
         if (showsFilm(film)) drawReadoutRight(graphics, minecraft, Component.literal(filmLabel(film)), layout.safeRight(), layout.statusTop(), HUD_TEXT);
         String bottomLeft = zoomLabel(session.targetZoom()) + "  " + aspectLabel(session.composition().aspectRatio().toString());

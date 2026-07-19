@@ -36,6 +36,25 @@ final class ChunkFrameViewerTracker {
         return viewers == null ? Set.of() : Set.copyOf(viewers);
     }
 
+    /** Returns players whose client has already received this chunk, even before it contains a frame. */
+    synchronized Set<ViewerChunk> viewersIn(UUID worldId, int chunkX, int chunkZ) {
+        Set<ViewerChunk> viewers = new HashSet<>();
+        for (ViewerChunk viewer : framesByViewerChunk.keySet()) {
+            if (viewer.worldId().equals(worldId) && viewer.chunkX() == chunkX && viewer.chunkZ() == chunkZ) viewers.add(viewer);
+        }
+        return Set.copyOf(viewers);
+    }
+
+    /** Adds a frame that appeared after this viewer's chunk was delivered. */
+    synchronized void trackFrame(ViewerChunk viewerChunk, UUID frameId) {
+        Set<UUID> frames = framesByViewerChunk.get(viewerChunk);
+        if (frames == null || frames.contains(frameId)) return;
+        Set<UUID> updated = new HashSet<>(frames);
+        updated.add(frameId);
+        framesByViewerChunk.put(viewerChunk, Set.copyOf(updated));
+        viewersByFrame.computeIfAbsent(frameId, ignored -> new HashSet<>()).add(viewerChunk);
+    }
+
     synchronized Set<ViewerChunk> removeFrame(UUID frameId) {
         Set<ViewerChunk> viewers = viewersByFrame.remove(frameId);
         if (viewers == null) return Set.of();
@@ -44,8 +63,7 @@ final class ChunkFrameViewerTracker {
             if (frames == null) continue;
             Set<UUID> remaining = new HashSet<>(frames);
             remaining.remove(frameId);
-            if (remaining.isEmpty()) framesByViewerChunk.remove(viewer);
-            else framesByViewerChunk.put(viewer, Set.copyOf(remaining));
+            framesByViewerChunk.put(viewer, Set.copyOf(remaining));
         }
         return Set.copyOf(viewers);
     }

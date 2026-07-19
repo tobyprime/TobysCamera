@@ -8,12 +8,12 @@ import org.junit.jupiter.api.Test;
 
 class PhotoBagDataTest {
     @Test
-    void retainsTheReferencedMediaAndPreviewDimensions() {
+    void retainsPhotoIdentityAndPreviewDimensions() {
         UUID mediaId = UUID.randomUUID();
-        PhotoBagData bag = new PhotoBagData(mediaId, PhotoBagKind.VIDEO, 42, 12, 8);
+        PhotoBagData bag = new PhotoBagData(mediaId, PhotoBagKind.PHOTO, 42, 12, 8);
 
         assertEquals(mediaId, bag.mediaId());
-        assertEquals(PhotoBagKind.VIDEO, bag.kind());
+        assertEquals(PhotoBagKind.PHOTO, bag.kind());
         assertEquals(42, bag.previewMapId());
         assertEquals(12, bag.gridWidth());
         assertEquals(8, bag.gridHeight());

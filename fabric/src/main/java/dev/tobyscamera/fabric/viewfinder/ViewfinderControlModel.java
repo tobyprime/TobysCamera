@@ -28,7 +28,4 @@ public final class ViewfinderControlModel {
         } catch (IllegalArgumentException ignored) { return false; }
     }
     public CompositionGrid cycleGrid() { return session.cycleGrid(); }
-    public boolean showsVideoFps() { return session.mode() == CaptureMode.VIDEO; }
-    public int adjustVideoFps(int delta, int maximum) { return session.adjustVideoFps(delta, maximum); }
-    public int setVideoFps(int value, int maximum) { return session.setVideoFps(value, maximum); }
 }

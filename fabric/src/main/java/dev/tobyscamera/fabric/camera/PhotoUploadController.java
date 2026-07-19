@@ -20,7 +20,7 @@ public final class PhotoUploadController {
     private UUID token;
     private int previewOffset, tile, offset, completedChunks, totalChunks;
     private boolean finishSent;
-    private dev.tobyscamera.fabric.video.ChunkTokenBucket allowance;
+    private ChunkTokenBucket allowance;
 
     public PhotoUploadController() { this(PhotoUploadController::send, System::currentTimeMillis); }
 
@@ -50,7 +50,7 @@ public final class PhotoUploadController {
     private void startUpload(Packets.UploadGranted grant) {
         if (pendingPhoto == null || clock.getAsLong() >= grant.expiresAtEpochMillis() || grant.maxChunksPerSecond() < 1) { clearPending(); return; }
         token = grant.token();
-        allowance = new dev.tobyscamera.fabric.video.ChunkTokenBucket(grant.maxChunksPerSecond(), clock.getAsLong());
+        allowance = new ChunkTokenBucket(grant.maxChunksPerSecond(), clock.getAsLong());
     }
 
     public void tick() {

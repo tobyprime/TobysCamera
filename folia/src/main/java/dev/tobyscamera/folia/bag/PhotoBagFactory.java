@@ -8,14 +8,11 @@ import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.MapMeta;
-import org.bukkit.map.MapRenderer;
-import org.bukkit.map.MapView;
 
 /** Manufactures preview-map photo bags and restores their immutable custom-data identity. */
 public final class PhotoBagFactory {
@@ -37,27 +34,20 @@ public final class PhotoBagFactory {
 
     private PhotoBagFactory() { }
 
-    public static ItemStack create(World world, UUID mediaId, PhotoBagKind kind, int width, int height, byte[] previewPixels) {
-        return create(world, mediaId, kind, width, height, null, previewPixels);
+    public static ItemStack create(int previewMapId, UUID mediaId, PhotoBagKind kind, int width, int height, byte[] previewPixels) {
+        return create(previewMapId, mediaId, kind, width, height, null, previewPixels);
     }
 
-    public static ItemStack create(World world, UUID mediaId, PhotoBagKind kind, int width, int height,
+    public static ItemStack create(int previewMapId, UUID mediaId, PhotoBagKind kind, int width, int height,
             PhotoMetadata metadata, byte[] previewPixels) {
         if (previewPixels.length != 16_384) throw new IllegalArgumentException("preview must contain 16384 palette pixels");
-        MapView preview = Bukkit.createMap(world);
-        preview.setTrackingPosition(false);
-        preview.setUnlimitedTracking(false);
-        preview.setLocked(true);
-        for (MapRenderer renderer : preview.getRenderers()) preview.removeRenderer(renderer);
-        return create(new PhotoBagData(mediaId, kind, preview.getId(), width, height, metadata));
+        return create(new PhotoBagData(mediaId, kind, previewMapId, width, height, metadata));
     }
 
     public static ItemStack create(PhotoBagData data) {
-        MapView preview = Bukkit.getMap(data.previewMapId());
-        if (preview == null) throw new IllegalArgumentException("preview map no longer exists: " + data.previewMapId());
         ItemStack item = new ItemStack(Material.FILLED_MAP);
         MapMeta meta = (MapMeta) item.getItemMeta();
-        meta.setMapView(preview);
+        meta.setMapId(data.previewMapId());
         meta.displayName(displayName(data.kind()));
         meta.lore(lore(data));
         item.setItemMeta(meta);

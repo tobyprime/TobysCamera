@@ -11,12 +11,6 @@ public record PluginSettings(
         int maxGridSize,
         int uploadChunksPerSecond,
         long uploadMaxActiveBytes,
-        int videoMaxFps,
-        int videoMaxFrames,
-        int videoUploadChunksPerSecond,
-        long videoMaxActiveUploadBytes,
-        int videoMaxActiveMapFrames,
-        int videoMaxUpdateDistance,
         String invalidTokenKickMessage) {
 
     public static PluginSettings from(Map<String, ?> values) {
@@ -29,12 +23,6 @@ public record PluginSettings(
                 integer(values, "upload.max-grid-size", 4),
                 integer(values, "upload.max-chunks-per-second", 120),
                 longValue(values, "upload.max-active-upload-bytes", 16_777_216L),
-                integer(values, "video.max-fps", 10),
-                integer(values, "video.max-frames", 100),
-                integer(values, "video.max-upload-chunks-per-second", 120),
-                longValue(values, "video.max-active-upload-bytes", 67_108_864L),
-                integer(values, "video.max-active-map-frames", 128),
-                integer(values, "video.max-update-distance", 128),
                 string(values, "invalid-token.kick-message", "Invalid or expired photo upload token"));
         settings.validate();
         return settings;
@@ -48,8 +36,6 @@ public record PluginSettings(
         }
         if (maxGridSize < 1) throw new IllegalArgumentException("max-grid-size must be positive");
         if (uploadChunksPerSecond < 1 || uploadMaxActiveBytes < 16_384L) throw new IllegalArgumentException("upload limits are invalid");
-        if (videoMaxFps < 1 || videoMaxFps > 20 || videoMaxFrames < 1 || videoUploadChunksPerSecond < 1 || videoMaxActiveUploadBytes < 16_384L || videoMaxActiveMapFrames < 1 || videoMaxUpdateDistance < 1)
-            throw new IllegalArgumentException("video limits are invalid");
     }
 
     private static String string(Map<String, ?> values, String key, String fallback) {

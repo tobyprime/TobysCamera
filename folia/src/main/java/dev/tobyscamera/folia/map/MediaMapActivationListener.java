@@ -35,33 +35,48 @@ public final class MediaMapActivationListener implements Listener {
     private final Plugin plugin;
     private final ServerTaskScheduler scheduler;
     private final MapPhotoService photos;
-    private final MapVideoService videos;
-    private final StillMapAttachmentService stills;
-    private final Map<String, MediaMapDescriptor.VideoTile> pendingVideos = new ConcurrentHashMap<>();
+    private final VirtualStillMapService stills;
     private final ChunkFrameViewerTracker frameViewers = new ChunkFrameViewerTracker();
     private final Set<String> frameSources = ConcurrentHashMap.newKeySet();
 
-    public MediaMapActivationListener(Plugin plugin, ServerTaskScheduler scheduler, MapPhotoService photos, MapVideoService videos) {
+    public MediaMapActivationListener(Plugin plugin, ServerTaskScheduler scheduler, MapPhotoService photos) {
         this.plugin = plugin;
         this.scheduler = scheduler;
         this.photos = photos;
-        this.videos = videos;
-        this.stills = new StillMapAttachmentService(Bukkit::getMap, scheduler::runAsync, scheduler::runGlobal,
-                failure -> plugin.getLogger().warning("Could not lazily load camera media: " + failure.getMessage()));
+        this.stills = new VirtualStillMapService(scheduler::runAsync, scheduler::runGlobal,
+                failure -> plugin.getLogger().warning("Could not lazily load camera media: " + failure.getMessage()),
+                new VirtualMapPacketSender());
     }
 
     /** Reconciles a changed frame for only clients whose loaded chunks currently contain it. */
     public void refreshFrame(ItemFrame frame) { refreshFrame(frame, frame.getItem()); }
 
+    /** Schedules a hand recheck after a server-side inventory mutation. */
+    public void refreshHeldMaps(Player player) { reconcileHandsNextTick(player); }
+
+    /** Seeds frame sources for chunks the client had already received before this listener was enabled. */
+    public void refreshVisibleFrames(Player player) {
+        scheduler.runEntityDelayed(player, 1L, () -> {
+            for (Chunk chunk : player.getSentChunks()) {
+                World world = chunk.getWorld();
+                int chunkX = chunk.getX();
+                int chunkZ = chunk.getZ();
+                var viewer = viewerChunk(player, chunk);
+                scheduler.runRegion(world, chunkX, chunkZ, () -> reconcileViewerChunk(viewer, world, chunkX, chunkZ));
+            }
+        }, () -> detachHands(player));
+    }
+
     public void clear() {
-        pendingVideos.clear();
         for (String source : frameSources) detach(source);
         frameSources.clear();
         stills.clear();
-        videos.clear();
     }
 
-    @EventHandler public void onPlayerJoin(PlayerJoinEvent event) { reconcileHandsNextTick(event.getPlayer()); }
+    @EventHandler public void onPlayerJoin(PlayerJoinEvent event) {
+        reconcileHandsNextTick(event.getPlayer());
+        refreshVisibleFrames(event.getPlayer());
+    }
     @EventHandler public void onPlayerQuit(PlayerQuitEvent event) { detachHands(event.getPlayer()); releasePlayerFrames(event.getPlayer().getUniqueId()); }
     @EventHandler public void onPlayerItemHeld(PlayerItemHeldEvent event) { reconcileHandsNextTick(event.getPlayer()); }
     @EventHandler public void onPlayerSwapHands(PlayerSwapHandItemsEvent event) { reconcileHandsNextTick(event.getPlayer()); }
@@ -99,8 +114,8 @@ public final class MediaMapActivationListener implements Listener {
     }
 
     private void reconcileHands(Player player) {
-        reconcile(playerSource(player, "main"), player.getInventory().getItemInMainHand());
-        reconcile(playerSource(player, "off"), player.getInventory().getItemInOffHand());
+        reconcile(playerSource(player, "main"), player, player.getInventory().getItemInMainHand());
+        reconcile(playerSource(player, "off"), player, player.getInventory().getItemInOffHand());
     }
 
     private void detachHands(Player player) {
@@ -120,7 +135,8 @@ public final class MediaMapActivationListener implements Listener {
             frames.add(frameId);
             String source = frameSource(viewer, frameId);
             frameSources.add(source);
-            reconcile(source, frame.getItem());
+            Player player = Bukkit.getPlayer(viewer.playerId());
+            if (player != null) reconcile(source, player, frame.getItem());
         }
         for (UUID removed : frameViewers.replace(viewer, frames)) {
             String source = frameSource(viewer, removed);
@@ -148,51 +164,31 @@ public final class MediaMapActivationListener implements Listener {
     }
 
     private void refreshFrame(ItemFrame frame, ItemStack item) {
-        for (var viewer : frameViewers.viewers(frame.getUniqueId())) {
+        Chunk chunk = frame.getChunk();
+        for (var viewer : frameViewers.viewersIn(chunk.getWorld().getUID(), chunk.getX(), chunk.getZ())) {
             String source = frameSource(viewer, frame.getUniqueId());
             frameSources.add(source);
-            reconcile(source, item);
+            frameViewers.trackFrame(viewer, frame.getUniqueId());
+            Player player = Bukkit.getPlayer(viewer.playerId());
+            if (player != null) reconcile(source, player, item);
         }
     }
 
-    private void reconcile(String source, ItemStack item) {
+    private void reconcile(String source, Player player, ItemStack item) {
         var descriptor = MediaMapDescriptor.from(item);
         if (descriptor.isEmpty()) {
             detach(source);
             return;
         }
         switch (descriptor.get()) {
-            case MediaMapDescriptor.PhotoTile photo -> { videos.detach(source); pendingVideos.remove(source); stills.attach(source, photo, () -> photos.tilePixels(photo)); }
-            case MediaMapDescriptor.VideoTile video -> activateVideo(source, video);
-            case MediaMapDescriptor.PhotoBagPreview photo -> { videos.detach(source); pendingVideos.remove(source); stills.attach(source, photo,
-                    () -> photos.previewPixels(new PhotoBagData(photo.mediaId(), PhotoBagKind.PHOTO, photo.mapId(), 1, 1))); }
-            case MediaMapDescriptor.VideoBagPreview video -> { videos.detach(source); pendingVideos.remove(source); stills.attach(source, video,
-                    () -> videos.previewPixels(new PhotoBagData(video.mediaId(), PhotoBagKind.VIDEO, video.mapId(), 1, 1))); }
+            case MediaMapDescriptor.PhotoTile photo -> stills.attach(source, player, photo, () -> photos.tilePixels(photo));
+            case MediaMapDescriptor.PhotoBagPreview photo -> stills.attach(source, player, photo,
+                    () -> photos.previewPixels(new PhotoBagData(photo.mediaId(), PhotoBagKind.PHOTO, photo.mapId(), 1, 1)));
         }
     }
 
-    private void activateVideo(String source, MediaMapDescriptor.VideoTile tile) {
-        if (tile.equals(pendingVideos.get(source))) return;
-        stills.detach(source);
-        videos.detach(source);
-        pendingVideos.put(source, tile);
-        scheduler.runAsync(() -> {
-            try {
-                MapVideoService.LoadedVideo loaded = videos.load(tile);
-                scheduler.runGlobal(() -> {
-                    if (!tile.equals(pendingVideos.get(source))) return;
-                    videos.attach(source, tile, loaded);
-                });
-            } catch (IOException exception) {
-                if (tile.equals(pendingVideos.remove(source))) plugin.getLogger().warning("Could not lazily load video " + tile.mediaId() + ": " + exception.getMessage());
-            }
-        });
-    }
-
     private void detach(String source) {
-        pendingVideos.remove(source);
         stills.detach(source);
-        videos.detach(source);
     }
 
     private static String playerSource(Player player, String hand) { return "player:" + player.getUniqueId() + ':' + hand; }

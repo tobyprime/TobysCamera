@@ -48,4 +48,42 @@ class ChunkFrameViewerTrackerTest {
 
         assertEquals(Set.of(firstChunk, secondChunk), tracker.releasePlayer(player).keySet());
     }
+
+    @Test
+    void findsAViewerOfAnAlreadyLoadedChunkBeforeAnyFrameExistsThere() {
+        ChunkFrameViewerTracker tracker = new ChunkFrameViewerTracker();
+        UUID player = UUID.randomUUID();
+        UUID world = UUID.randomUUID();
+        var viewerChunk = new ChunkFrameViewerTracker.ViewerChunk(player, world, 4, -2);
+
+        tracker.replace(viewerChunk, Set.of());
+
+        assertEquals(Set.of(viewerChunk), tracker.viewersIn(world, 4, -2));
+    }
+
+    @Test
+    void tracksAFrameAddedAfterTheChunkWasDelivered() {
+        ChunkFrameViewerTracker tracker = new ChunkFrameViewerTracker();
+        var viewerChunk = new ChunkFrameViewerTracker.ViewerChunk(UUID.randomUUID(), UUID.randomUUID(), 4, -2);
+        UUID frame = UUID.randomUUID();
+        tracker.replace(viewerChunk, Set.of());
+
+        tracker.trackFrame(viewerChunk, frame);
+
+        assertEquals(Set.of(viewerChunk), tracker.viewers(frame));
+        assertEquals(Set.of(frame), tracker.release(viewerChunk));
+    }
+
+    @Test
+    void keepsTheDeliveredChunkViewerAfterItsLastFrameIsRemoved() {
+        ChunkFrameViewerTracker tracker = new ChunkFrameViewerTracker();
+        UUID world = UUID.randomUUID();
+        var viewerChunk = new ChunkFrameViewerTracker.ViewerChunk(UUID.randomUUID(), world, 4, -2);
+        UUID frame = UUID.randomUUID();
+        tracker.replace(viewerChunk, Set.of(frame));
+
+        tracker.removeFrame(frame);
+
+        assertEquals(Set.of(viewerChunk), tracker.viewersIn(world, 4, -2));
+    }
 }

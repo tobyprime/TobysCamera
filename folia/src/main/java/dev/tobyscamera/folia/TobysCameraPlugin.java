@@ -14,14 +14,8 @@ import dev.tobyscamera.folia.bag.PhotoBagPlacementListener;
 import dev.tobyscamera.folia.delivery.PendingDeliveryRepository;
 import dev.tobyscamera.folia.storage.PhotoRepository;
 import dev.tobyscamera.folia.storage.SqlitePhotoRepository;
-import dev.tobyscamera.folia.storage.SqliteVideoRepository;
-import dev.tobyscamera.folia.storage.VideoRepository;
-import dev.tobyscamera.folia.storage.MediaTileCache;
 import dev.tobyscamera.folia.upload.UploadCoordinator;
-import dev.tobyscamera.folia.upload.VideoUploadCoordinator;
-import dev.tobyscamera.folia.map.MapVideoService;
 import dev.tobyscamera.folia.map.MediaMapActivationListener;
-import dev.tobyscamera.folia.video.VideoPlaybackService;
 import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import dev.tobyscamera.folia.scheduler.ServerTaskSchedulers;
 import java.io.IOException;
@@ -42,16 +36,11 @@ import net.kyori.adventure.text.Component;
 
 public final class TobysCameraPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private UploadCoordinator coordinator;
-    private VideoUploadCoordinator videoCoordinator;
     private PhotoRepository repository;
-    private VideoRepository videoRepository;
     private MapPhotoService photos;
-    private MapVideoService videos;
     private MapDeliveryService deliveries;
     private ServerTaskScheduler scheduler;
-    private ServerTaskScheduler.TaskHandle videoPlaybackTask;
     private ServerTaskScheduler.TaskHandle uploadCleanupTask;
-    private VideoPlaybackService videoPlayback;
     private PluginPayloadGateway gateway;
     private CameraFilmInventoryListener filmListener;
     private PhotoBagPlacementListener bagPlacement;
@@ -63,21 +52,20 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         scheduler = ServerTaskSchedulers.create(this);
         try {
             repository = new SqlitePhotoRepository(getDataFolder().toPath());
-            videoRepository = new SqliteVideoRepository(getDataFolder().toPath());
         } catch (IOException exception) {
             throw new IllegalStateException("Could not initialize camera storage", exception);
         }
-        MediaTileCache mediaCache = new MediaTileCache(64L * 1024L * 1024L);
-        photos = new MapPhotoService(this, repository, mediaCache);
-        videos = new MapVideoService(videoRepository, mediaCache);
-        bagPlacement = new PhotoBagPlacementListener(this, photos, videos, scheduler);
+        photos = new MapPhotoService(this, repository);
+        bagPlacement = new PhotoBagPlacementListener(this, photos, scheduler);
         try { deliveries = new MapDeliveryService(photos, new PendingDeliveryRepository(getDataFolder().toPath())); }
         catch (IOException exception) { throw new IllegalStateException("Could not initialize pending deliveries", exception); }
         configureRuntime(PluginSettings.from(flatten(getConfig())));
-        mediaActivation = new MediaMapActivationListener(this, scheduler, photos, videos);
+        mediaActivation = new MediaMapActivationListener(this, scheduler, photos);
         bagPlacement.setFrameRefresher(mediaActivation::refreshFrame);
+        bagPlacement.setHeldMapRefresher(mediaActivation::refreshHeldMaps);
         getServer().getPluginManager().registerEvents(mediaActivation, this);
-        gateway = new PluginPayloadGateway(this, scheduler, coordinator, videoCoordinator);
+        getServer().getOnlinePlayers().forEach(mediaActivation::refreshVisibleFrames);
+        gateway = new PluginPayloadGateway(this, scheduler, coordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
         getServer().getMessenger().registerOutgoingPluginChannel(this, PluginPayloadGateway.CHANNEL);
         getServer().getPluginManager().registerEvents(this, this);
@@ -87,26 +75,18 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     }
 
     private void configureRuntime(PluginSettings settings) {
-        if (videoPlaybackTask != null) videoPlaybackTask.cancel();
         if (uploadCleanupTask != null) uploadCleanupTask.cancel();
-        if (videoPlayback != null) HandlerList.unregisterAll(videoPlayback);
         if (filmListener != null) HandlerList.unregisterAll(filmListener);
         CameraFilmService films = new CameraFilmService(settings.cameraTagKey(), settings.filmTagKey(), settings.maxGridSize());
         coordinator = new UploadCoordinator(settings, films, this::send,
                 (player, session, metadata) -> createAndDeliver(player, session, metadata),
                 player -> player.getWorld().playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.3f));
-        videoCoordinator = new VideoUploadCoordinator(settings, films, this::send, this::createAndDeliverVideo, coordinator::discardCaptureIntent);
-        if (gateway != null) gateway.setCoordinators(coordinator, videoCoordinator);
+        if (gateway != null) gateway.setCoordinator(coordinator);
         filmListener = new CameraFilmInventoryListener(films);
         getServer().getPluginManager().registerEvents(filmListener, this);
-        videoPlayback = new VideoPlaybackService(this, scheduler, videos, settings.videoMaxActiveMapFrames(), settings.videoMaxUpdateDistance());
-        videoPlayback.indexLoadedFrames();
-        getServer().getPluginManager().registerEvents(videoPlayback, this);
-        videoPlaybackTask = scheduler.runGlobalRepeating(1L, 1L, () -> videoPlayback.tick());
         uploadCleanupTask = scheduler.runGlobalRepeating(20L, 20L, () -> {
             var now = java.time.Instant.now();
             coordinator.expireSessions(now);
-            videoCoordinator.expireSessions(now);
         });
     }
 
@@ -114,11 +94,9 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     public void onDisable() {
         getServer().getMessenger().unregisterIncomingPluginChannel(this);
         getServer().getMessenger().unregisterOutgoingPluginChannel(this);
-        if (videoPlaybackTask != null) videoPlaybackTask.cancel();
         if (uploadCleanupTask != null) uploadCleanupTask.cancel();
         if (mediaActivation != null) mediaActivation.clear();
         if (repository != null) try { repository.close(); } catch (IOException exception) { getLogger().warning("Could not close photo storage: " + exception.getMessage()); }
-        if (videoRepository != null) try { videoRepository.close(); } catch (IOException exception) { getLogger().warning("Could not close video storage: " + exception.getMessage()); }
     }
 
     @Override
@@ -134,39 +112,6 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
             sender.sendMessage(Component.text("TobysCamera configuration reload failed; keeping the previous configuration."));
         }
         return true;
-    }
-
-    private void createAndDeliverVideo(Player player, dev.tobyscamera.common.upload.VideoUploadSession session, dev.tobyscamera.folia.upload.PhotoMetadata metadata) {
-        var world = player.getWorld();
-        scheduler.runGlobal(() -> {
-            try {
-                var record = videos.createMaps(player.getUniqueId(), world, session);
-                scheduler.runAsync(() -> {
-                    try {
-                        videos.persist(record, session);
-                        scheduler.runGlobal(() -> {
-                            var bag = videos.bag(world, record, session, metadata);
-                            scheduler.runEntity(player, () -> {
-                                try {
-                                    MapItemDelivery.deliver(java.util.List.of(bag), player.getInventory()::addItem,
-                                            item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
-                                    getLogger().info("Delivered a video bag for " + record.videoId() + " to " + player.getName() + ".");
-                                    send(player, new Packets.VideoCreated(record.videoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight(), record.fps(), record.frameCount()));
-                                } catch (RuntimeException exception) {
-                                    getLogger().warning("Could not deliver video maps to " + player.getName() + ": " + exception.getMessage());
-                                    send(player, new Packets.UploadRejected("Could not deliver video maps"));
-                                }
-                            }, () -> { });
-                        });
-                    } catch (IOException exception) {
-                        scheduler.runGlobal(() -> videos.discard(record));
-                        scheduler.runEntity(player, () -> send(player, new Packets.UploadRejected("Could not save video maps")), () -> { });
-                    }
-                });
-            } catch (RuntimeException exception) {
-                scheduler.runEntity(player, () -> send(player, new Packets.UploadRejected("Could not create video maps")), () -> { });
-            }
-        });
     }
 
     private void send(Player player, dev.tobyscamera.common.protocol.CameraPacket packet) {

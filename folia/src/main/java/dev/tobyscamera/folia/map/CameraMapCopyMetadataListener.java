@@ -22,7 +22,6 @@ import org.bukkit.inventory.ItemStack;
 /** Retains camera-map metadata and makes one bag copy cost its complete tile grid. */
 public final class CameraMapCopyMetadataListener implements Listener {
     private static final NamespacedKey PHOTO_ID = new NamespacedKey("tobyscamera", "photo_id");
-    private static final NamespacedKey VIDEO_ID = new NamespacedKey("tobyscamera", "video_id");
 
     @EventHandler
     public void onPrepareCopy(PrepareItemCraftEvent event) {
@@ -162,6 +161,6 @@ public final class CameraMapCopyMetadataListener implements Listener {
     }
 
     private static boolean isCameraMap(ItemStack item) {
-        return PhotoBagFactory.isBag(item) || RootCustomData.contains(item, PHOTO_ID) || RootCustomData.contains(item, VIDEO_ID);
+        return PhotoBagFactory.isBag(item) || RootCustomData.contains(item, PHOTO_ID);
     }
 }

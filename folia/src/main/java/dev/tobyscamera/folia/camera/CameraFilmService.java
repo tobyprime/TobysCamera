@@ -18,10 +18,6 @@ public final class CameraFilmService {
     private final NamespacedKey maximumKey;
     private final NamespacedKey noFilmRequiredKey;
     private final NamespacedKey magicPhotoKey;
-    private final NamespacedKey maximumVideoFpsKey;
-    private final NamespacedKey videoKey;
-    private final NamespacedKey maximumVideoGridSizeKey;
-    private final NamespacedKey maximumVideoFramesKey;
     private final int configuredMaximum;
 
     public CameraFilmService(String cameraTagKey, String filmTagKey, int configuredMaximum) {
@@ -32,10 +28,6 @@ public final class CameraFilmService {
         maximumKey = new NamespacedKey(cameraKey.getNamespace(), "max_grid_size");
         noFilmRequiredKey = new NamespacedKey(cameraKey.getNamespace(), "no_film_required");
         magicPhotoKey = new NamespacedKey(cameraKey.getNamespace(), "magic_photo");
-        maximumVideoFpsKey = new NamespacedKey(cameraKey.getNamespace(), "max_video_fps");
-        videoKey = new NamespacedKey(cameraKey.getNamespace(), "video");
-        maximumVideoGridSizeKey = new NamespacedKey(cameraKey.getNamespace(), "video_max_grid_size");
-        maximumVideoFramesKey = new NamespacedKey(cameraKey.getNamespace(), "video_max_frames");
         this.configuredMaximum = Math.max(1, configuredMaximum);
     }
 
@@ -43,7 +35,6 @@ public final class CameraFilmService {
     public boolean isFilm(ItemStack item) { return !item.isEmpty() && RootCustomData.contains(item, filmKey); }
     public boolean isMagicPhoto(ItemStack camera) { return isCamera(camera) && RootCustomData.contains(camera, magicPhotoKey); }
     public boolean isFilmFree(ItemStack camera) { return isCamera(camera) && (RootCustomData.contains(camera, noFilmRequiredKey) || isMagicPhoto(camera)); }
-    public boolean supportsVideo(ItemStack camera) { return isCamera(camera) && RootCustomData.contains(camera, videoKey); }
     public ItemStack heldCamera(Player player) {
         ItemStack mainHand = player.getInventory().getItemInMainHand();
         return isCamera(mainHand) ? mainHand : isCamera(player.getInventory().getItemInOffHand())
@@ -85,19 +76,6 @@ public final class CameraFilmService {
         camera.setAmount(camera.getAmount() - 1);
         return true;
     }
-
-    public static int capVideoFps(int componentMaximum, int configuredMaximum) {
-        return Math.max(1, Math.min(Math.min(20, Math.max(1, configuredMaximum)), componentMaximum));
-    }
-
-    public int maximumVideoFps(ItemStack camera, int configuredMaximum) {
-        return capVideoFps(readInt(camera, maximumVideoFpsKey, configuredMaximum), configuredMaximum);
-    }
-
-    public static int capVideoGridSize(int componentMaximum, int configuredMaximum) { return Math.max(1, Math.min(Math.max(1, componentMaximum), Math.max(1, configuredMaximum))); }
-    public static int capVideoFrames(int componentMaximum, int configuredMaximum) { return Math.max(1, Math.min(Math.max(1, componentMaximum), Math.max(1, configuredMaximum))); }
-    public int maximumVideoGridSize(ItemStack camera, int configuredMaximum) { return capVideoGridSize(readInt(camera, maximumVideoGridSizeKey, maximum(camera, configuredMaximum)), configuredMaximum); }
-    public int maximumVideoFrames(ItemStack camera, int configuredMaximum) { return capVideoFrames(readInt(camera, maximumVideoFramesKey, configuredMaximum), configuredMaximum); }
 
     public static List<Component> lore(int remaining, int maximum) {
         return List.of(

@@ -62,25 +62,4 @@ public final class Packets {
         @Override public PacketType type() { return PacketType.UPLOAD_REJECTED; }
     }
 
-    public record VideoBegin(int gridWidth, int gridHeight, int fps, int frameCount) implements CameraPacket {
-        @Override public PacketType type() { return PacketType.VIDEO_BEGIN; }
-    }
-    public record VideoGranted(UUID token, long expiresAtEpochMillis, int tileBytes, int maxChunksPerSecond) implements CameraPacket {
-        @Override public PacketType type() { return PacketType.VIDEO_GRANTED; }
-    }
-    public record VideoPreviewChunk(UUID token, int offset, byte[] data) implements CameraPacket {
-        public VideoPreviewChunk { data = data.clone(); }
-        @Override public byte[] data() { return data.clone(); }
-        @Override public PacketType type() { return PacketType.VIDEO_PREVIEW_CHUNK; }
-    }
-    public record VideoTileChunk(UUID token, int frameIndex, int tileX, int tileY, int offset, byte[] data) implements CameraPacket {
-        public VideoTileChunk { data = data.clone(); }
-        @Override public byte[] data() { return data.clone(); }
-        @Override public PacketType type() { return PacketType.VIDEO_TILE_CHUNK; }
-    }
-    public record VideoFinish(UUID token) implements CameraPacket { @Override public PacketType type() { return PacketType.VIDEO_FINISH; } }
-    public record VideoCreated(UUID videoId, List<Integer> mapIds, int gridWidth, int gridHeight, int fps, int frameCount) implements CameraPacket {
-        public VideoCreated { mapIds = List.copyOf(mapIds); }
-        @Override public PacketType type() { return PacketType.VIDEO_CREATED; }
-    }
 }

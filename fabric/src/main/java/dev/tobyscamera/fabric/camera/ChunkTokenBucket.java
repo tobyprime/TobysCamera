@@ -1,6 +1,6 @@
-package dev.tobyscamera.fabric.video;
+package dev.tobyscamera.fabric.camera;
 
-/** Monotonic non-blocking upload allowance; callers drive it from client ticks. */
+/** Monotonic non-blocking allowance for photo upload chunks. */
 public final class ChunkTokenBucket {
     private final int perSecond;
     private double tokens;
@@ -8,7 +8,9 @@ public final class ChunkTokenBucket {
 
     public ChunkTokenBucket(int perSecond, long nowMillis) {
         if (perSecond < 1) throw new IllegalArgumentException("chunk rate must be positive");
-        this.perSecond = perSecond; this.tokens = perSecond; this.lastMillis = nowMillis;
+        this.perSecond = perSecond;
+        this.tokens = perSecond;
+        this.lastMillis = nowMillis;
     }
 
     public int takeAvailable(long nowMillis, int requested) {

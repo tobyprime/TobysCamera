@@ -51,12 +51,6 @@ public final class PacketCodec {
                     for (int id : value.mapIds()) out.writeInt(id);
                 }
                 case Packets.UploadRejected value -> writeString(out, value.reason());
-                case Packets.VideoBegin value -> { out.writeInt(value.gridWidth()); out.writeInt(value.gridHeight()); out.writeInt(value.fps()); out.writeInt(value.frameCount()); }
-                case Packets.VideoGranted value -> { writeUuid(out, value.token()); out.writeLong(value.expiresAtEpochMillis()); out.writeInt(value.tileBytes()); out.writeInt(value.maxChunksPerSecond()); }
-                case Packets.VideoPreviewChunk value -> writePreviewChunk(out, value.token(), value.offset(), value.data());
-                case Packets.VideoTileChunk value -> { if (value.data().length > MAX_CHUNK_BYTES) throw new ProtocolException("chunk exceeds limit"); writeUuid(out, value.token()); out.writeInt(value.frameIndex()); out.writeInt(value.tileX()); out.writeInt(value.tileY()); out.writeInt(value.offset()); out.writeInt(value.data().length); out.write(value.data()); }
-                case Packets.VideoFinish value -> writeUuid(out, value.token());
-                case Packets.VideoCreated value -> { writeUuid(out, value.videoId()); out.writeInt(value.gridWidth()); out.writeInt(value.gridHeight()); out.writeInt(value.fps()); out.writeInt(value.frameCount()); out.writeInt(value.mapIds().size()); for (int id : value.mapIds()) out.writeInt(id); }
             }
             out.flush();
             return bytes.toByteArray();
@@ -82,12 +76,6 @@ public final class PacketCodec {
                 case UPLOAD_FINISH -> new Packets.UploadFinish(readUuid(in));
                 case PHOTO_CREATED -> readPhotoCreated(in);
                 case UPLOAD_REJECTED -> new Packets.UploadRejected(readString(in));
-                case VIDEO_BEGIN -> new Packets.VideoBegin(in.getInt(), in.getInt(), in.getInt(), in.getInt());
-                case VIDEO_GRANTED -> new Packets.VideoGranted(readUuid(in), in.getLong(), in.getInt(), in.getInt());
-                case VIDEO_PREVIEW_CHUNK -> readVideoPreviewChunk(in);
-                case VIDEO_TILE_CHUNK -> readVideoChunk(in);
-                case VIDEO_FINISH -> new Packets.VideoFinish(readUuid(in));
-                case VIDEO_CREATED -> readVideoCreated(in);
             };
             if (in.hasRemaining()) throw new ProtocolException("trailing packet bytes");
             return packet;
@@ -106,15 +94,6 @@ public final class PacketCodec {
     private static Packets.UploadPreviewChunk readUploadPreviewChunk(ByteBuffer in) {
         UUID token = readUuid(in); int offset = in.getInt();
         return new Packets.UploadPreviewChunk(token, offset, readChunkData(in));
-    }
-    private static Packets.VideoTileChunk readVideoChunk(ByteBuffer in) {
-        UUID token = readUuid(in); int frame = in.getInt(), x = in.getInt(), y = in.getInt(), offset = in.getInt(), length = in.getInt();
-        if (length < 0 || length > MAX_CHUNK_BYTES || length > in.remaining()) throw new ProtocolException("invalid chunk length");
-        byte[] data = new byte[length]; in.get(data); return new Packets.VideoTileChunk(token, frame, x, y, offset, data);
-    }
-    private static Packets.VideoPreviewChunk readVideoPreviewChunk(ByteBuffer in) {
-        UUID token = readUuid(in); int offset = in.getInt();
-        return new Packets.VideoPreviewChunk(token, offset, readChunkData(in));
     }
 
     private static void writePreviewChunk(DataOutputStream out, UUID token, int offset, byte[] data) throws IOException {
@@ -135,12 +114,6 @@ public final class PacketCodec {
         List<Integer> mapIds = new ArrayList<>(count);
         for (int index = 0; index < count; index++) mapIds.add(in.getInt());
         return new Packets.PhotoCreated(photoId, mapIds, width, height);
-    }
-    private static Packets.VideoCreated readVideoCreated(ByteBuffer in) {
-        UUID id = readUuid(in); int width = in.getInt(), height = in.getInt(), fps = in.getInt(), frames = in.getInt(), count = in.getInt();
-        if (count < 0 || count > in.remaining() / Integer.BYTES) throw new ProtocolException("invalid map id count");
-        List<Integer> mapIds = new ArrayList<>(count); for (int i = 0; i < count; i++) mapIds.add(in.getInt());
-        return new Packets.VideoCreated(id, mapIds, width, height, fps, frames);
     }
 
     private static void writeUuid(DataOutputStream out, UUID value) throws IOException {

@@ -2,6 +2,8 @@
 
 Fabric 1.21.11 and 26.1 client Mod + Paper and Folia 1.21.11+ plugin. Only the photographer installs the Mod; completed pictures are ordinary `filled_map` items visible to every vanilla client.
 
+Keep the client mod and server plugin on the same TobysCamera release. Older clients receive an explicit upload rejection for unsupported camera packets.
+
 Modrinth-ready guides: [English](MODRINTH_en_US.md) | [简体中文](MODRINTH_zh_CN.md).
 
 ## Build
@@ -45,39 +47,15 @@ use normal production authentication settings when deploying it.
 
 Run the same verification workflow on both Paper and Folia with the identical plugin JAR.
 
-## Video maps
+After editing `plugins/TobysCamera/config.yml`, run `/tobyscamera reload` (permission `tobyscamera.reload`, default OP). Existing photo maps and database connections remain active; new upload grants use the new values.
 
-Only cameras with the `tobyscamera:video` component can record video. `tobyscamera:video_max_grid_size` and `tobyscamera:video_max_frames` independently limit a video's map size and retained frame count; `tobyscamera:max_video_fps` limits its frame rate. While holding one, `V` (rebindable in **TobysCamera** controls) switches between photo and video modes. In video mode, `]` cycles only tick-aligned `1 / 5 / 10 / 20 FPS` rates. Press the shutter once to start and again to stop. The confirmation screen trims the retained frame range, chooses the final rectangular map layout and dithering, then uploads exactly the palette bytes that it previews. Floyd–Steinberg dithering is enabled by default.
+### Lazy photo loading
 
-The plugin's reloadable `video:` configuration has these defaults:
-
-```yaml
-video:
-  max-fps: 10                    # Hard ceiling: 20
-  max-frames: 100
-  max-upload-chunks-per-second: 120
-  max-active-map-frames: 128
-  max-update-distance: 128
-```
-
-After editing `plugins/TobysCamera/config.yml`, run `/tobyscamera reload` (permission `tobyscamera.reload`, default OP). Existing maps and database connections remain active; new upload grants and the playback budget use the new values.
-
-### Lazy media loading
-
-Historical photos and videos are not loaded into the plugin heap during startup. The server reads them only while a tagged map or photo bag is in a player's main hand, off hand, or an item frame in a loaded chunk. Inactive media renderers immediately release their pixel arrays; a cold disk read is asynchronous and applies on the tick after it completes, without blocking a server tick.
-
-Each retained frame costs one film for every final map tile: a 12-frame 2×3 video costs 72 film. Cameras marked `tobyscamera:no_film_required` remain free. Placed video maps loop independently at their own FPS; each server pass updates at most the nearest 128 individual maps and only sends display-frame updates within `video.max-update-distance` blocks (default: 128). A held video map also receives its updates directly.
+Historical photos are not loaded into the plugin heap during startup. The server reads them only while a tagged map or photo bag is in a player's main hand, off hand, or an item frame in a loaded chunk. Inactive renderers immediately release their pixel arrays; a cold disk read is asynchronous and applies on the tick after it completes, without blocking a server tick.
 
 ### Magic photo camera
 
 A camera tagged with `tobyscamera:magic_photo` is film-free but can be used for only one valid photo upload. The server removes one held magic camera as soon as it accepts that upload; failed validation does not consume it. The behavior is server-side only, so no client mod update or extra item component is required.
-
-### Video manual verification
-
-1. Give yourself a tagged camera with `tobyscamera:video`, enough film (or `tobyscamera:no_film_required`), and optionally `tobyscamera:max_video_fps`. Hold it, right-click, press `V`, choose an FPS with `]`, then press the configured shutter key to start and stop a short recording.
-2. In confirmation, move the start/end controls to remove at least one frame from each side. Select a non-square composition (for example 4:3) and a print size that produces a rectangular map layout. The displayed preview must match the final map palette, including black borders and dithering.
-3. Confirm printing. Check that the server grants the upload, the client throttles rather than freezing, and every delivered `filled_map` has matching grid position, photographer, location and time lore.
-4. Place the delivered maps in item frames. They should loop at the selected FPS after a server restart. Place more than `video.max-active-map-frames` maps at varied distances; only the nearest configured number should receive refreshes each pass.
 
 ## Scope
 

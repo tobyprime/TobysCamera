@@ -20,10 +20,6 @@ public final class CameraKeyBindings {
         return GLFW.GLFW_KEY_EQUAL;
     }
 
-    public static int defaultVideoFpsKey() {
-        return GLFW.GLFW_KEY_RIGHT_BRACKET;
-    }
-
     public static KeyMapping shutter() {
         return new KeyMapping("key.tobyscamera.shutter", InputConstants.Type.MOUSE, defaultShutterKey(), CameraKeyCategory.value());
     }
