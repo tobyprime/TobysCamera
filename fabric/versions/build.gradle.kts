@@ -21,7 +21,7 @@ val artifactFileName = "tobyscamera-$artifactVersion+mc$targetMinecraftVersion.j
 modrinth {
     token.set(providers.environmentVariable("MODRINTH_TOKEN"))
     projectId.set(providers.environmentVariable("MODRINTH_PROJECT_ID"))
-    versionNumber.set(artifactFileName.removeSuffix(".jar"))
+    versionNumber.set("$artifactVersion+mc$targetMinecraftVersion")
     versionName.set(artifactFileName.removeSuffix(".jar"))
     versionType.set("release")
     uploadFile.set(tasks.named("remapJar"))

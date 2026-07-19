@@ -10,13 +10,13 @@ Publish Mod and Paper/Folia plugin artifacts to one Modrinth project through Gra
 
 ## Artifact-to-version mapping
 
-Every JAR creates its own Modrinth version. The Modrinth `versionNumber` and `versionName` are exactly the JAR filename without `.jar`, so independent uploads in the same project do not conflict.
+Every JAR creates its own Modrinth version. `versionNumber` contains the release version, CI build number, and target identifier; `versionName` is exactly the JAR filename without `.jar`. This keeps each version unique without exceeding Modrinth's version-number length limit.
 
 - `mod-vX.Y.Z` uploads only the two Fabric JARs, each as a separate version with loader `fabric` and its matching Minecraft version.
 - `plugin-vX.Y.Z` uploads only the Paper/Folia plugin JAR as a separate version with loaders `paper` and `folia`.
 - All versions have Minotaur `versionType=release`.
 
-For example, a Mod run can publish `tobyscamera-0.1.0+build.4+mc1.21.11` and `tobyscamera-0.1.0+build.4+mc26.1`; a plugin run can publish `tobyscamera-plugin-0.1.0+build.5`.
+For example, a Mod run can publish version numbers `0.1.0+build.4+mc1.21.11` and `0.1.0+build.4+mc26.1`, with full JAR names as their version names. A plugin run can publish `0.1.0+build.5+plugin`.
 
 ## Gradle architecture
 

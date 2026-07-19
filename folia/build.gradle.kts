@@ -12,7 +12,7 @@ val artifactVersion = providers.gradleProperty("artifact_version").orElse(rootPr
 modrinth {
     token.set(providers.environmentVariable("MODRINTH_TOKEN"))
     projectId.set(providers.environmentVariable("MODRINTH_PROJECT_ID"))
-    versionNumber.set("tobyscamera-plugin-$artifactVersion")
+    versionNumber.set("$artifactVersion+plugin")
     versionName.set("tobyscamera-plugin-$artifactVersion")
     versionType.set("release")
     uploadFile.set(tasks.named("jar"))
