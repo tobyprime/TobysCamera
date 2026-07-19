@@ -17,6 +17,16 @@ class SqlitePhotoRepositoryTest {
     @TempDir Path directory;
 
     @Test
+    void reportsPhotoAndTileTotalsWithoutLoadingPayloads() throws Exception {
+        try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
+            assertEquals(new PhotoStorageStats(0, 0), repository.stats());
+            repository.save(record(2, 1), pixels(2, 1), filled((byte) 1));
+            repository.save(record(1, 3), pixels(1, 3), filled((byte) 2));
+            assertEquals(new PhotoStorageStats(2, 5), repository.stats());
+        }
+    }
+
+    @Test
     void persistsTilesAndMapIdsAcrossRepositoryReopen() throws Exception {
         UUID photoId = UUID.randomUUID();
         Map<TileCoordinate, Integer> maps = new LinkedHashMap<>();
@@ -44,6 +54,22 @@ class SqlitePhotoRepositoryTest {
     private static byte[] filled(byte value) {
         byte[] result = new byte[16_384];
         java.util.Arrays.fill(result, value);
+        return result;
+    }
+
+    private static PhotoRecord record(int width, int height) {
+        Map<TileCoordinate, Integer> maps = new LinkedHashMap<>();
+        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+            maps.put(new TileCoordinate(x, y), 100 + maps.size());
+        }
+        return new PhotoRecord(UUID.randomUUID(), UUID.randomUUID(), Instant.now(), width, height, maps);
+    }
+
+    private static Map<TileCoordinate, byte[]> pixels(int width, int height) {
+        Map<TileCoordinate, byte[]> result = new LinkedHashMap<>();
+        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+            result.put(new TileCoordinate(x, y), new byte[16_384]);
+        }
         return result;
     }
 

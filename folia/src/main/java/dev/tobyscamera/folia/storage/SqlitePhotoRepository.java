@@ -89,6 +89,17 @@ public final class SqlitePhotoRepository implements PhotoRepository {
     }
 
     @Override
+    public synchronized PhotoStorageStats stats() throws IOException {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery("select count(*), coalesce(sum(width * height), 0) from photos")) {
+            if (!result.next()) return new PhotoStorageStats(0, 0);
+            return new PhotoStorageStats(result.getLong(1), result.getLong(2));
+        } catch (SQLException exception) {
+            throw new IOException("could not count stored photos", exception);
+        }
+    }
+
+    @Override
     public synchronized PhotoRecord find(UUID photoId) throws IOException {
         try (PreparedStatement photo = connection.prepareStatement("select id, owner, created, width, height from photos where id=?")) {
             photo.setString(1, photoId.toString());
