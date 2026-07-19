@@ -7,9 +7,21 @@ description: Receives client-rendered camera tiles and turns them into persisten
 commands:
   tobyscamera:
     description: Reload TobysCamera or show its runtime status.
-    usage: /tobyscamera <reload|status>
+    usage: /tobyscamera <reload|status|detail>
 permissions:
+  tobyscamera.upload:
+    description: Allows a player to capture and upload photos.
+    default: true
+  tobyscamera.admin:
+    description: Grants administrative TobysCamera commands.
+    default: false
+    children:
+      tobyscamera.reload: true
+      tobyscamera.status: true
+      tobyscamera.detail: true
   tobyscamera.reload:
-    default: op
+    default: false
   tobyscamera.status:
-    default: op
+    default: false
+  tobyscamera.detail:
+    default: false

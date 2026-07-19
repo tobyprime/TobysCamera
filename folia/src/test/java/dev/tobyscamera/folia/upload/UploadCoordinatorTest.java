@@ -118,6 +118,20 @@ class UploadCoordinatorTest {
     }
 
     @Test
+    void rejectsCaptureWhenPlayerLacksUploadPermission() {
+        Player player = player();
+        when(player.hasPermission("tobyscamera.upload")).thenReturn(false);
+        List<CameraPacket> sent = new ArrayList<>();
+        CameraFilmService films = mock(CameraFilmService.class);
+        when(films.heldCamera(player)).thenReturn(mock(ItemStack.class));
+        UploadCoordinator coordinator = coordinator(sent, films, (ignored, session, metadata) -> { });
+
+        coordinator.handle(player, new Packets.CaptureIntent());
+
+        assertEquals(Packets.UploadRejected.class, sent.getFirst().getClass());
+    }
+
+    @Test
     void acceptsClientPreviewBeforeCompletingThePhoto() {
         Player player = player();
         List<CameraPacket> sent = new ArrayList<>();
@@ -184,6 +198,7 @@ class UploadCoordinatorTest {
 
     private static Player player() {
         Player player = mock(Player.class);
+        when(player.hasPermission("tobyscamera.upload")).thenReturn(true);
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
         org.bukkit.World world = mock(org.bukkit.World.class);
         when(world.getKey()).thenReturn(new org.bukkit.NamespacedKey("minecraft", "world"));

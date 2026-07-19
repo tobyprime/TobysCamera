@@ -11,6 +11,7 @@ import dev.tobyscamera.folia.map.CameraMapCopyMetadataListener;
 import dev.tobyscamera.folia.delivery.MapDeliveryService;
 import dev.tobyscamera.folia.delivery.MapItemDelivery;
 import dev.tobyscamera.folia.bag.PhotoBagPlacementListener;
+import dev.tobyscamera.folia.bag.PhotoBagFactory;
 import dev.tobyscamera.folia.delivery.PendingDeliveryRepository;
 import dev.tobyscamera.folia.storage.PhotoRepository;
 import dev.tobyscamera.folia.storage.SqlitePhotoRepository;
@@ -112,6 +113,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length != 1) return false;
         if (args[0].equalsIgnoreCase("status")) return status(sender);
+        if (args[0].equalsIgnoreCase("detail")) return detail(sender);
         if (!args[0].equalsIgnoreCase("reload")) return false;
         if (!sender.hasPermission("tobyscamera.reload")) { sender.sendMessage(Component.text("You do not have permission to reload TobysCamera.")); return true; }
         try {
@@ -181,6 +183,16 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         sender.sendMessage(Component.text("Uploading: " + upload.activePhotoCount() + " photos, " + upload.activeTileCount() + " tiles, " + upload.reservedBytes() + "/" + upload.maxReservedBytes() + " bytes"));
         sender.sendMessage(Component.text("This run: " + totals.runPhotos() + " photos, " + totals.runTiles() + " tiles"));
         sender.sendMessage(Component.text("Stored: " + totals.storedPhotos() + " photos, " + totals.storedTiles() + " tiles"));
+        return true;
+    }
+
+    private boolean detail(CommandSender sender) {
+        if (!sender.hasPermission("tobyscamera.detail")) { sender.sendMessage(Component.text("You do not have permission to view TobysCamera photo details.")); return true; }
+        if (!(sender instanceof Player player)) { sender.sendMessage(Component.text("This command must be run by a player holding a photo bag.")); return true; }
+        var item = PhotoBagFactory.isBag(player.getInventory().getItemInMainHand()) ? player.getInventory().getItemInMainHand() : player.getInventory().getItemInOffHand();
+        if (!PhotoBagFactory.isBag(item)) { sender.sendMessage(Component.text("Hold a TobysCamera photo bag in either hand.")); return true; }
+        try { for (var line : PhotoBagFactory.adminDetails(PhotoBagFactory.read(item))) sender.sendMessage(line); }
+        catch (IllegalArgumentException exception) { sender.sendMessage(Component.text("The held photo bag has invalid data.")); }
         return true;
     }
 
