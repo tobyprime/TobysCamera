@@ -41,12 +41,12 @@ public final class PreviewScreen extends Screen {
     private Future<?> previewTask;
     private Button usePhotoButton;
 
-    public PreviewScreen(CapturedFrame frame, Consumer<PhotoPreviewProcessor.Result> usePhoto, Runnable retake) {
+    public PreviewScreen(CapturedFrame frame, int defaultPrintSize, Consumer<PhotoPreviewProcessor.Result> usePhoto, Runnable retake) {
         super(Component.translatable("tobyscamera.preview.title"));
         this.frame = frame;
         this.usePhoto = usePhoto;
         this.retake = retake;
-        this.printSize = frame.gridSize();
+        this.printSize = Math.clamp(defaultPrintSize, 1, frame.gridSize());
     }
 
     @Override
