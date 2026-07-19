@@ -20,7 +20,7 @@ class PacketCodecTest {
                 new Packets.CaptureIntent(),
                 new Packets.UploadGranted(TOKEN, 1_700_000_000_000L, 16_384, 120),
                 new Packets.RateLimited(1_000L),
-                new Packets.UploadBegin(2, 2),
+                new Packets.UploadBegin(2, 2, new PhotoPresentation("晨雾", "山谷日出", false, true)),
                 new Packets.UploadPreviewChunk(TOKEN, 8_192, new byte[8_192]),
                 new Packets.UploadTileChunk(TOKEN, 1, 0, 8_192, new byte[8_192]),
                 new Packets.UploadFinish(TOKEN),
@@ -60,6 +60,28 @@ class PacketCodecTest {
         assertArrayEquals(new byte[] {1, 2}, photo.data());
         photo.data()[1] = 9;
         assertArrayEquals(new byte[] {1, 2}, photo.data());
+    }
+
+    @Test
+    void roundTripsAndNormalizesPhotoPresentationText() {
+        Packets.UploadBegin upload = new Packets.UploadBegin(1, 1,
+                new PhotoPresentation("  晨雾  ", "   ", false, true));
+
+        Packets.UploadBegin decoded = assertInstanceOf(Packets.UploadBegin.class,
+                PacketCodec.decode(PacketCodec.encode(upload)));
+        assertEquals(new PhotoPresentation("晨雾", "", false, true), decoded.presentation());
+    }
+
+    @Test
+    void rejectsPhotoPresentationTextOver512Utf8Bytes() {
+        String oversized = "a".repeat(513);
+
+        assertThrows(ProtocolException.class,
+                () -> PacketCodec.encode(new Packets.UploadBegin(1, 1,
+                        new PhotoPresentation(oversized, "", true, true))));
+        assertThrows(ProtocolException.class,
+                () -> PacketCodec.encode(new Packets.UploadBegin(1, 1,
+                        new PhotoPresentation("", oversized, true, true))));
     }
 
     private static void assertSamePacket(CameraPacket expected, CameraPacket actual) {
