@@ -35,12 +35,11 @@ public final class PreviewScreen extends Screen {
 
     private int printSize;
     private MapTileEncoder.DitheringMode ditheringMode = MapTileEncoder.DEFAULT_DITHERING;
-    private PhotoPreviewProcessor.Result printPhoto;
+    private final PreviewResultGate<PhotoPreviewProcessor.Result> previewResult = new PreviewResultGate<>();
     private int previewImageWidth;
     private int previewImageHeight;
-    private int previewRevision;
-    private boolean previewReady;
     private Future<?> previewTask;
+    private Button usePhotoButton;
 
     public PreviewScreen(CapturedFrame frame, Consumer<PhotoPreviewProcessor.Result> usePhoto, Runnable retake) {
         super(Component.translatable("tobyscamera.preview.title"));
@@ -66,13 +65,14 @@ public final class PreviewScreen extends Screen {
                 .displayOnlyValue()
                 .create(width / 2 - 75, buttonY - 24, 150, 20, Component.translatable("tobyscamera.preview.print_label"), (button, value) -> { printSize = value; requestPreviewRefresh(); }));
         addRenderableWidget(Button.builder(Component.translatable("tobyscamera.preview.retake"), button -> closeForRetake()).bounds(width / 2 - 155, buttonY, 150, 20).build());
-        addRenderableWidget(Button.builder(Component.translatable("tobyscamera.preview.use_photo"), button -> closeForUse()).bounds(width / 2 + 5, buttonY, 150, 20).build());
+        usePhotoButton = addRenderableWidget(Button.builder(Component.translatable("tobyscamera.preview.use_photo"), button -> closeForUse()).bounds(width / 2 + 5, buttonY, 150, 20).build());
+        usePhotoButton.active = previewResult.ready();
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderTransparentBackground(graphics);
-        if (!previewReady) {
+        if (!previewResult.ready()) {
             graphics.drawCenteredString(font, Component.translatable("tobyscamera.preview.processing"), width / 2, height / 2, 0xFFFFFFFF);
             super.render(graphics, mouseX, mouseY, partialTick);
             return;
@@ -105,16 +105,22 @@ public final class PreviewScreen extends Screen {
     @Override
     public void removed() { cancelPreviewTask(); releaseTexture(); }
 
-    private void closeForUse() { releaseTexture(); if (printPhoto != null) usePhoto.accept(printPhoto); }
+    private void closeForUse() {
+        if (!previewResult.ready()) return;
+        PhotoPreviewProcessor.Result photo = previewResult.result();
+        if (photo == null) return;
+        releaseTexture();
+        usePhoto.accept(photo);
+    }
     private void closeForRetake() { releaseTexture(); retake.run(); }
     private void releaseTexture() { if (!released && textureId != null) { minecraft.getTextureManager().release(textureId); released = true; } }
 
     private void requestPreviewRefresh() {
         cancelPreviewTask();
-        int revision = ++previewRevision;
+        int revision = previewResult.request();
         int requestedPrintSize = printSize;
         MapTileEncoder.DitheringMode requestedDithering = ditheringMode;
-        previewReady = false;
+        if (usePhotoButton != null) usePhotoButton.active = false;
         previewTask = PREVIEW_PROCESSOR.submit(() -> {
             try {
             PhotoPreviewProcessor.Result result = previewProcessor.process(frame, requestedPrintSize, requestedDithering);
@@ -126,12 +132,11 @@ public final class PreviewScreen extends Screen {
     private void cancelPreviewTask() { if (previewTask != null) { previewTask.cancel(true); previewTask = null; } }
 
     private void publishPreview(int revision, PhotoPreviewProcessor.Result photo, NativeImage image) {
-        if (released || minecraft.screen != this || revision != previewRevision) { image.close(); return; }
-        printPhoto = photo;
+        if (released || minecraft.screen != this || !previewResult.publish(revision, photo)) { image.close(); return; }
         previewImageWidth = image.getWidth();
         previewImageHeight = image.getHeight();
         minecraft.getTextureManager().register(textureId, new DynamicTexture(() -> "tobyscamera-preview", image));
-        previewReady = true;
+        if (usePhotoButton != null) usePhotoButton.active = true;
     }
 
     static PrintLayout printLayout(CapturedFrame frame, int printSize) {

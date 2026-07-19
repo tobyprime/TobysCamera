@@ -21,17 +21,22 @@ class PhotoPreviewProcessorTest {
     }
 
     @Test
-    void producesTheBagPreviewByRenderingTheWholePrintCanvasAtOneByOne() {
-        BufferedImage image = new BufferedImage(256, 128, BufferedImage.TYPE_INT_ARGB);
+    void producesTheSameUndistortedThreeByTwoBagPreviewAtEveryPrintSize() {
+        BufferedImage image = new BufferedImage(300, 200, BufferedImage.TYPE_INT_ARGB);
         for (int y = 0; y < image.getHeight(); y++) for (int x = 0; x < image.getWidth(); x++) {
-            int shade = (x * 255 / 255 + y) / 2;
+            int shade = (x * 255 / (image.getWidth() - 1) + y * 255 / (image.getHeight() - 1)) / 2;
             image.setRGB(x, y, 0xff000000 | shade << 16 | shade << 8 | shade);
         }
-        CapturedFrame frame = new CapturedFrame(image, 2, new CameraComposition(new AspectRatio(2, 1), 0.0f));
+        CapturedFrame frame = new CapturedFrame(image, 3, new CameraComposition(new AspectRatio(3, 2), 0.0f));
         MapTileEncoder encoder = new MapTileEncoder();
+        PhotoPreviewProcessor processor = new PhotoPreviewProcessor();
 
-        PhotoPreviewProcessor.Result result = new PhotoPreviewProcessor().process(frame, 2, MapTileEncoder.DitheringMode.FLOYD_STEINBERG);
+        PhotoPreviewProcessor.Result twoByTwo = processor.process(frame, 2, MapTileEncoder.DitheringMode.FLOYD_STEINBERG);
+        PhotoPreviewProcessor.Result threeByThree = processor.process(frame, 3, MapTileEncoder.DitheringMode.FLOYD_STEINBERG);
+        var oneByOneCanvas = new PrintCanvasProcessor().process(image, PrintLayout.forMaximumSide(1, frame.composition().aspectRatio()));
+        byte[] expected = encoder.bagPreview(oneByOneCanvas, MapTileEncoder.DitheringMode.FLOYD_STEINBERG);
 
-        assertArrayEquals(encoder.bagPreview(image, MapTileEncoder.DitheringMode.FLOYD_STEINBERG), result.bagPreview());
+        assertArrayEquals(expected, twoByTwo.bagPreview());
+        assertArrayEquals(expected, threeByThree.bagPreview());
     }
 }

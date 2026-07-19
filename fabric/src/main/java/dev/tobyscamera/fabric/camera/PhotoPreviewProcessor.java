@@ -7,9 +7,11 @@ public final class PhotoPreviewProcessor {
     private final MapTileEncoder encoder = new MapTileEncoder();
 
     public Result process(CapturedFrame frame, int printSize, MapTileEncoder.DitheringMode dithering) {
-        BufferedImage canvas = new PrintCanvasProcessor().process(frame.image(), PrintLayout.forMaximumSide(printSize, frame.composition().aspectRatio()));
+        PrintCanvasProcessor canvasProcessor = new PrintCanvasProcessor();
+        BufferedImage canvas = canvasProcessor.process(frame.image(), PrintLayout.forMaximumSide(printSize, frame.composition().aspectRatio()));
         MapTileEncoder.EncodedPhoto photo = encoder.encode(canvas, dithering);
-        return new Result(photo, encoder.palettePreview(photo), encoder.bagPreview(canvas, dithering));
+        BufferedImage bagCanvas = canvasProcessor.process(frame.image(), PrintLayout.forMaximumSide(1, frame.composition().aspectRatio()));
+        return new Result(photo, encoder.palettePreview(photo), encoder.bagPreview(bagCanvas, dithering));
     }
 
     public record Result(MapTileEncoder.EncodedPhoto photo, BufferedImage image, byte[] bagPreview) { }
