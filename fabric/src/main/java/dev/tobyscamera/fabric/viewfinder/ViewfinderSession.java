@@ -14,6 +14,8 @@ public final class ViewfinderSession {
     private CameraComposition composition = CameraComposition.DEFAULT;
     private int gridSize;
     private int printSize = 1;
+    private boolean publicAddress = true;
+    private boolean publicPhotographer = true;
     private Consumer<ViewfinderSettings> settingsListener = ignored -> { };
 
     public boolean open() {
@@ -66,10 +68,11 @@ public final class ViewfinderSession {
         printSize = Math.clamp(value, 1, Math.max(1, cameraMaximum));
         settingsChanged();
     }
-    public ViewfinderSettings settings() { return new ViewfinderSettings(grid, targetZoom, composition, printSize); }
+    public ViewfinderSettings settings() { return new ViewfinderSettings(grid, targetZoom, composition, printSize, publicAddress, publicPhotographer); }
     public void applySettings(ViewfinderSettings settings) {
         settings = Objects.requireNonNull(settings, "settings");
         grid = settings.grid(); targetZoom = settings.zoom(); composition = settings.composition(); printSize = settings.printSize();
+        publicAddress = settings.publicAddress(); publicPhotographer = settings.publicPhotographer();
     }
     public void setSettingsListener(Consumer<ViewfinderSettings> listener) { settingsListener = Objects.requireNonNull(listener, "listener"); }
     private void settingsChanged() { settingsListener.accept(settings()); }
@@ -79,6 +82,10 @@ public final class ViewfinderSession {
     public CameraComposition composition() { return composition; }
     public int gridSize() { return gridSize; }
     public int printSize() { return printSize; }
+    public boolean publicAddress() { return publicAddress; }
+    public boolean publicPhotographer() { return publicPhotographer; }
+    public void setPublicAddress(boolean value) { publicAddress = value; settingsChanged(); }
+    public void setPublicPhotographer(boolean value) { publicPhotographer = value; settingsChanged(); }
     public boolean captureHidden() { return state == ViewfinderState.CAPTURING; }
     public boolean zoomActive() { return state == ViewfinderState.VIEWFINDER || state == ViewfinderState.CAPTURING; }
 }

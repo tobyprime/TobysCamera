@@ -123,7 +123,8 @@ public final class UploadCoordinator {
             chunkLimiters.put(token, new SlidingWindowRateLimiter(new RateLimit(settings.uploadChunksPerSecond(), Integer.MAX_VALUE)));
             sessionBytes.put(token, uploadBytes);
             activeUploadBytes += uploadBytes;
-            uploadMetadata.put(token, capturedMetadata.remove(player.getUniqueId()));
+            PhotoMetadata captured = capturedMetadata.remove(player.getUniqueId());
+            uploadMetadata.put(token, (captured == null ? PhotoMetadata.capture(player) : captured).withPresentation(begin.presentation()));
             sender.send(player, new Packets.UploadGranted(token, grant.expiresAt().toEpochMilli(), UploadSession.TILE_BYTES, settings.uploadChunksPerSecond()));
         } catch (UploadFailure exception) {
             clear(token);

@@ -5,12 +5,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.tobyscamera.common.protocol.CameraPacket;
 import dev.tobyscamera.common.protocol.Packets;
+import dev.tobyscamera.common.protocol.PhotoPresentation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class PhotoUploadControllerTest {
+    @Test
+    void sendsPresentationWithUploadBegin() {
+        List<CameraPacket> sent = new ArrayList<>();
+        PhotoUploadController controller = new PhotoUploadController(sent::add);
+        PhotoPresentation presentation = new PhotoPresentation("晨雾", "山谷日出", false, true);
+
+        controller.confirm(new MapTileEncoder.EncodedPhoto(1, 1, List.of(new byte[16_384])), new byte[16_384], presentation);
+
+        assertEquals(new Packets.UploadBegin(1, 1, presentation), sent.getFirst());
+    }
+
     @Test
     void pacesChunksSoNoStrictOneSecondWindowExceedsTheGrantedRate() {
         List<CameraPacket> sent = new ArrayList<>();

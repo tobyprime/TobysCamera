@@ -6,9 +6,10 @@ import dev.tobyscamera.fabric.camera.MapTileEncoder;
 import dev.tobyscamera.fabric.camera.NativeImageConverter;
 import dev.tobyscamera.fabric.camera.PrintLayout;
 import dev.tobyscamera.fabric.camera.PhotoPreviewProcessor;
+import dev.tobyscamera.common.protocol.PhotoPresentation;
 import java.util.UUID;
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -16,6 +17,7 @@ import java.util.concurrent.CancellationException;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -27,8 +29,10 @@ public final class PreviewScreen extends Screen {
         Thread thread = new Thread(runnable, "TobysCamera photo preview processor"); thread.setDaemon(true); return thread;
     });
     private final CapturedFrame frame;
-    private final Consumer<PhotoPreviewProcessor.Result> usePhoto;
+    private final BiConsumer<PhotoPreviewProcessor.Result, PhotoPresentation> usePhoto;
     private final Runnable retake;
+    private final java.util.function.Consumer<Boolean> publicAddressChanged;
+    private final java.util.function.Consumer<Boolean> publicPhotographerChanged;
     private final PhotoPreviewProcessor previewProcessor = new PhotoPreviewProcessor();
     private Identifier textureId;
     private boolean released;
@@ -40,12 +44,23 @@ public final class PreviewScreen extends Screen {
     private int previewImageHeight;
     private Future<?> previewTask;
     private Button usePhotoButton;
+    private String photoName = "";
+    private String description = "";
+    private boolean publicAddress;
+    private boolean publicPhotographer;
 
-    public PreviewScreen(CapturedFrame frame, int defaultPrintSize, Consumer<PhotoPreviewProcessor.Result> usePhoto, Runnable retake) {
+    public PreviewScreen(CapturedFrame frame, int defaultPrintSize, boolean publicAddress, boolean publicPhotographer,
+            BiConsumer<PhotoPreviewProcessor.Result, PhotoPresentation> usePhoto, Runnable retake,
+            java.util.function.Consumer<Boolean> publicAddressChanged,
+            java.util.function.Consumer<Boolean> publicPhotographerChanged) {
         super(Component.translatable("tobyscamera.preview.title"));
         this.frame = frame;
         this.usePhoto = usePhoto;
         this.retake = retake;
+        this.publicAddress = publicAddress;
+        this.publicPhotographer = publicPhotographer;
+        this.publicAddressChanged = publicAddressChanged;
+        this.publicPhotographerChanged = publicPhotographerChanged;
         this.printSize = Math.clamp(defaultPrintSize, 1, frame.gridSize());
     }
 
@@ -64,6 +79,28 @@ public final class PreviewScreen extends Screen {
                 .withValues(sizes)
                 .displayOnlyValue()
                 .create(width / 2 - 75, buttonY - 24, 150, 20, Component.translatable("tobyscamera.preview.print_label"), (button, value) -> { printSize = value; requestPreviewRefresh(); }));
+        EditBox nameInput = addRenderableWidget(new EditBox(font, width / 2 - 100, buttonY - 120, 200, 20,
+                Component.translatable("tobyscamera.preview.photo_name")));
+        nameInput.setHint(Component.translatable("tobyscamera.preview.photo_name"));
+        nameInput.setMaxLength(128);
+        nameInput.setValue(photoName);
+        nameInput.setResponder(value -> photoName = value);
+        EditBox descriptionInput = addRenderableWidget(new EditBox(font, width / 2 - 100, buttonY - 96, 200, 20,
+                Component.translatable("tobyscamera.preview.description")));
+        descriptionInput.setHint(Component.translatable("tobyscamera.preview.description"));
+        descriptionInput.setMaxLength(128);
+        descriptionInput.setValue(description);
+        descriptionInput.setResponder(value -> description = value);
+        addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.preview.public_address_value", value ? Component.translatable("options.on") : Component.translatable("options.off")), publicAddress)
+                .withValues(List.of(true, false))
+                .create(width / 2 - 100, buttonY - 72, 99, 20, Component.empty(), (button, value) -> {
+                    publicAddress = value; publicAddressChanged.accept(value);
+                }));
+        addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.preview.public_photographer_value", value ? Component.translatable("options.on") : Component.translatable("options.off")), publicPhotographer)
+                .withValues(List.of(true, false))
+                .create(width / 2 + 1, buttonY - 72, 99, 20, Component.empty(), (button, value) -> {
+                    publicPhotographer = value; publicPhotographerChanged.accept(value);
+                }));
         addRenderableWidget(Button.builder(Component.translatable("tobyscamera.preview.retake"), button -> closeForRetake()).bounds(width / 2 - 155, buttonY, 150, 20).build());
         usePhotoButton = addRenderableWidget(Button.builder(Component.translatable("tobyscamera.preview.use_photo"), button -> closeForUse()).bounds(width / 2 + 5, buttonY, 150, 20).build());
         usePhotoButton.active = previewResult.ready();
@@ -77,7 +114,7 @@ public final class PreviewScreen extends Screen {
             super.render(graphics, mouseX, mouseY, partialTick);
             return;
         }
-        TextureBlit blit = textureBlit(20, 20, previewImageWidth, previewImageHeight, width - 40, height - 104);
+        TextureBlit blit = textureBlit(20, 20, previewImageWidth, previewImageHeight, width - 40, height - 176);
         graphics.blit(
             RenderPipelines.GUI_TEXTURED,
             textureId,
@@ -110,7 +147,7 @@ public final class PreviewScreen extends Screen {
         PhotoPreviewProcessor.Result photo = previewResult.result();
         if (photo == null) return;
         releaseTexture();
-        usePhoto.accept(photo);
+        usePhoto.accept(photo, new PhotoPresentation(photoName, description, publicAddress, publicPhotographer));
     }
     private void closeForRetake() { releaseTexture(); retake.run(); }
     private void releaseTexture() { if (!released && textureId != null) { minecraft.getTextureManager().release(textureId); released = true; } }

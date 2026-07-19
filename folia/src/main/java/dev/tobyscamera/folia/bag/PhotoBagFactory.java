@@ -2,6 +2,7 @@ package dev.tobyscamera.folia.bag;
 
 import dev.tobyscamera.folia.item.RootCustomData;
 import dev.tobyscamera.folia.upload.PhotoMetadata;
+import dev.tobyscamera.common.protocol.PhotoPresentation;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +32,10 @@ public final class PhotoBagFactory {
     private static final NamespacedKey CAPTURE_Y = key("capture_y");
     private static final NamespacedKey CAPTURE_Z = key("capture_z");
     private static final NamespacedKey CAPTURED_AT = key("captured_at");
+    private static final NamespacedKey PHOTO_NAME = key("photo_name");
+    private static final NamespacedKey DESCRIPTION = key("description");
+    private static final NamespacedKey PUBLIC_ADDRESS = key("public_address");
+    private static final NamespacedKey PUBLIC_PHOTOGRAPHER = key("public_photographer");
 
     private PhotoBagFactory() { }
 
@@ -48,7 +53,7 @@ public final class PhotoBagFactory {
         ItemStack item = new ItemStack(Material.FILLED_MAP);
         MapMeta meta = (MapMeta) item.getItemMeta();
         meta.setMapId(data.previewMapId());
-        meta.displayName(displayName(data.kind()));
+        meta.displayName(displayName(data));
         meta.lore(lore(data));
         item.setItemMeta(meta);
         RootCustomData.update(item, tag -> {
@@ -67,14 +72,20 @@ public final class PhotoBagFactory {
         return Component.text(typeName(kind) + "\u888b");
     }
 
+    static Component displayName(PhotoBagData data) {
+        if (data.metadata() != null && !data.metadata().presentation().name().isEmpty()) return Component.text(data.metadata().presentation().name());
+        return displayName(data.kind());
+    }
+
     public static List<Component> lore(PhotoBagData data) {
         String type = typeName(data.kind());
         java.util.ArrayList<Component> lore = new java.util.ArrayList<>();
         lore.add(Component.text("\u5c3a\u5bf8: " + data.gridWidth() + "\u00d7" + data.gridHeight(), NamedTextColor.GRAY));
         PhotoMetadata metadata = data.metadata();
         if (metadata != null) {
-            lore.add(Component.text("\u62cd\u6444\u8005: " + metadata.photographer(), NamedTextColor.GRAY));
-            lore.add(Component.text("\u62cd\u6444\u5750\u6807: " + metadata.coordinates(), NamedTextColor.GRAY));
+            if (!metadata.presentation().description().isEmpty()) lore.add(Component.text(metadata.presentation().description(), NamedTextColor.GRAY));
+            if (metadata.presentation().publicPhotographer()) lore.add(Component.text("\u62cd\u6444\u8005: " + metadata.photographer(), NamedTextColor.GRAY));
+            if (metadata.presentation().publicAddress()) lore.add(Component.text("\u62cd\u6444\u5750\u6807: " + metadata.coordinates(), NamedTextColor.GRAY));
             lore.add(Component.text("\u62cd\u6444\u65f6\u95f4: " + metadata.capturedTime(), NamedTextColor.GRAY));
         }
         lore.add(Component.empty());
@@ -160,6 +171,11 @@ public final class PhotoBagFactory {
         tag.putInt(CAPTURE_Y.toString(), metadata.y());
         tag.putInt(CAPTURE_Z.toString(), metadata.z());
         tag.putLong(CAPTURED_AT.toString(), metadata.capturedAt().toEpochMilli());
+        PhotoPresentation presentation = metadata.presentation();
+        if (!presentation.name().isEmpty()) tag.putString(PHOTO_NAME.toString(), presentation.name());
+        if (!presentation.description().isEmpty()) tag.putString(DESCRIPTION.toString(), presentation.description());
+        tag.putBoolean(PUBLIC_ADDRESS.toString(), presentation.publicAddress());
+        tag.putBoolean(PUBLIC_PHOTOGRAPHER.toString(), presentation.publicPhotographer());
     }
 
     private static PhotoMetadata readMetadata(ItemStack item) {
@@ -169,6 +185,8 @@ public final class PhotoBagFactory {
                 RootCustomData.intOr(item, CAPTURE_X, 0),
                 RootCustomData.intOr(item, CAPTURE_Y, 0),
                 RootCustomData.intOr(item, CAPTURE_Z, 0),
-                Instant.ofEpochMilli(RootCustomData.longOr(item, CAPTURED_AT, 0L)));
+                Instant.ofEpochMilli(RootCustomData.longOr(item, CAPTURED_AT, 0L)),
+                new PhotoPresentation(RootCustomData.stringOr(item, PHOTO_NAME, ""), RootCustomData.stringOr(item, DESCRIPTION, ""),
+                        RootCustomData.booleanOr(item, PUBLIC_ADDRESS, true), RootCustomData.booleanOr(item, PUBLIC_PHOTOGRAPHER, true)));
     }
 }

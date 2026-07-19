@@ -187,9 +187,9 @@ public final class TobysCameraClient implements ClientModInitializer {
 
     private static void openPreview(net.minecraft.client.Minecraft client, CapturedFrame frame) {
         if (!VIEWFINDER.captureComplete()) return;
-        client.setScreen(new PreviewScreen(frame, VIEWFINDER.printSize(),
-                photo -> { if (VIEWFINDER.beginUpload() && !UPLOADS.confirm(photo.photo(), photo.bagPreview())) VIEWFINDER.retake(); client.setScreen(null); },
-                () -> { VIEWFINDER.retake(); client.setScreen(null); }));
+        client.setScreen(new PreviewScreen(frame, VIEWFINDER.printSize(), VIEWFINDER.publicAddress(), VIEWFINDER.publicPhotographer(),
+                (photo, presentation) -> { if (VIEWFINDER.beginUpload() && !UPLOADS.confirm(photo.photo(), photo.bagPreview(), presentation)) VIEWFINDER.retake(); client.setScreen(null); },
+                () -> { VIEWFINDER.retake(); client.setScreen(null); }, VIEWFINDER::setPublicAddress, VIEWFINDER::setPublicPhotographer));
     }
 
     private static CapturedFrame toFrame(com.mojang.blaze3d.platform.NativeImage nativeImage, int gridSize) {

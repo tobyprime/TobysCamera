@@ -23,6 +23,7 @@ public final class Packets {
 
     /** Requests an upload session. It deliberately has no token: the server issues one after charging film. */
     public record UploadBegin(int gridWidth, int gridHeight, PhotoPresentation presentation) implements CameraPacket {
+        public UploadBegin(int gridWidth, int gridHeight) { this(gridWidth, gridHeight, PhotoPresentation.DEFAULT); }
         @Override public PacketType type() { return PacketType.UPLOAD_BEGIN; }
     }
 

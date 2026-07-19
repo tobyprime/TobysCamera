@@ -123,6 +123,11 @@ public final class MapPhotoService {
                 tag.putInt("tobyscamera:capture_y", metadata.y());
                 tag.putInt("tobyscamera:capture_z", metadata.z());
                 tag.putLong("tobyscamera:captured_at", metadata.capturedAt().toEpochMilli());
+                var photoPresentation = metadata.presentation();
+                if (!photoPresentation.name().isEmpty()) tag.putString("tobyscamera:photo_name", photoPresentation.name());
+                if (!photoPresentation.description().isEmpty()) tag.putString("tobyscamera:description", photoPresentation.description());
+                tag.putBoolean("tobyscamera:public_address", photoPresentation.publicAddress());
+                tag.putBoolean("tobyscamera:public_photographer", photoPresentation.publicPhotographer());
             }
         });
         return item;

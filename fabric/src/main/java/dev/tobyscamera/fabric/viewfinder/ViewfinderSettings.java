@@ -4,9 +4,14 @@ import dev.tobyscamera.fabric.camera.AspectRatio;
 import dev.tobyscamera.fabric.camera.CameraComposition;
 
 /** Client-local settings that should survive a restart. */
-public record ViewfinderSettings(CompositionGrid grid, float zoom, CameraComposition composition, int printSize) {
+public record ViewfinderSettings(CompositionGrid grid, float zoom, CameraComposition composition, int printSize,
+        boolean publicAddress, boolean publicPhotographer) {
     public static final ViewfinderSettings DEFAULT = new ViewfinderSettings(
-            CompositionGrid.NONE, 1.0f, new CameraComposition(AspectRatio.of(1, 1), 0.0f), 1);
+            CompositionGrid.NONE, 1.0f, new CameraComposition(AspectRatio.of(1, 1), 0.0f), 1, true, true);
+
+    public ViewfinderSettings(CompositionGrid grid, float zoom, CameraComposition composition, int printSize) {
+        this(grid, zoom, composition, printSize, true, true);
+    }
 
     public ViewfinderSettings {
         if (grid == null || composition == null) throw new IllegalArgumentException("viewfinder settings are required");

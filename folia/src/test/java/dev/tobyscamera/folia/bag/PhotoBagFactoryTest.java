@@ -3,6 +3,7 @@ package dev.tobyscamera.folia.bag;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import dev.tobyscamera.folia.upload.PhotoMetadata;
+import dev.tobyscamera.common.protocol.PhotoPresentation;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -10,6 +11,17 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.junit.jupiter.api.Test;
 
 class PhotoBagFactoryTest {
+    @Test
+    void preservesCustomPresentationAndHidesPrivateLore() {
+        PhotoMetadata metadata = new PhotoMetadata("Toby", "world", 1, 64, -2, Instant.parse("2026-07-17T00:00:00Z"),
+                new PhotoPresentation("旅行回忆", "第一天", false, true));
+        PhotoBagData data = new PhotoBagData(UUID.randomUUID(), PhotoBagKind.PHOTO, 42, 3, 2, metadata);
+        var text = PlainTextComponentSerializer.plainText();
+
+        assertEquals("旅行回忆", text.serialize(PhotoBagFactory.displayName(data)));
+        assertEquals(List.of("尺寸: 3×2", "第一天", "拍摄者: Toby", "拍摄时间: " + metadata.capturedTime(), "", "右键长按: 取出地图", "右键空展示框: 展开相片"),
+                PhotoBagFactory.lore(data).stream().map(text::serialize).toList());
+    }
     @Test
     void buildsPhotoBagDisplayName() {
         var text = PlainTextComponentSerializer.plainText();

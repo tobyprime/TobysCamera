@@ -3,6 +3,7 @@ package dev.tobyscamera.fabric.camera;
 import dev.tobyscamera.common.protocol.CameraPacket;
 import com.mojang.logging.LogUtils;
 import dev.tobyscamera.common.protocol.Packets;
+import dev.tobyscamera.common.protocol.PhotoPresentation;
 import dev.tobyscamera.fabric.net.CameraPayload;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -36,14 +37,18 @@ public final class PhotoUploadController {
     }
 
     public boolean confirm(MapTileEncoder.EncodedPhoto photo, byte[] preview) {
+        return confirm(photo, preview, PhotoPresentation.DEFAULT);
+    }
+
+    public boolean confirm(MapTileEncoder.EncodedPhoto photo, byte[] preview, PhotoPresentation presentation) {
         if (pendingPhoto != null || photo == null || photo.gridWidth() < 1 || photo.gridHeight() < 1 || photo.tiles().size() != photo.gridWidth() * photo.gridHeight()) return false;
-        if (preview == null || preview.length != 16_384) return false;
+        if (preview == null || preview.length != 16_384 || presentation == null) return false;
         pendingPhoto = photo;
         previewPixels = preview.clone();
         totalChunks = photo.tiles().size() * 2 + 2;
         completedChunks = previewOffset = tile = offset = 0;
         finishSent = false;
-        sender.accept(new Packets.UploadBegin(photo.gridWidth(), photo.gridHeight()));
+        sender.accept(new Packets.UploadBegin(photo.gridWidth(), photo.gridHeight(), presentation));
         return true;
     }
 

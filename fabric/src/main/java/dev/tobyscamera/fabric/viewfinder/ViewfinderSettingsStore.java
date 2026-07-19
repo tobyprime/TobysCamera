@@ -25,7 +25,9 @@ public final class ViewfinderSettingsStore {
                     Float.parseFloat(properties.getProperty("zoom")),
                     new CameraComposition(AspectRatio.of(Integer.parseInt(properties.getProperty("ratio_width")),
                             Integer.parseInt(properties.getProperty("ratio_height"))), Float.parseFloat(properties.getProperty("roll"))),
-                    Integer.parseInt(properties.getProperty("print_size", "1")));
+                    Integer.parseInt(properties.getProperty("print_size", "1")),
+                    Boolean.parseBoolean(properties.getProperty("public_address", "true")),
+                    Boolean.parseBoolean(properties.getProperty("public_photographer", "true")));
         } catch (IOException | IllegalArgumentException | NullPointerException exception) {
             return ViewfinderSettings.DEFAULT;
         }
@@ -39,6 +41,8 @@ public final class ViewfinderSettingsStore {
         properties.setProperty("ratio_height", Integer.toString(settings.composition().aspectRatio().height()));
         properties.setProperty("roll", Float.toString(settings.composition().rollDegrees()));
         properties.setProperty("print_size", Integer.toString(settings.printSize()));
+        properties.setProperty("public_address", Boolean.toString(settings.publicAddress()));
+        properties.setProperty("public_photographer", Boolean.toString(settings.publicPhotographer()));
         Path parent = file.getParent();
         if (parent != null) Files.createDirectories(parent);
         try (OutputStream output = Files.newOutputStream(file)) { properties.store(output, "TobysCamera client settings"); }
