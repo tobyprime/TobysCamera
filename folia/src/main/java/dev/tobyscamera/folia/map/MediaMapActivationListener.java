@@ -54,6 +54,8 @@ public final class MediaMapActivationListener implements Listener {
     /** Schedules a hand recheck after a server-side inventory mutation. */
     public void refreshHeldMaps(Player player) { reconcileHandsNextTick(player); }
 
+    public VirtualStillMapService.Status status() { return stills.status(); }
+
     /** Seeds frame sources for chunks the client had already received before this listener was enabled. */
     public void refreshVisibleFrames(Player player) {
         scheduler.runEntityDelayed(player, 1L, () -> {

@@ -21,6 +21,20 @@ import org.junit.jupiter.api.Test;
 
 class UploadCoordinatorTest {
     @Test
+    void reportsActiveUploadsTheirDeclaredTilesAndReservedBytes() {
+        Player player = player();
+        List<CameraPacket> sent = new ArrayList<>();
+        CameraFilmService films = mock(CameraFilmService.class);
+        ItemStack camera = mock(ItemStack.class);
+        when(films.heldCamera(player)).thenReturn(camera);
+        when(films.maximumForFilm(camera, 4)).thenReturn(2);
+        when(films.consume(camera, 4)).thenReturn(true);
+        UploadCoordinator coordinator = coordinator(sent, films, (ignored, session, metadata) -> { });
+        coordinator.handle(player, new Packets.UploadBegin(2, 2));
+        assertEquals(new UploadCoordinator.Status(1, 4, 81_920, 16_777_216), coordinator.status());
+    }
+
+    @Test
     void expiresIncompleteUploadSessionsWithoutWaitingForAnotherPacket() {
         Player player = player();
         List<CameraPacket> sent = new ArrayList<>();

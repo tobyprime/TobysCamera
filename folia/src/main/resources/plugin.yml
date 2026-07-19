@@ -6,9 +6,10 @@ folia-supported: true
 description: Receives client-rendered camera tiles and turns them into persistent maps.
 commands:
   tobyscamera:
-    description: Reload TobysCamera configuration.
-    usage: /tobyscamera reload
-    permission: tobyscamera.reload
+    description: Reload TobysCamera or show its runtime status.
+    usage: /tobyscamera <reload|status>
 permissions:
   tobyscamera.reload:
+    default: op
+  tobyscamera.status:
     default: op

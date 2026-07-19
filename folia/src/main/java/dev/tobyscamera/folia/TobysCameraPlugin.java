@@ -15,6 +15,7 @@ import dev.tobyscamera.folia.delivery.PendingDeliveryRepository;
 import dev.tobyscamera.folia.storage.PhotoRepository;
 import dev.tobyscamera.folia.storage.SqlitePhotoRepository;
 import dev.tobyscamera.folia.upload.UploadCoordinator;
+import dev.tobyscamera.folia.status.PluginRuntimeStatus;
 import dev.tobyscamera.folia.map.MediaMapActivationListener;
 import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import dev.tobyscamera.folia.scheduler.ServerTaskSchedulers;
@@ -45,6 +46,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     private CameraFilmInventoryListener filmListener;
     private PhotoBagPlacementListener bagPlacement;
     private MediaMapActivationListener mediaActivation;
+    private PluginRuntimeStatus runtimeStatus;
 
     @Override
     public void onEnable() {
@@ -52,6 +54,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         scheduler = ServerTaskSchedulers.create(this);
         try {
             repository = new SqlitePhotoRepository(getDataFolder().toPath());
+            runtimeStatus = new PluginRuntimeStatus(repository.stats());
         } catch (IOException exception) {
             throw new IllegalStateException("Could not initialize camera storage", exception);
         }
@@ -101,7 +104,9 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length != 1 || !args[0].equalsIgnoreCase("reload")) return false;
+        if (args.length != 1) return false;
+        if (args[0].equalsIgnoreCase("status")) return status(sender);
+        if (!args[0].equalsIgnoreCase("reload")) return false;
         if (!sender.hasPermission("tobyscamera.reload")) { sender.sendMessage(Component.text("You do not have permission to reload TobysCamera.")); return true; }
         try {
             reloadConfig();
@@ -135,6 +140,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
                 scheduler.runAsync(() -> {
                     try {
                         photos.persist(record, session);
+                        runtimeStatus.recordPersisted(record.mapIds().size());
                         scheduler.runGlobal(() -> {
                             var bag = photos.bag(world, record, session, metadata);
                             scheduler.runEntity(player, () -> {
@@ -153,6 +159,17 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
                 getLogger().warning("Could not create photo map: " + exception.getMessage());
             }
         });
+    }
+
+    private boolean status(CommandSender sender) {
+        if (!sender.hasPermission("tobyscamera.status")) { sender.sendMessage(Component.text("You do not have permission to view TobysCamera status.")); return true; }
+        var render = mediaActivation.status(); var upload = coordinator.status(); var totals = runtimeStatus.totals();
+        sender.sendMessage(Component.text("TobysCamera status"));
+        sender.sendMessage(Component.text("Rendering: " + render.activePhotoCount() + " photos, " + render.activeMapCount() + " maps"));
+        sender.sendMessage(Component.text("Uploading: " + upload.activePhotoCount() + " photos, " + upload.activeTileCount() + " tiles, " + upload.reservedBytes() + "/" + upload.maxReservedBytes() + " bytes"));
+        sender.sendMessage(Component.text("This run: " + totals.runPhotos() + " photos, " + totals.runTiles() + " tiles"));
+        sender.sendMessage(Component.text("Stored: " + totals.storedPhotos() + " photos, " + totals.storedTiles() + " tiles"));
+        return true;
     }
 
     @EventHandler

@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +14,20 @@ import org.bukkit.entity.Player;
 import org.junit.jupiter.api.Test;
 
 class VirtualStillMapServiceTest {
+    @Test
+    void reportsDistinctPhotosAndActiveMaps() {
+        List<Runnable> async = new ArrayList<>();
+        List<Runnable> sync = new ArrayList<>();
+        VirtualStillMapService service = new VirtualStillMapService(async::add, sync::add, ignored -> { }, mock(VirtualMapPacketSender.class));
+        Player player = mock(Player.class);
+        UUID photoId = UUID.randomUUID();
+        service.attach("a", player, new MediaMapDescriptor.PhotoTile(10, photoId, new dev.tobyscamera.folia.storage.TileCoordinate(0, 0)), () -> new byte[16_384]);
+        service.attach("b", player, new MediaMapDescriptor.PhotoTile(11, photoId, new dev.tobyscamera.folia.storage.TileCoordinate(1, 0)), () -> new byte[16_384]);
+        assertEquals(new VirtualStillMapService.Status(1, 2), service.status());
+        service.detach("a");
+        assertEquals(new VirtualStillMapService.Status(1, 1), service.status());
+    }
+
     @Test
     void sendsOneFullMapToTheSamePlayerWhenTwoSourcesShareATile() {
         List<Runnable> async = new ArrayList<>();

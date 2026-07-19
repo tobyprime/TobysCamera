@@ -53,6 +53,11 @@ public final class UploadCoordinator {
         }
     }
 
+    public synchronized Status status() {
+        int tiles = sessions.values().stream().mapToInt(session -> session.width() * session.height()).sum();
+        return new Status(sessions.size(), tiles, activeUploadBytes, settings.uploadMaxActiveBytes());
+    }
+
     private void capture(Player player) {
         if (films.heldCamera(player) == null) {
             sender.send(player, new Packets.UploadRejected("A tagged camera must be held"));
@@ -210,4 +215,6 @@ public final class UploadCoordinator {
     public interface PluginPayloadGatewaySender {
         void send(Player player, CameraPacket packet);
     }
+
+    public record Status(int activePhotoCount, int activeTileCount, long reservedBytes, long maxReservedBytes) { }
 }
