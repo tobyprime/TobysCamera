@@ -32,10 +32,14 @@ class MediaMapActivationListenerTest {
         Player player = mock(Player.class);
         World world = mock(World.class);
         Chunk chunk = mock(Chunk.class);
+        org.bukkit.Location location = mock(org.bukkit.Location.class);
         org.mockito.ArgumentCaptor<Runnable> delayed = org.mockito.ArgumentCaptor.forClass(Runnable.class);
         org.mockito.Mockito.when(player.getSentChunks()).thenReturn(Set.of(chunk));
         org.mockito.Mockito.when(player.getUniqueId()).thenReturn(UUID.randomUUID());
         org.mockito.Mockito.when(chunk.getWorld()).thenReturn(world);
+        org.mockito.Mockito.when(player.getLocation()).thenReturn(location);
+        org.mockito.Mockito.when(location.getBlockX()).thenReturn(0);
+        org.mockito.Mockito.when(location.getBlockZ()).thenReturn(0);
         org.mockito.Mockito.when(world.getUID()).thenReturn(UUID.randomUUID());
         org.mockito.Mockito.when(chunk.getX()).thenReturn(4);
         org.mockito.Mockito.when(chunk.getZ()).thenReturn(-2);

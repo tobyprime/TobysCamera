@@ -72,6 +72,43 @@ class VirtualMapDeliverySchedulerTest {
     }
 
     @Test
+    void keepsAnInFlightReadReservedAgainstTheNextGlobalDeliveryBudget() {
+        Fixture fixture = new Fixture(new VirtualMapDeliveryScheduler.Limits(12, 4, 65_536L, 16_384L));
+        Player player = fixture.player();
+        fixture.scheduler.attach("one", player, 1, VirtualMapDeliveryScheduler.Priority.FRAME, 0L, fixture::tile);
+        fixture.scheduler.attach("two", player, 2, VirtualMapDeliveryScheduler.Priority.FRAME, 0L, fixture::tile);
+        fixture.scheduler.tick();
+        fixture.scheduler.tick();
+
+        assertEquals(1, fixture.async.size());
+    }
+
+    @Test
+    void appliesThePerPlayerMapBudgetBeforeStartingReads() {
+        Fixture fixture = new Fixture(new VirtualMapDeliveryScheduler.Limits(12, 1, 65_536L, 65_536L));
+        Player player = fixture.player();
+        fixture.scheduler.attach("one", player, 1, VirtualMapDeliveryScheduler.Priority.FRAME, 0L, fixture::tile);
+        fixture.scheduler.attach("two", player, 2, VirtualMapDeliveryScheduler.Priority.FRAME, 0L, fixture::tile);
+
+        fixture.scheduler.tick();
+
+        assertEquals(1, fixture.async.size());
+    }
+
+    @Test
+    void startsTheNearestFrameBeforeAfartherFrame() {
+        Fixture fixture = new Fixture(new VirtualMapDeliveryScheduler.Limits(1, 4, 65_536L, 65_536L));
+        Player player = fixture.player();
+        fixture.scheduler.attach("far", player, 1, VirtualMapDeliveryScheduler.Priority.FRAME, 25L, () -> fixture.namedTile("far"));
+        fixture.scheduler.attach("near", player, 2, VirtualMapDeliveryScheduler.Priority.FRAME, 1L, () -> fixture.namedTile("near"));
+
+        fixture.scheduler.tick();
+        fixture.runAsync();
+
+        assertEquals(List.of("near"), fixture.loaded);
+    }
+
+    @Test
     void appliesTheGlobalByteBudgetPerTick() {
         Fixture fixture = new Fixture(new VirtualMapDeliveryScheduler.Limits(2, 4, 65_536L, 16_384L));
         Player player = fixture.player();

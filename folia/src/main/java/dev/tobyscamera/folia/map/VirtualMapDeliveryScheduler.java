@@ -74,7 +74,7 @@ public final class VirtualMapDeliveryScheduler {
         }
         ReadAdmission admission = new ReadAdmission(limits);
         for (Demand demand : demandsByKey.values()) {
-            if (!demand.sent && demand.pixels != null) admission.reserve(demand.key.playerId());
+            if (!demand.sent && (demand.pixels != null || demand.reading)) admission.reserve(demand.key.playerId());
         }
         while (inFlightReads < limits.maxConcurrentReads()) {
             Demand demand = selectUnreadDemand(admission);
@@ -140,6 +140,7 @@ public final class VirtualMapDeliveryScheduler {
     private void send(Demand demand, TickBudget budget) {
         sender.sendFull(demand.bestSource().player, demand.key.mapId(), demand.pixels);
         demand.sent = true;
+        demand.pixels = null;
         budget.consume(demand.key.playerId());
         countDispatch(demand.key.playerId());
     }

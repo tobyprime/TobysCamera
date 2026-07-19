@@ -17,6 +17,7 @@ import dev.tobyscamera.folia.storage.SqlitePhotoRepository;
 import dev.tobyscamera.folia.upload.UploadCoordinator;
 import dev.tobyscamera.folia.status.PluginRuntimeStatus;
 import dev.tobyscamera.folia.map.MediaMapActivationListener;
+import dev.tobyscamera.folia.map.VirtualMapDeliveryScheduler;
 import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import dev.tobyscamera.folia.scheduler.ServerTaskSchedulers;
 import java.io.IOException;
@@ -42,6 +43,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     private MapDeliveryService deliveries;
     private ServerTaskScheduler scheduler;
     private ServerTaskScheduler.TaskHandle uploadCleanupTask;
+    private ServerTaskScheduler.TaskHandle deliveryTickTask;
     private PluginPayloadGateway gateway;
     private CameraFilmInventoryListener filmListener;
     private PhotoBagPlacementListener bagPlacement;
@@ -64,6 +66,8 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         catch (IOException exception) { throw new IllegalStateException("Could not initialize pending deliveries", exception); }
         configureRuntime(PluginSettings.from(flatten(getConfig())));
         mediaActivation = new MediaMapActivationListener(this, scheduler, photos);
+        mediaActivation.setDeliveryLimits(deliveryLimits(PluginSettings.from(flatten(getConfig()))));
+        deliveryTickTask = scheduler.runGlobalRepeating(1L, 1L, mediaActivation::tickDelivery);
         bagPlacement.setFrameRefresher(mediaActivation::refreshFrame);
         bagPlacement.setHeldMapRefresher(mediaActivation::refreshHeldMaps);
         getServer().getPluginManager().registerEvents(mediaActivation, this);
@@ -91,6 +95,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
             var now = java.time.Instant.now();
             coordinator.expireSessions(now);
         });
+        if (mediaActivation != null) mediaActivation.setDeliveryLimits(deliveryLimits(settings));
     }
 
     @Override
@@ -98,6 +103,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         getServer().getMessenger().unregisterIncomingPluginChannel(this);
         getServer().getMessenger().unregisterOutgoingPluginChannel(this);
         if (uploadCleanupTask != null) uploadCleanupTask.cancel();
+        if (deliveryTickTask != null) deliveryTickTask.cancel();
         if (mediaActivation != null) mediaActivation.clear();
         if (repository != null) try { repository.close(); } catch (IOException exception) { getLogger().warning("Could not close photo storage: " + exception.getMessage()); }
     }
@@ -129,6 +135,12 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
             if (!config.isConfigurationSection(key)) values.put(key, config.get(key));
         }
         return values;
+    }
+
+    private static VirtualMapDeliveryScheduler.Limits deliveryLimits(PluginSettings settings) {
+        return new VirtualMapDeliveryScheduler.Limits(settings.virtualMapMaxConcurrentReads(),
+                settings.virtualMapPerPlayerMapsPerTick(), settings.virtualMapPerPlayerBytesPerTick(),
+                settings.virtualMapGlobalBytesPerTick());
     }
 
     private void createAndDeliver(Player player, dev.tobyscamera.common.upload.UploadSession session,

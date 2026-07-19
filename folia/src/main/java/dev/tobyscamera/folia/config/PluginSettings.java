@@ -11,6 +11,10 @@ public record PluginSettings(
         int maxGridSize,
         int uploadChunksPerSecond,
         long uploadMaxActiveBytes,
+        int virtualMapMaxConcurrentReads,
+        int virtualMapPerPlayerMapsPerTick,
+        long virtualMapPerPlayerBytesPerTick,
+        long virtualMapGlobalBytesPerTick,
         String invalidTokenKickMessage) {
 
     public static PluginSettings from(Map<String, ?> values) {
@@ -23,6 +27,10 @@ public record PluginSettings(
                 integer(values, "upload.max-grid-size", 4),
                 integer(values, "upload.max-chunks-per-second", 120),
                 longValue(values, "upload.max-active-upload-bytes", 16_777_216L),
+                integer(values, "virtual-map-delivery.max-concurrent-reads", 12),
+                integer(values, "virtual-map-delivery.per-player-maps-per-tick", 4),
+                longValue(values, "virtual-map-delivery.per-player-bytes-per-tick", 65_536L),
+                longValue(values, "virtual-map-delivery.global-bytes-per-tick", 2_097_152L),
                 string(values, "invalid-token.kick-message", "Invalid or expired photo upload token"));
         settings.validate();
         return settings;
@@ -36,6 +44,10 @@ public record PluginSettings(
         }
         if (maxGridSize < 1) throw new IllegalArgumentException("max-grid-size must be positive");
         if (uploadChunksPerSecond < 1 || uploadMaxActiveBytes < 16_384L) throw new IllegalArgumentException("upload limits are invalid");
+        if (virtualMapMaxConcurrentReads < 1 || virtualMapPerPlayerMapsPerTick < 1
+                || virtualMapPerPlayerBytesPerTick < 16_384L || virtualMapGlobalBytesPerTick < 16_384L) {
+            throw new IllegalArgumentException("virtual map delivery limits are invalid");
+        }
     }
 
     private static String string(Map<String, ?> values, String key, String fallback) {

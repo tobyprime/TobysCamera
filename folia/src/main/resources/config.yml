@@ -8,5 +8,10 @@ upload:
   max-grid-size: 4
   max-chunks-per-second: 120
   max-active-upload-bytes: 16777216
+virtual-map-delivery:
+  max-concurrent-reads: 12
+  per-player-maps-per-tick: 4
+  per-player-bytes-per-tick: 65536
+  global-bytes-per-tick: 2097152
 invalid-token:
   kick-message: "Invalid or expired photo upload token"

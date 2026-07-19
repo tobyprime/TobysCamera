@@ -38,6 +38,7 @@ public final class MediaMapActivationListener implements Listener {
     private final VirtualStillMapService stills;
     private final ChunkFrameViewerTracker frameViewers = new ChunkFrameViewerTracker();
     private final Set<String> frameSources = ConcurrentHashMap.newKeySet();
+    private final Map<ChunkFrameViewerTracker.ViewerChunk, Long> frameDistances = new ConcurrentHashMap<>();
 
     public MediaMapActivationListener(Plugin plugin, ServerTaskScheduler scheduler, MapPhotoService photos) {
         this.plugin = plugin;
@@ -56,6 +57,10 @@ public final class MediaMapActivationListener implements Listener {
 
     public VirtualStillMapService.Status status() { return stills.status(); }
 
+    public void setDeliveryLimits(VirtualMapDeliveryScheduler.Limits limits) { stills.setLimits(limits); }
+
+    public void tickDelivery() { stills.tick(); }
+
     /** Seeds frame sources for chunks the client had already received before this listener was enabled. */
     public void refreshVisibleFrames(Player player) {
         scheduler.runEntityDelayed(player, 1L, () -> {
@@ -64,6 +69,8 @@ public final class MediaMapActivationListener implements Listener {
                 int chunkX = chunk.getX();
                 int chunkZ = chunk.getZ();
                 var viewer = viewerChunk(player, chunk);
+                long distanceSquared = chunkDistanceSquared(player, chunk);
+                frameDistances.put(viewer, distanceSquared);
                 scheduler.runRegion(world, chunkX, chunkZ, () -> reconcileViewerChunk(viewer, world, chunkX, chunkZ));
             }
         }, () -> detachHands(player));
@@ -72,6 +79,7 @@ public final class MediaMapActivationListener implements Listener {
     public void clear() {
         for (String source : frameSources) detach(source);
         frameSources.clear();
+        frameDistances.clear();
         stills.clear();
     }
 
@@ -96,6 +104,7 @@ public final class MediaMapActivationListener implements Listener {
     @EventHandler public void onPlayerChunkLoad(PlayerChunkLoadEvent event) {
         Chunk chunk = event.getChunk();
         var viewer = viewerChunk(event.getPlayer(), chunk);
+        frameDistances.put(viewer, chunkDistanceSquared(event.getPlayer(), chunk));
         scheduler.runRegion(chunk.getWorld(), chunk.getX(), chunk.getZ(),
                 () -> reconcileViewerChunk(viewer, chunk.getWorld(), chunk.getX(), chunk.getZ()));
     }
@@ -116,8 +125,10 @@ public final class MediaMapActivationListener implements Listener {
     }
 
     private void reconcileHands(Player player) {
-        reconcile(playerSource(player, "main"), player, player.getInventory().getItemInMainHand());
-        reconcile(playerSource(player, "off"), player, player.getInventory().getItemInOffHand());
+        reconcile(playerSource(player, "main"), player, player.getInventory().getItemInMainHand(),
+                VirtualMapDeliveryScheduler.Priority.MAIN_HAND, 0L);
+        reconcile(playerSource(player, "off"), player, player.getInventory().getItemInOffHand(),
+                VirtualMapDeliveryScheduler.Priority.OFF_HAND, 0L);
     }
 
     private void detachHands(Player player) {
@@ -138,7 +149,8 @@ public final class MediaMapActivationListener implements Listener {
             String source = frameSource(viewer, frameId);
             frameSources.add(source);
             Player player = Bukkit.getPlayer(viewer.playerId());
-            if (player != null) reconcile(source, player, frame.getItem());
+            if (player != null) reconcile(source, player, frame.getItem(), VirtualMapDeliveryScheduler.Priority.FRAME,
+                    frameDistances.getOrDefault(viewer, Long.MAX_VALUE));
         }
         for (UUID removed : frameViewers.replace(viewer, frames)) {
             String source = frameSource(viewer, removed);
@@ -148,6 +160,7 @@ public final class MediaMapActivationListener implements Listener {
     }
 
     private void releaseViewerChunk(ChunkFrameViewerTracker.ViewerChunk viewer) {
+        frameDistances.remove(viewer);
         for (UUID frameId : frameViewers.release(viewer)) {
             String source = frameSource(viewer, frameId);
             frameSources.remove(source);
@@ -157,6 +170,7 @@ public final class MediaMapActivationListener implements Listener {
 
     private void releasePlayerFrames(UUID playerId) {
         for (var entry : frameViewers.releasePlayer(playerId).entrySet()) {
+            frameDistances.remove(entry.getKey());
             for (UUID frameId : entry.getValue()) {
                 String source = frameSource(entry.getKey(), frameId);
                 frameSources.remove(source);
@@ -172,19 +186,23 @@ public final class MediaMapActivationListener implements Listener {
             frameSources.add(source);
             frameViewers.trackFrame(viewer, frame.getUniqueId());
             Player player = Bukkit.getPlayer(viewer.playerId());
-            if (player != null) reconcile(source, player, item);
+            if (player != null) reconcile(source, player, item, VirtualMapDeliveryScheduler.Priority.FRAME,
+                    frameDistances.getOrDefault(viewer, Long.MAX_VALUE));
         }
     }
 
-    private void reconcile(String source, Player player, ItemStack item) {
+    private void reconcile(String source, Player player, ItemStack item, VirtualMapDeliveryScheduler.Priority priority,
+            long distanceSquared) {
         var descriptor = MediaMapDescriptor.from(item);
         if (descriptor.isEmpty()) {
             detach(source);
             return;
         }
         switch (descriptor.get()) {
-            case MediaMapDescriptor.PhotoTile photo -> stills.attach(source, player, photo, () -> photos.tilePixels(photo));
+            case MediaMapDescriptor.PhotoTile photo -> stills.attach(source, player, photo, priority, distanceSquared,
+                    () -> photos.tilePixels(photo));
             case MediaMapDescriptor.PhotoBagPreview photo -> stills.attach(source, player, photo,
+                    priority, distanceSquared,
                     () -> photos.previewPixels(new PhotoBagData(photo.mediaId(), PhotoBagKind.PHOTO, photo.mapId(), 1, 1)));
         }
     }
@@ -196,6 +214,13 @@ public final class MediaMapActivationListener implements Listener {
     private static String playerSource(Player player, String hand) { return "player:" + player.getUniqueId() + ':' + hand; }
     private static ChunkFrameViewerTracker.ViewerChunk viewerChunk(Player player, Chunk chunk) {
         return new ChunkFrameViewerTracker.ViewerChunk(player.getUniqueId(), chunk.getWorld().getUID(), chunk.getX(), chunk.getZ());
+    }
+    private static long chunkDistanceSquared(Player player, Chunk chunk) {
+        long playerChunkX = player.getLocation().getBlockX() >> 4;
+        long playerChunkZ = player.getLocation().getBlockZ() >> 4;
+        long deltaX = playerChunkX - chunk.getX();
+        long deltaZ = playerChunkZ - chunk.getZ();
+        return deltaX * deltaX + deltaZ * deltaZ;
     }
     private static String frameSource(ChunkFrameViewerTracker.ViewerChunk viewer, UUID frameId) {
         return "frame:" + frameId + ":viewer:" + viewer.playerId();
