@@ -32,7 +32,7 @@ jobs:
         run: scripts/release-metadata.sh "$GITHUB_REF_NAME"
 
       - name: Build release artifacts
-        run: ./gradlew verifyModules "-Pmod_version=${{ steps.metadata.outputs.version }}"
+        run: bash ./gradlew verifyModules "-Pmod_version=${{ steps.metadata.outputs.version }}"
 
       - name: Select release artifacts and write checksums
         env:
