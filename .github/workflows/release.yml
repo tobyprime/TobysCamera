@@ -1,0 +1,92 @@
+name: Publish tagged artifacts
+
+on:
+  push:
+    tags:
+      - 'mod-v*'
+      - 'plugin-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build and publish release artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out tagged commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Parse and validate release tag
+        id: metadata
+        run: scripts/release-metadata.sh "$GITHUB_REF_NAME"
+
+      - name: Build release artifacts
+        run: ./gradlew verifyModules "-Pmod_version=${{ steps.metadata.outputs.version }}"
+
+      - name: Select release artifacts and write checksums
+        env:
+          RELEASE_KIND: ${{ steps.metadata.outputs.kind }}
+          RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          release_dir=release-artifacts
+          rm -rf "$release_dir"
+          mkdir -p "$release_dir"
+
+          case "$RELEASE_KIND" in
+            mod)
+              artifacts=(build/libs/*/tobyscamera-"$RELEASE_VERSION"+mc*.jar)
+              expected_count=2
+              ;;
+            plugin)
+              artifacts=(folia/build/libs/tobyscamera-plugin-"$RELEASE_VERSION".jar)
+              expected_count=1
+              ;;
+            *)
+              printf 'Unknown release kind: %s\n' "$RELEASE_KIND" >&2
+              exit 1
+              ;;
+          esac
+
+          if (( ${#artifacts[@]} != expected_count )); then
+            printf 'Expected %d %s artifact(s), found %d:\n' "$expected_count" "$RELEASE_KIND" "${#artifacts[@]}" >&2
+            printf '  %s\n' "${artifacts[@]:-<none>}" >&2
+            exit 1
+          fi
+
+          cp -- "${artifacts[@]}" "$release_dir/"
+          for artifact in "$release_dir"/*.jar; do
+            (
+              cd "$release_dir"
+              sha256sum "$(basename "$artifact")" > "$(basename "$artifact").sha256"
+            )
+          done
+
+          find "$release_dir" -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ steps.metadata.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          release_args=(--generate-notes)
+          if [[ "$PRERELEASE" == 'true' ]]; then
+            release_args+=(--prerelease)
+          fi
+
+          gh release create "$GITHUB_REF_NAME" release-artifacts/* "${release_args[@]}"
