@@ -40,6 +40,7 @@ public final class ViewfinderControlsScreen extends Screen {
         addRenderableWidget(new RollSlider(left + 6, rowOne, rollWidth));
         addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.viewfinder.controls.ratio", value), session.composition().aspectRatio())
                 .withValues(ViewfinderControlModel.RATIOS)
+                .displayOnlyValue()
                 .create(left + rollWidth + 12, rowOne, 118, 20, Component.empty(), (button, value) -> session.setAspectRatio(value)));
         EditBox customRatio = new EditBox(font, left + rollWidth + 136, rowOne, 78, 20, Component.translatable("tobyscamera.composition.custom_ratio"));
         customRatio.setValue(session.composition().aspectRatio().toString());
@@ -50,6 +51,7 @@ public final class ViewfinderControlsScreen extends Screen {
         addRenderableWidget(new ZoomSlider(left + Math.min(panelWidth - 196, rollWidth + 270), rowOne, Math.min(190, panelWidth - rollWidth - 280)));
         addRenderableWidget(CycleButton.builder(value -> Component.translatable("tobyscamera.viewfinder.controls.grid", gridName(value)), session.grid())
                 .withValues(CompositionGrid.values())
+                .displayOnlyValue()
                 .create(left + 6, rowTwo, 135, 20, Component.empty(), (button, value) -> setGrid(value)));
         int maximum = Math.max(1, maximumGridSize.getAsInt());
         int selected = Math.clamp(session.printSize(), 1, maximum);
