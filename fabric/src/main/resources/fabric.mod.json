@@ -3,6 +3,7 @@
   "id": "tobyscamera",
   "version": "${version}",
   "name": "TobysCamera",
+  "license": "MIT",
   "environment": "client",
   "entrypoints": { "client": ["dev.tobyscamera.fabric.TobysCameraClient"] },
   "mixins": ["tobyscamera.mixins.json"],

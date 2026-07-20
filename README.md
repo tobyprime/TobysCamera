@@ -2,6 +2,8 @@
 
 Fabric 1.21.11 and 26.1 client Mod + Paper and Folia 1.21.11+ plugin. Only the photographer installs the Mod; completed pictures are ordinary `filled_map` items visible to every vanilla client.
 
+Licensed under the [MIT License](LICENSE).
+
 Keep the client mod and server plugin on the same TobysCamera release. Older clients receive an explicit upload rejection for unsupported camera packets.
 
 Modrinth project body: [English and 简体中文](MODRINTH.md).
