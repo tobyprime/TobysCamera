@@ -98,7 +98,9 @@ public final class UploadCoordinator {
         }
         final long uploadBytes;
         try {
-            uploadBytes = Math.multiplyExact(Math.addExact(Math.multiplyExact((long) begin.gridWidth(), begin.gridHeight()), 1L), UploadSession.TILE_BYTES);
+            long imageCount = Math.addExact(
+                    Math.multiplyExact((long) begin.gridWidth(), begin.gridHeight()), 1L);
+            uploadBytes = Math.multiplyExact(imageCount, UploadSession.RESERVED_BYTES_PER_IMAGE);
         } catch (ArithmeticException exception) {
             sender.send(player, new Packets.UploadRejected("Photo is too large"));
             return;
@@ -145,11 +147,12 @@ public final class UploadCoordinator {
         }
         try {
             session.append(player.getUniqueId(), chunk.tileX(), chunk.tileY(), chunk.offset(), chunk.data());
-            completeIfReady(player, chunk.token(), session);
         } catch (UploadFailure exception) {
             clear(chunk.token());
             sender.send(player, new Packets.UploadRejected(exception.getMessage()));
+            return;
         }
+        completeIfReady(player, chunk.token(), session);
     }
 
     private void appendPreview(Player player, Packets.UploadPreviewChunk chunk) {
@@ -162,11 +165,12 @@ public final class UploadCoordinator {
         }
         try {
             session.appendPreview(player.getUniqueId(), chunk.offset(), chunk.data());
-            completeIfReady(player, chunk.token(), session);
         } catch (UploadFailure exception) {
             clear(chunk.token());
             sender.send(player, new Packets.UploadRejected(exception.getMessage()));
+            return;
         }
+        completeIfReady(player, chunk.token(), session);
     }
 
     private void finish(Player player, Packets.UploadFinish finish) {

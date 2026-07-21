@@ -34,7 +34,7 @@ class UploadCoordinatorTest {
         when(films.consume(camera, 4)).thenReturn(true);
         UploadCoordinator coordinator = coordinator(sent, films, (ignored, session, metadata) -> { });
         coordinator.handle(player, new Packets.UploadBegin(2, 2));
-        assertEquals(new UploadCoordinator.Status(1, 4, 81_920, 16_777_216), coordinator.status());
+        assertEquals(new UploadCoordinator.Status(1, 4, 92_160, 16_777_216), coordinator.status());
     }
 
     @Test
