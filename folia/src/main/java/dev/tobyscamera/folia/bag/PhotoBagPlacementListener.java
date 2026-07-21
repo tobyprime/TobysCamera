@@ -59,10 +59,10 @@ public final class PhotoBagPlacementListener implements Listener {
      * unpack packet.  A normal use begins a one-second server-side hold window; the
      * scheduled check only unpacks when the player still holds that exact bag.
      */
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler
     public void onUseBag(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND
-                || (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK)) return;
+                || event.getAction() != Action.RIGHT_CLICK_AIR) return;
         ItemStack held = event.getItem();
         if (!PhotoBagFactory.isBag(held) || PhotoBagFactory.isNegative(held)) return;
         final PhotoBagData started;
