@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -39,32 +40,69 @@ class UploadSessionTest {
     }
 
     @Test
-    void rejectsMediaUntilItsContiguousPreviewIsComplete() {
+    void acceptsTileAndPreviewChunksInAnyOrder() {
         UploadSession session = new UploadSession(new UploadGrant(TOKEN, PLAYER,
                 Instant.EPOCH, Instant.MAX, 1), 1, 1);
-        byte[] chunk = new byte[8_192];
+        byte[] first = filled((byte) 17, 8_192);
+        byte[] second = filled((byte) 23, 8_192);
 
-        assertThrows(UploadFailure.class, () -> session.append(PLAYER, 0, 0, 0, chunk));
+        session.append(PLAYER, 0, 0, 8_192, second);
+        session.appendPreview(PLAYER, 8_192, second);
         assertFalse(session.isComplete());
-        assertThrows(UploadFailure.class, () -> session.previewPixels());
-        session.appendPreview(PLAYER, 0, chunk);
-        assertFalse(session.previewComplete());
-        assertThrows(UploadFailure.class, () -> session.appendPreview(PLAYER, 8_191, chunk));
-        session.appendPreview(PLAYER, 8_192, chunk);
-        assertTrue(session.previewComplete());
-        session.append(PLAYER, 0, 0, 0, new byte[16_384]);
+        session.append(PLAYER, 0, 0, 0, first);
+        session.appendPreview(PLAYER, 0, first);
+
+        assertTrue(session.isComplete());
+        assertArrayEquals(second, Arrays.copyOfRange(session.previewPixels(), 8_192, 16_384));
+        assertArrayEquals(second, Arrays.copyOfRange(session.tile(0, 0), 8_192, 16_384));
+    }
+
+    @Test
+    void acceptsIdenticalDuplicateAndOverlappingChunksWithoutAdvancingCoverageTwice() {
+        UploadSession session = new UploadSession(new UploadGrant(TOKEN, PLAYER,
+                Instant.EPOCH, Instant.MAX, 1), 1, 1);
+        byte[] first = filled((byte) 31, 8_192);
+        byte[] second = filled((byte) 47, 8_192);
+
+        session.appendPreview(PLAYER, 0, first);
+        session.appendPreview(PLAYER, 0, first.clone());
+        session.appendPreview(PLAYER, 4_096, Arrays.copyOfRange(first, 4_096, 8_192));
+        session.appendPreview(PLAYER, 8_192, second);
+        session.append(PLAYER, 0, 0, 0, first);
+        session.append(PLAYER, 0, 0, 0, first.clone());
+        session.append(PLAYER, 0, 0, 4_096, Arrays.copyOfRange(first, 4_096, 8_192));
+        session.append(PLAYER, 0, 0, 8_192, second);
+
         assertTrue(session.isComplete());
     }
 
     @Test
-    void rejectsForeignPlayerOutOfOrderAndOutOfRangeChunks() {
+    void rejectsConflictingOverlapAndInvalidChunkRanges() {
+        UploadSession session = new UploadSession(new UploadGrant(TOKEN, PLAYER,
+                Instant.EPOCH, Instant.MAX, 1), 1, 1);
+        byte[] first = filled((byte) 61, 8_192);
+        session.appendPreview(PLAYER, 0, first);
+        byte[] conflict = Arrays.copyOfRange(first, 4_096, 8_192);
+        conflict[0] ^= 1;
+
+        UploadFailure overlap = assertThrows(UploadFailure.class,
+                () -> session.appendPreview(PLAYER, 4_096, conflict));
+        assertEquals("chunk overlaps conflicting data", overlap.getMessage());
+        assertThrows(UploadFailure.class, () -> session.appendPreview(PLAYER, -1, new byte[] {1}));
+        assertThrows(UploadFailure.class, () -> session.appendPreview(PLAYER, 8_192, new byte[0]));
+        assertThrows(UploadFailure.class, () -> session.appendPreview(PLAYER, 8_192, new byte[8_193]));
+        assertThrows(UploadFailure.class, () -> session.appendPreview(PLAYER, 16_384, new byte[] {1}));
+        assertFalse(session.isComplete());
+    }
+
+    @Test
+    void rejectsForeignPlayerAndOutOfRangeTileCoordinates() {
         UploadSession session = new UploadSession(new UploadGrant(TOKEN, PLAYER,
                 Instant.EPOCH, Instant.MAX, 1), 1, 1);
         byte[] bytes = new byte[8_192];
 
         assertThrows(UploadFailure.class, () -> session.append(UUID.randomUUID(), 0, 0, 0, bytes));
         assertThrows(UploadFailure.class, () -> session.append(PLAYER, 1, 0, 0, bytes));
-        assertThrows(UploadFailure.class, () -> session.append(PLAYER, 0, 0, 1, bytes));
         assertFalse(session.isComplete());
     }
 
@@ -91,5 +129,11 @@ class UploadSessionTest {
         UploadGrant grant = new UploadGrant(TOKEN, PLAYER, Instant.now(), Instant.now().plusSeconds(30), 8);
 
         assertEquals(8, grant.gridSize());
+    }
+
+    private static byte[] filled(byte value, int length) {
+        byte[] result = new byte[length];
+        Arrays.fill(result, value);
+        return result;
     }
 }
