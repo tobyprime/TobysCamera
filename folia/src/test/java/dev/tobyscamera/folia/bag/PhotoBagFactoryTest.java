@@ -12,6 +12,18 @@ import org.junit.jupiter.api.Test;
 
 class PhotoBagFactoryTest {
     @Test
+    void addsAndRemovesTheVisibleNegativeMarkerWithoutChangingOtherLore() {
+        var text = PlainTextComponentSerializer.plainText();
+        List<net.kyori.adventure.text.Component> base = List.of(net.kyori.adventure.text.Component.text("尺寸: 3×2"));
+
+        List<net.kyori.adventure.text.Component> negative = PhotoBagFactory.withNegativeLore(base);
+
+        assertEquals(List.of("尺寸: 3×2", "底片"), negative.stream().map(text::serialize).toList());
+        assertEquals(true, PhotoBagFactory.hasNegativeLore(negative));
+        assertEquals(List.of("尺寸: 3×2"), PhotoBagFactory.withoutNegativeLore(negative).stream().map(text::serialize).toList());
+    }
+
+    @Test
     void preservesCustomPresentationAndHidesPrivateLore() {
         PhotoMetadata metadata = new PhotoMetadata("Toby", "world", 1, 64, -2, Instant.parse("2026-07-17T00:00:00Z"),
                 new PhotoPresentation("旅行回忆", "第一天", false, true, false));
@@ -56,4 +68,5 @@ class PhotoBagFactoryTest {
         assertEquals(List.of("\u7c7b\u578b: \u76f8\u7247", "\u76f8\u7247ID: 123e4567-e89b-12d3-a456-426614174000", "\u9884\u89c8\u5730\u56fe: #42", "\u5c3a\u5bf8: 3\u00d72", "\u62cd\u6444\u8005: Toby", "\u62cd\u6444\u5750\u6807: world 1, 64, -2", "\u62cd\u6444\u65f6\u95f4: " + metadata.capturedTime()),
                 PhotoBagFactory.adminDetails(data).stream().map(text::serialize).toList());
     }
+
 }

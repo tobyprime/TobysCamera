@@ -29,8 +29,12 @@ public final class CameraMapCopyMetadataListener implements Listener {
         if (result == null || result.getType() != Material.FILLED_MAP) return;
         ItemStack source = source(event.getInventory().getMatrix());
         if (source == null) return;
+        if (PhotoBagFactory.isCopy(source)) {
+            event.getInventory().setResult(null);
+            return;
+        }
         if (!PhotoBagFactory.isBag(source)) {
-            ItemStack copy = source.clone();
+            ItemStack copy = PhotoBagFactory.markCopy(source);
             copy.setAmount(result.getAmount());
             event.getInventory().setResult(copy);
             return;
@@ -48,7 +52,15 @@ public final class CameraMapCopyMetadataListener implements Listener {
     public void onPrepareCartographyCopy(PrepareInventoryResultEvent event) {
         if (!(event.getInventory() instanceof CartographyInventory inventory)) return;
         ItemStack source = inventory.getItem(0);
-        if (!PhotoBagFactory.isBag(source)) return;
+        if (!isCameraMap(source)) return;
+        if (PhotoBagFactory.isCopy(source)) {
+            event.setResult(null);
+            return;
+        }
+        if (!PhotoBagFactory.isBag(source)) {
+            event.setResult(PhotoBagFactory.markCopy(source));
+            return;
+        }
         ItemStack blanks = inventory.getItem(1);
         if (blanks == null || blanks.getType() != Material.MAP || blanks.getAmount() < requiredBlankMaps(source)) {
             event.setResult(null);
@@ -61,6 +73,10 @@ public final class CameraMapCopyMetadataListener implements Listener {
     public void onTakeCraftingBagCopy(CraftItemEvent event) {
         ItemStack source = source(event.getInventory().getMatrix());
         if (!PhotoBagFactory.isBag(source)) return;
+        if (PhotoBagFactory.isCopy(source)) {
+            event.setCancelled(true);
+            return;
+        }
         int required = requiredBlankMaps(source);
         List<Integer> blankSlots = blankSlots(event.getInventory().getMatrix());
         if (countBlankMaps(event.getInventory().getMatrix()) < required || !giveCopy(event, singleCopy(source))) {
@@ -78,6 +94,10 @@ public final class CameraMapCopyMetadataListener implements Listener {
         CartographyInventory inventory = event.getInventory();
         ItemStack source = inventory.getItem(0);
         ItemStack blanks = inventory.getItem(1);
+        if (isCameraMap(source) && PhotoBagFactory.isCopy(source)) {
+            event.setCancelled(true);
+            return;
+        }
         if (!PhotoBagFactory.isBag(source)) return;
         int required = requiredBlankMaps(source);
         if (blanks == null || blanks.getType() != Material.MAP || blanks.getAmount() < required || !giveCopy(event, singleCopy(source))) {
@@ -108,7 +128,7 @@ public final class CameraMapCopyMetadataListener implements Listener {
     }
 
     private static ItemStack singleCopy(ItemStack source) {
-        ItemStack copy = source.clone();
+        ItemStack copy = PhotoBagFactory.copyForPrint(source);
         copy.setAmount(1);
         return copy;
     }

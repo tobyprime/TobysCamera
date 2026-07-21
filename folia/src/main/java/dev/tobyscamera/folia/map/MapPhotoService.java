@@ -74,9 +74,8 @@ public final class MapPhotoService {
     }
 
     public ItemStack bag(World world, PhotoRecord record, UploadSession session, PhotoMetadata metadata) {
-        return PhotoBagFactory.create(virtualMapIds.allocate(), record.photoId(), PhotoBagKind.PHOTO, record.gridWidth(), record.gridHeight(),
-                metadata,
-                session.previewPixels());
+        return PhotoBagFactory.createNegative(new PhotoBagData(record.photoId(), PhotoBagKind.PHOTO, virtualMapIds.allocate(),
+                record.gridWidth(), record.gridHeight(), metadata));
     }
 
     public ItemStack bag(World world, PhotoRecord record) throws IOException {
@@ -84,9 +83,8 @@ public final class MapPhotoService {
     }
 
     public ItemStack bag(World world, PhotoRecord record, PhotoMetadata metadata) throws IOException {
-        return PhotoBagFactory.create(virtualMapIds.allocate(), record.photoId(), PhotoBagKind.PHOTO, record.gridWidth(), record.gridHeight(),
-                metadata,
-                previewPixels(new PhotoBagData(record.photoId(), PhotoBagKind.PHOTO, 0, record.gridWidth(), record.gridHeight())));
+        return PhotoBagFactory.createNegative(new PhotoBagData(record.photoId(), PhotoBagKind.PHOTO, virtualMapIds.allocate(),
+                record.gridWidth(), record.gridHeight(), metadata));
     }
 
     /** Reads the client-generated preview persisted with the photo. Legacy bags are unsupported. */

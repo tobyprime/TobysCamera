@@ -18,6 +18,8 @@ import org.bukkit.inventory.meta.MapMeta;
 /** Manufactures preview-map photo bags and restores their immutable custom-data identity. */
 public final class PhotoBagFactory {
     private static final NamespacedKey BAG = key("photo_bag");
+    private static final NamespacedKey COPY = key("photo_copy");
+    private static final Component NEGATIVE_LORE = Component.text("底片", NamedTextColor.YELLOW);
     private static final NamespacedKey KIND = key("bag_kind");
     private static final NamespacedKey MEDIA_ID = key("media_id");
     private static final NamespacedKey PREVIEW_MAP_ID = key("preview_map_id");
@@ -68,6 +70,57 @@ public final class PhotoBagFactory {
         });
         return item;
     }
+
+    /** Creates a newly captured photo bag that must be copied before it can be used. */
+    public static ItemStack createNegative(PhotoBagData data) {
+        ItemStack item = create(data);
+        setLore(item, withNegativeLore(item.getItemMeta().lore()));
+        return item;
+    }
+
+    /** Returns a copy of lore with the visible negative marker appended. */
+    public static List<Component> withNegativeLore(List<Component> lore) {
+        var result = new java.util.ArrayList<Component>();
+        if (lore != null) result.addAll(lore);
+        result.add(NEGATIVE_LORE);
+        return List.copyOf(result);
+    }
+
+    /** Returns whether a lore list identifies a newly captured negative. */
+    public static boolean hasNegativeLore(List<Component> lore) {
+        return lore != null && lore.contains(NEGATIVE_LORE);
+    }
+
+    /** Returns a copy of lore with every visible negative marker removed. */
+    public static List<Component> withoutNegativeLore(List<Component> lore) {
+        if (lore == null) return List.of();
+        return lore.stream().filter(component -> !NEGATIVE_LORE.equals(component)).toList();
+    }
+
+    /** Returns whether an untagged bag is presented as a newly captured negative. */
+    public static boolean isNegative(ItemStack item) {
+        return isBag(item) && hasNegativeLore(item.getItemMeta().lore());
+    }
+
+    /** Returns whether an item was produced by a camera-map copy operation. */
+    public static boolean isCopy(ItemStack item) {
+        return item != null && RootCustomData.contains(item, COPY);
+    }
+
+    /** Clones an item and applies the sole copy marker. */
+    public static ItemStack markCopy(ItemStack item) {
+        ItemStack copy = item.clone();
+        RootCustomData.update(copy, tag -> tag.putBoolean(COPY.toString(), true));
+        return copy;
+    }
+
+    /** Produces an unpackable printable copy from a bag, removing its negative presentation. */
+    public static ItemStack copyForPrint(ItemStack item) {
+        ItemStack copy = markCopy(item);
+        setLore(copy, withoutNegativeLore(copy.getItemMeta().lore()));
+        return copy;
+    }
+
 
     static Component displayName(PhotoBagKind kind) {
         return Component.text(typeName(kind) + "\u888b");
@@ -163,6 +216,12 @@ public final class PhotoBagFactory {
     }
 
     private static NamespacedKey key(String path) { return new NamespacedKey("tobyscamera", path); }
+
+    private static void setLore(ItemStack item, List<Component> lore) {
+        var meta = item.getItemMeta();
+        meta.lore(lore);
+        item.setItemMeta(meta);
+    }
 
     private static void writeMetadata(CompoundTag tag, PhotoMetadata metadata) {
         if (metadata == null) return;

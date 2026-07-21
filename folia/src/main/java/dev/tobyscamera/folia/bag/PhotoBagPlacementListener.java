@@ -64,7 +64,7 @@ public final class PhotoBagPlacementListener implements Listener {
         if (event.getHand() != EquipmentSlot.HAND
                 || (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK)) return;
         ItemStack held = event.getItem();
-        if (!PhotoBagFactory.isBag(held)) return;
+        if (!PhotoBagFactory.isBag(held) || PhotoBagFactory.isNegative(held)) return;
         final PhotoBagData started;
         try { started = PhotoBagFactory.read(held); }
         catch (IllegalArgumentException ignored) { return; }
@@ -94,13 +94,13 @@ public final class PhotoBagPlacementListener implements Listener {
         if (event.getHand() != EquipmentSlot.HAND || !(event.getRightClicked() instanceof ItemFrame origin)) return;
         Player player = event.getPlayer();
         ItemStack held = player.getInventory().getItemInMainHand();
-        if (!PhotoBagFactory.isBag(held) || !isEmpty(origin)) return;
+        if (!PhotoBagFactory.isBag(held) || PhotoBagFactory.isNegative(held) || !isEmpty(origin)) return;
         PhotoBagData bag;
         try { bag = PhotoBagFactory.read(held); } catch (IllegalArgumentException ignored) { return; }
         List<ItemFrame> frames = findEmptyPlacement(origin, bag);
         if (frames == null) return;
         List<ItemStack> maps;
-        try { maps = memberMaps(bag); } catch (IOException | IllegalArgumentException ignored) { return; }
+        try { maps = memberMaps(bag, PhotoBagFactory.isCopy(held)); } catch (IOException | IllegalArgumentException ignored) { return; }
         if (maps.size() != frames.size()) return;
         event.setCancelled(true);
         consumeOne(player, held);
@@ -117,12 +117,12 @@ public final class PhotoBagPlacementListener implements Listener {
     /** Expands a held bag into ordinary maps after the Fabric client has confirmed a continuous hold. */
     public void unpack(Player player) {
         ItemStack held = player.getInventory().getItemInMainHand();
-        if (!PhotoBagFactory.isBag(held)) return;
+        if (!PhotoBagFactory.isBag(held) || PhotoBagFactory.isNegative(held)) return;
         PhotoBagData bag;
         List<ItemStack> maps;
         try {
             bag = PhotoBagFactory.read(held);
-            maps = memberMaps(bag);
+            maps = memberMaps(bag, PhotoBagFactory.isCopy(held));
         } catch (IOException | IllegalArgumentException ignored) {
             return;
         }
@@ -162,15 +162,19 @@ public final class PhotoBagPlacementListener implements Listener {
             frameRefresher.accept(frame);
         }
         ItemStack bag = PhotoBagFactory.create(member.bag());
+        if (PhotoBagFactory.isCopy(broken.getItem())) bag = PhotoBagFactory.markCopy(bag);
         broken.getWorld().dropItemNaturally(broken.getLocation(), bag);
         return true;
     }
 
-    private List<ItemStack> memberMaps(PhotoBagData bag) throws IOException {
+    private List<ItemStack> memberMaps(PhotoBagData bag, boolean copied) throws IOException {
         List<ItemStack> maps = new ArrayList<>(bag.gridWidth() * bag.gridHeight());
         PhotoRecord record = photos.record(bag.mediaId());
         if (record == null || record.gridWidth() != bag.gridWidth() || record.gridHeight() != bag.gridHeight()) throw new IllegalArgumentException("photo bag does not match stored photo");
-        for (int y = 0; y < bag.gridHeight(); y++) for (int x = 0; x < bag.gridWidth(); x++) maps.add(photos.mapItem(record, new TileCoordinate(x, y), bag.metadata()));
+        for (int y = 0; y < bag.gridHeight(); y++) for (int x = 0; x < bag.gridWidth(); x++) {
+            ItemStack map = photos.mapItem(record, new TileCoordinate(x, y), bag.metadata());
+            maps.add(copied ? PhotoBagFactory.markCopy(map) : map);
+        }
         return maps;
     }
 
