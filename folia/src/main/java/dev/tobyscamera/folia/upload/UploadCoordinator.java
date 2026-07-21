@@ -12,7 +12,9 @@ import dev.tobyscamera.folia.config.PluginSettings;
 import dev.tobyscamera.folia.sound.ShutterSoundService;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
@@ -30,6 +32,7 @@ public final class UploadCoordinator {
     private final Map<UUID, Long> sessionBytes = new HashMap<>();
     private final Map<UUID, PhotoMetadata> capturedMetadata = new HashMap<>();
     private final Map<UUID, PhotoMetadata> uploadMetadata = new HashMap<>();
+    private final Set<UUID> finishRequested = new HashSet<>();
     private long activeUploadBytes;
 
     public UploadCoordinator(PluginSettings settings, CameraFilmService films,
@@ -142,6 +145,7 @@ public final class UploadCoordinator {
         }
         try {
             session.append(player.getUniqueId(), chunk.tileX(), chunk.tileY(), chunk.offset(), chunk.data());
+            completeIfReady(player, chunk.token(), session);
         } catch (UploadFailure exception) {
             clear(chunk.token());
             sender.send(player, new Packets.UploadRejected(exception.getMessage()));
@@ -158,6 +162,7 @@ public final class UploadCoordinator {
         }
         try {
             session.appendPreview(player.getUniqueId(), chunk.offset(), chunk.data());
+            completeIfReady(player, chunk.token(), session);
         } catch (UploadFailure exception) {
             clear(chunk.token());
             sender.send(player, new Packets.UploadRejected(exception.getMessage()));
@@ -167,12 +172,14 @@ public final class UploadCoordinator {
     private void finish(Player player, Packets.UploadFinish finish) {
         UploadSession session = validSessionOrKick(player, finish.token());
         if (session == null) return;
-        if (!session.isComplete()) {
-            sender.send(player, new Packets.UploadRejected("Every map tile must be complete"));
-            return;
-        }
-        PhotoMetadata metadata = uploadMetadata.get(finish.token());
-        clear(finish.token());
+        finishRequested.add(finish.token());
+        completeIfReady(player, finish.token(), session);
+    }
+
+    private void completeIfReady(Player player, UUID token, UploadSession session) {
+        if (!finishRequested.contains(token) || !session.isComplete()) return;
+        PhotoMetadata metadata = uploadMetadata.get(token);
+        clear(token);
         completionHandler.accept(player, session, metadata == null ? PhotoMetadata.capture(player) : metadata);
     }
 
@@ -218,6 +225,7 @@ public final class UploadCoordinator {
         Long bytes = sessionBytes.remove(token);
         if (bytes != null) activeUploadBytes -= bytes;
         uploadMetadata.remove(token);
+        finishRequested.remove(token);
     }
 
     @FunctionalInterface

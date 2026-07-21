@@ -1,8 +1,11 @@
 package dev.tobyscamera.folia.upload;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -152,6 +155,35 @@ class UploadCoordinatorTest {
         coordinator.handle(player, new Packets.UploadFinish(token));
 
         assertEquals(23, Byte.toUnsignedInt(completed.get().previewPixels()[8_192]));
+    }
+
+    @Test
+    void completesWhenFinishArrivesBeforeOutOfOrderMediaChunks() {
+        Player player = player();
+        List<CameraPacket> sent = new ArrayList<>();
+        CameraFilmService films = mock(CameraFilmService.class);
+        ItemStack camera = mock(ItemStack.class);
+        when(films.heldCamera(player)).thenReturn(camera);
+        when(films.maximumForFilm(camera, 4)).thenReturn(1);
+        when(films.consume(camera, 1)).thenReturn(true);
+        AtomicReference<dev.tobyscamera.common.upload.UploadSession> completed = new AtomicReference<>();
+        UploadCoordinator coordinator = coordinator(sent, films,
+                (ignored, session, metadata) -> completed.set(session));
+
+        coordinator.handle(player, new Packets.UploadBegin(1, 1));
+        UUID token = ((Packets.UploadGranted) sent.getFirst()).token();
+        byte[] first = filled((byte) 31, 8_192);
+        byte[] second = filled((byte) 47, 8_192);
+        coordinator.handle(player, new Packets.UploadFinish(token));
+        coordinator.handle(player, new Packets.UploadTileChunk(token, 0, 0, 8_192, second));
+        coordinator.handle(player, new Packets.UploadTileChunk(token, 0, 0, 0, first));
+        coordinator.handle(player, new Packets.UploadPreviewChunk(token, 8_192, second));
+        coordinator.handle(player, new Packets.UploadPreviewChunk(token, 0, first));
+
+        assertNotNull(completed.get());
+        assertTrue(completed.get().isComplete());
+        assertEquals(1, sent.size());
+        verify(player, never()).kick(any());
     }
 
     @Test
