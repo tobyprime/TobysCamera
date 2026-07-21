@@ -73,9 +73,7 @@ public final class PhotoBagFactory {
 
     /** Creates a newly captured photo bag that must be copied before it can be used. */
     public static ItemStack createNegative(PhotoBagData data) {
-        ItemStack item = create(data);
-        setLore(item, withNegativeLore(item.getItemMeta().lore()));
-        return item;
+        return markNegative(create(data));
     }
 
     /** Returns a copy of lore with the visible negative marker appended. */
@@ -100,6 +98,13 @@ public final class PhotoBagFactory {
     /** Returns whether an untagged bag is presented as a newly captured negative. */
     public static boolean isNegative(ItemStack item) {
         return isBag(item) && hasNegativeLore(item.getItemMeta().lore());
+    }
+
+    /** Clones an item and adds the visible negative marker without adding custom data. */
+    public static ItemStack markNegative(ItemStack item) {
+        ItemStack negative = item.clone();
+        setLore(negative, withNegativeLore(negative.getItemMeta().lore()));
+        return negative;
     }
 
     /** Returns whether an item was produced by a camera-map copy operation. */
