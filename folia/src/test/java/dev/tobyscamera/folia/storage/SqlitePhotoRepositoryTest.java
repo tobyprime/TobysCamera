@@ -94,6 +94,24 @@ class SqlitePhotoRepositoryTest {
     }
 
     @Test
+    void matchesOwnerAndPhotoUuidsOnlyAtTheirPrefixes() throws Exception {
+        try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
+            PhotoRecord ownerContainsTerm = new PhotoRecord(UUID.fromString("aaaaaaaa-2222-0000-0000-000000000001"),
+                    UUID.fromString("11111111-2222-0000-0000-000000000001"), "Alice", Instant.parse("2026-07-20T00:00:00Z"),
+                    1, 1, Map.of(new TileCoordinate(0, 0), 100), null);
+            PhotoRecord photoContainsTerm = new PhotoRecord(UUID.fromString("bbbbbbbb-2222-0000-0000-000000000002"),
+                    UUID.fromString("33333333-0000-0000-0000-000000000003"), "Bob", Instant.parse("2026-07-21T00:00:00Z"),
+                    1, 1, Map.of(new TileCoordinate(0, 0), 101), null);
+            repository.save(ownerContainsTerm, pixels(1, 1), filled((byte) 1));
+            repository.save(photoContainsTerm, pixels(1, 1), filled((byte) 2));
+
+            assertTrue(repository.findPage(new PhotoQuery("2222", PhotoQuery.Sort.NEWEST, 0, 2)).records().isEmpty());
+            assertEquals(List.of(ownerContainsTerm), repository.findPage(new PhotoQuery("11111111", PhotoQuery.Sort.NEWEST, 0, 2)).records());
+            assertEquals(List.of(photoContainsTerm), repository.findPage(new PhotoQuery("bbbbbbbb", PhotoQuery.Sort.NEWEST, 0, 2)).records());
+        }
+    }
+
+    @Test
     void treatsQueryWildcardsAsLiteralCharacters() throws Exception {
         try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
             PhotoRecord literal = record("A%B_C!", "11111111-0000-0000-0000-000000000001", "2026-07-20T00:00:00Z");

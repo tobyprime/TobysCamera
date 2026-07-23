@@ -90,9 +90,10 @@ public final class SqlitePhotoRepository implements PhotoRepository {
         String order = query.sort() == PhotoQuery.Sort.NEWEST ? "desc" : "asc";
         String sql = photoSelect("where lower(coalesce(p.owner_name, '')) like ? escape '!' or lower(p.owner) like ? escape '!' or lower(p.id) like ? escape '!' "
                 + "order by p.created " + order + ", p.id " + order + " limit ? offset ?");
-        String pattern = likePattern(query.term());
+        String namePattern = containsLikePattern(query.term());
+        String uuidPrefixPattern = uuidPrefixLikePattern(query.term());
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, pattern); statement.setString(2, pattern); statement.setString(3, pattern);
+            statement.setString(1, namePattern); statement.setString(2, uuidPrefixPattern); statement.setString(3, uuidPrefixPattern);
             statement.setInt(4, query.pageSize() + 1); statement.setLong(5, (long) query.page() * query.pageSize());
             try (ResultSet rows = statement.executeQuery()) {
                 List<PhotoRecord> records = new ArrayList<>();
@@ -286,8 +287,16 @@ public final class SqlitePhotoRepository implements PhotoRepository {
         }
     }
 
-    private static String likePattern(String term) {
-        return "%" + term.toLowerCase(java.util.Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+    private static String containsLikePattern(String term) {
+        return "%" + escapeLikeTerm(term) + "%";
+    }
+
+    private static String uuidPrefixLikePattern(String term) {
+        return escapeLikeTerm(term) + "%";
+    }
+
+    private static String escapeLikeTerm(String term) {
+        return term.toLowerCase(java.util.Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     private static String tileKey(TileCoordinate coordinate) { return coordinate.x() + "-" + coordinate.y(); }
