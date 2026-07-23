@@ -176,7 +176,7 @@ public final class PhotoBagPlacementListener implements Listener {
         PhotoRecord record = photos.record(bag.mediaId());
         if (record == null || record.gridWidth() != bag.gridWidth() || record.gridHeight() != bag.gridHeight()) throw new IllegalArgumentException("photo bag does not match stored photo");
         for (int y = 0; y < bag.gridHeight(); y++) for (int x = 0; x < bag.gridWidth(); x++) {
-            ItemStack map = photos.mapItem(record, new TileCoordinate(x, y), bag.metadata());
+            ItemStack map = photos.mapItem(record, new TileCoordinate(x, y));
             maps.add(negative ? PhotoBagFactory.markNegative(map) : copied ? PhotoBagFactory.markCopy(map) : map);
         }
         return maps;

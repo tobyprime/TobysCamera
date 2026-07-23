@@ -60,6 +60,17 @@ public final class MediaTileCache {
 
     public synchronized byte[] find(Key key) { return entries.get(key); }
 
+    /** Removes every cached preview and tile belonging to a deleted photo. */
+    public synchronized void invalidatePhoto(UUID photoId) {
+        var iterator = entries.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Key, byte[]> entry = iterator.next();
+            if (!entry.getKey().mediaId().equals(photoId)) continue;
+            cachedBytes -= entry.getValue().length;
+            iterator.remove();
+        }
+    }
+
     private void put(Key key, byte[] pixels) {
         byte[] prior = entries.put(key, pixels);
         if (prior != null) cachedBytes -= prior.length;

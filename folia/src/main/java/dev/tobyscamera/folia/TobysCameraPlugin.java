@@ -9,7 +9,6 @@ import dev.tobyscamera.folia.net.PluginPayloadGateway;
 import dev.tobyscamera.folia.map.MapPhotoService;
 import dev.tobyscamera.folia.map.CameraMapCopyMetadataListener;
 import dev.tobyscamera.folia.delivery.MapDeliveryService;
-import dev.tobyscamera.folia.delivery.MapItemDelivery;
 import dev.tobyscamera.folia.bag.PhotoBagPlacementListener;
 import dev.tobyscamera.folia.bag.PhotoBagFactory;
 import dev.tobyscamera.folia.delivery.PendingDeliveryRepository;
@@ -150,18 +149,16 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         var world = player.getWorld();
         scheduler.runGlobal(() -> {
             try {
-                var record = photos.createMaps(player.getUniqueId(), world, session);
+                var record = photos.createMaps(player.getUniqueId(), player.getName(), world, session, metadata);
                 scheduler.runAsync(() -> {
                     try {
                         photos.persist(record, session);
                         runtimeStatus.recordPersisted(record.mapIds().size());
                         scheduler.runGlobal(() -> {
-                            var bag = photos.bag(world, record, session, metadata);
                             scheduler.runEntity(player, () -> {
-                                MapItemDelivery.deliver(java.util.List.of(bag), player.getInventory()::addItem,
-                                        item -> player.getWorld().dropItemNaturally(player.getLocation(), item));
+                                deliveries.deliver(player, record);
                                 send(player, new Packets.PhotoCreated(record.photoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight()));
-                            }, () -> { try { deliveries.queue(player, record, metadata); } catch (IOException exception) { getLogger().warning("Could not queue photo delivery: " + exception.getMessage()); } });
+                            }, () -> { try { deliveries.queue(player, record); } catch (IOException exception) { getLogger().warning("Could not queue photo delivery: " + exception.getMessage()); } });
                         });
                     } catch (IOException exception) {
                         scheduler.runGlobal(() -> photos.discard(record));

@@ -1,0 +1,69 @@
+package dev.tobyscamera.folia.map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import dev.tobyscamera.common.protocol.PhotoPresentation;
+import dev.tobyscamera.folia.bag.PhotoBagData;
+import dev.tobyscamera.folia.bag.PhotoBagKind;
+import dev.tobyscamera.folia.bag.PhotoBagFactory;
+import dev.tobyscamera.folia.delivery.MapDeliveryService;
+import dev.tobyscamera.folia.delivery.PendingDeliveryRepository;
+import dev.tobyscamera.folia.storage.MediaTileCache;
+import dev.tobyscamera.folia.storage.PhotoRecord;
+import dev.tobyscamera.folia.storage.PhotoRepository;
+import dev.tobyscamera.folia.storage.TileCoordinate;
+import dev.tobyscamera.folia.upload.PhotoMetadata;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import org.bukkit.World;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+
+class MapDeliveryServiceTest {
+    @TempDir Path directory;
+
+    @Test
+    void reconstructsDeliveredBagMetadataFromThePersistedRecord() throws Exception {
+        ItemStack bag = mock(ItemStack.class);
+        MapPhotoService photos = new MapPhotoService(null, mock(PhotoRepository.class), new MediaTileCache(16_384), () -> 7);
+        MapDeliveryService deliveries = new MapDeliveryService(photos, new PendingDeliveryRepository(directory));
+        Player player = mock(Player.class);
+        PlayerInventory inventory = mock(PlayerInventory.class);
+        when(player.getWorld()).thenReturn(mock(World.class));
+        when(player.getInventory()).thenReturn(inventory);
+        when(inventory.addItem(any(ItemStack.class))).thenReturn(new HashMap<>());
+        PhotoRecord record = record();
+
+        try (MockedStatic<PhotoBagFactory> bags = org.mockito.Mockito.mockStatic(PhotoBagFactory.class)) {
+            bags.when(() -> PhotoBagFactory.createNegative(org.mockito.ArgumentMatchers.any(PhotoBagData.class))).thenReturn(bag);
+
+            deliveries.deliver(player, record);
+
+            bags.verify(() -> PhotoBagFactory.createNegative(new PhotoBagData(record.photoId(), PhotoBagKind.PHOTO, 7,
+                    record.gridWidth(), record.gridHeight(), record.metadata())));
+        }
+
+        ArgumentCaptor<ItemStack> delivered = ArgumentCaptor.forClass(ItemStack.class);
+        verify(inventory).addItem(delivered.capture());
+        assertEquals(bag, delivered.getValue());
+    }
+
+    private static PhotoRecord record() {
+        PhotoMetadata metadata = new PhotoMetadata("Toby", "world", 1, 64, -2, Instant.parse("2026-07-20T12:00:00Z"),
+                new PhotoPresentation("Sunset", "At the fortress", false, true, false));
+        return new PhotoRecord(UUID.randomUUID(), UUID.randomUUID(), "Toby", Instant.parse("2026-07-20T12:01:00Z"),
+                1, 1, Map.of(new TileCoordinate(0, 0), 100), metadata);
+    }
+}
