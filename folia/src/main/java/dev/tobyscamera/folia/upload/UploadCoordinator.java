@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 
@@ -25,6 +26,7 @@ public final class UploadCoordinator {
     private final PluginPayloadGatewaySender sender;
     private final CompletedUploadHandler completionHandler;
     private final ShutterSoundService shutterSound;
+    private final Predicate<UUID> uploadBlocked;
     private final SlidingWindowRateLimiter rateLimiter;
     private final Map<UUID, UploadGrant> grants = new HashMap<>();
     private final Map<UUID, UploadSession> sessions = new HashMap<>();
@@ -37,11 +39,18 @@ public final class UploadCoordinator {
 
     public UploadCoordinator(PluginSettings settings, CameraFilmService films,
             PluginPayloadGatewaySender sender, CompletedUploadHandler completionHandler, ShutterSoundService shutterSound) {
+        this(settings, films, sender, completionHandler, shutterSound, ignored -> false);
+    }
+
+    public UploadCoordinator(PluginSettings settings, CameraFilmService films,
+            PluginPayloadGatewaySender sender, CompletedUploadHandler completionHandler, ShutterSoundService shutterSound,
+            Predicate<UUID> uploadBlocked) {
         this.settings = settings;
         this.films = films;
         this.sender = sender;
         this.completionHandler = completionHandler;
         this.shutterSound = shutterSound;
+        this.uploadBlocked = uploadBlocked;
         this.rateLimiter = new SlidingWindowRateLimiter(new RateLimit(settings.perSecond(), settings.perMinute()));
     }
 
@@ -77,6 +86,10 @@ public final class UploadCoordinator {
     private void begin(Player player, Packets.UploadBegin begin) {
         if (!player.hasPermission("tobyscamera.upload")) {
             sender.send(player, new Packets.UploadRejected("You do not have permission to upload photos"));
+            return;
+        }
+        if (uploadBlocked.test(player.getUniqueId())) {
+            sender.send(player, new Packets.UploadRejected("You are blocked from uploading photos"));
             return;
         }
         var camera = films.heldCamera(player);

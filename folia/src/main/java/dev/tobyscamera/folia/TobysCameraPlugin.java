@@ -87,7 +87,8 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         CameraFilmService films = new CameraFilmService(settings.cameraTagKey(), settings.filmTagKey(), settings.maxGridSize());
         coordinator = new UploadCoordinator(settings, films, this::send,
                 (player, session, metadata) -> createAndDeliver(player, session, metadata),
-                player -> player.getWorld().playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.3f));
+                player -> player.getWorld().playSound(player.getLocation(), Sound.BLOCK_DISPENSER_DISPENSE, 1.0f, 1.3f),
+                this::isUploadBlocked);
         if (gateway != null) gateway.setCoordinator(coordinator);
         filmListener = new CameraFilmInventoryListener(films);
         getServer().getPluginManager().registerEvents(filmListener, this);
@@ -128,6 +129,15 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
 
     private void send(Player player, dev.tobyscamera.common.protocol.CameraPacket packet) {
         player.sendPluginMessage(this, PluginPayloadGateway.CHANNEL, PacketCodec.encode(packet));
+    }
+
+    private boolean isUploadBlocked(java.util.UUID playerId) {
+        try {
+            return repository.isBlocked(playerId);
+        } catch (IOException exception) {
+            getLogger().warning("Could not check photo upload block: " + exception.getMessage());
+            return true;
+        }
     }
 
     private static Map<String, Object> flatten(FileConfiguration config) {

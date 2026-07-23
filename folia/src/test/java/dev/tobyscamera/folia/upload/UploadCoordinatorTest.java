@@ -135,6 +135,24 @@ class UploadCoordinatorTest {
     }
 
     @Test
+    void rejectsBlockedPlayerBeforeFilmIsConsumed() {
+        Player player = player();
+        List<CameraPacket> sent = new ArrayList<>();
+        CameraFilmService films = mock(CameraFilmService.class);
+        ItemStack camera = mock(ItemStack.class);
+        when(films.heldCamera(player)).thenReturn(camera);
+        UploadCoordinator coordinator = new UploadCoordinator(PluginSettings.from(java.util.Map.of()), films,
+                (ignored, packet) -> sent.add(packet), (ignored, session, metadata) -> { }, ignored -> { }, ignored -> true);
+
+        coordinator.handle(player, new Packets.UploadBegin(1, 1));
+
+        assertEquals(Packets.UploadRejected.class, sent.getFirst().getClass());
+        verify(films, never()).consume(camera, 1);
+        verify(films, never()).consumeMagicPhoto(camera);
+        assertEquals(0, coordinator.status().activePhotoCount());
+    }
+
+    @Test
     void acceptsClientPreviewBeforeCompletingThePhoto() {
         Player player = player();
         List<CameraPacket> sent = new ArrayList<>();
