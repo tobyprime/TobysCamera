@@ -20,6 +20,7 @@ import dev.tobyscamera.folia.map.MediaMapActivationListener;
 import dev.tobyscamera.folia.map.VirtualMapDeliveryScheduler;
 import dev.tobyscamera.folia.scheduler.ServerTaskScheduler;
 import dev.tobyscamera.folia.scheduler.ServerTaskSchedulers;
+import dev.tobyscamera.folia.gallery.PhotoGalleryListener;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,6 +50,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     private PhotoBagPlacementListener bagPlacement;
     private MediaMapActivationListener mediaActivation;
     private PluginRuntimeStatus runtimeStatus;
+    private PhotoGalleryListener gallery;
 
     @Override
     public void onEnable() {
@@ -71,6 +73,8 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         bagPlacement.setFrameRefresher(mediaActivation::refreshFrame);
         bagPlacement.setHeldMapRefresher(mediaActivation::refreshHeldMaps);
         getServer().getPluginManager().registerEvents(mediaActivation, this);
+        gallery = new PhotoGalleryListener(repository, photos, mediaActivation, scheduler);
+        getServer().getPluginManager().registerEvents(gallery, this);
         getServer().getOnlinePlayers().forEach(mediaActivation::refreshVisibleFrames);
         gateway = new PluginPayloadGateway(this, scheduler, coordinator);
         getServer().getMessenger().registerIncomingPluginChannel(this, PluginPayloadGateway.CHANNEL, gateway);
@@ -112,6 +116,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length != 1) return false;
+        if (args[0].equalsIgnoreCase("gallery")) { if (sender instanceof Player player) gallery.open(player); else sender.sendMessage(Component.text("This command must be run by a player.")); return true; }
         if (args[0].equalsIgnoreCase("status")) return status(sender);
         if (args[0].equalsIgnoreCase("detail")) return detail(sender);
         if (!args[0].equalsIgnoreCase("reload")) return false;

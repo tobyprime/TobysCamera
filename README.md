@@ -67,6 +67,10 @@ Run the same verification workflow on both Paper and Folia with the identical pl
 
 After editing `plugins/TobysCamera/config.yml`, run `/tobyscamera reload` (permission `tobyscamera.reload`, default OP). Existing photo maps and database connections remain active; new upload grants use the new values.
 
+### Administrator gallery
+
+Players with `tobyscamera.admin` can run `/tobyscamera gallery` to browse stored photos in game. The inventory supports player/name or UUID-prefix search through chat input, newest/oldest sorting, and pagination. A photo detail page shows its stored capture metadata and preview, can issue an unpackable but non-copyable non-negative photo bag, block or unblock the uploader's future uploads, and delete the photo after a second confirmation click. Upload blocks take effect on the next upload request and do not interrupt an upload already in progress.
+
 ### Lazy photo loading
 
 Historical photos are not loaded into the plugin heap during startup. The server reads them only while a tagged map or photo bag is in a player's main hand, off hand, or an item frame in a loaded chunk. Inactive renderers immediately release their pixel arrays; a cold disk read is asynchronous and applies on the tick after it completes, without blocking a server tick.

@@ -55,6 +55,13 @@ public final class MediaMapActivationListener implements Listener {
     /** Schedules a hand recheck after a server-side inventory mutation. */
     public void refreshHeldMaps(Player player) { reconcileHandsNextTick(player); }
 
+    /** Adds a single temporary preview source for an administrator's gallery detail screen. */
+    public void attachGalleryPreview(Player player, String source, ItemStack preview) {
+        reconcile(source, player, preview, VirtualMapDeliveryScheduler.Priority.MAIN_HAND, 0L);
+    }
+
+    public void detachGalleryPreview(String source) { detach(source); }
+
     public VirtualStillMapService.Status status() { return stills.status(); }
 
     public void setDeliveryLimits(VirtualMapDeliveryScheduler.Limits limits) { stills.setLimits(limits); }
