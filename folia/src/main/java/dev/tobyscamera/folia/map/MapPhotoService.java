@@ -100,6 +100,14 @@ public final class MapPhotoService {
         return PhotoBagFactory.copyForPrint(originalBag(world, record));
     }
 
+    /** Creates a gallery preview using a virtual map ID allocated once for that gallery session. */
+    public ItemStack galleryPreview(PhotoRecord record, int previewMapId) {
+        return PhotoBagFactory.copyForPrint(PhotoBagFactory.create(new PhotoBagData(record.photoId(), PhotoBagKind.PHOTO,
+                previewMapId, record.gridWidth(), record.gridHeight(), record.metadata())));
+    }
+
+    public int allocateGalleryPreviewMapId() { return virtualMapIds.allocate(); }
+
     /** Deletes persisted media and removes its cached preview and tiles. */
     public void delete(UUID photoId) throws IOException {
         repository.delete(photoId);

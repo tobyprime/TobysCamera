@@ -13,9 +13,9 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 import java.io.IOException;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -42,7 +42,8 @@ public final class PhotoGalleryListener implements Listener {
     private final MapPhotoService photos;
     private final MediaMapActivationListener activation;
     private final ServerTaskScheduler scheduler;
-    private final Map<UUID, Session> sessions = new HashMap<>();
+    private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
+    private final Map<UUID, Session> awaitingSearch = new ConcurrentHashMap<>();
 
     public PhotoGalleryListener(PhotoRepository repository, MapPhotoService photos, MediaMapActivationListener activation,
             ServerTaskScheduler scheduler) {
@@ -64,13 +65,16 @@ public final class PhotoGalleryListener implements Listener {
     }
 
     private void showList(Player player, Session session) {
+        if (!active(player, session)) return;
         session.selected = null;
         activation.detachGalleryPreview(session.previewSource());
+        long generation = ++session.generation;
+        var query = session.state.query();
         scheduler.runAsync(() -> {
             try {
-                PhotoPage page = repository.findPage(session.state.query());
+                PhotoPage page = repository.findPage(query);
                 scheduler.runEntity(player, () -> {
-                    if (sessions.get(player.getUniqueId()) != session) return;
+                    if (!active(player, session) || session.generation != generation) return;
                     session.page = page;
                     Inventory inventory = inventory(session, LIST_TITLE);
                     for (int slot = 0; slot < page.records().size(); slot++) inventory.setItem(slot, listItem(page.records().get(slot)));
@@ -89,14 +93,16 @@ public final class PhotoGalleryListener implements Listener {
     }
 
     private void showDetail(Player player, Session session, PhotoRecord record) {
+        if (!active(player, session)) return;
         session.selected = record;
+        long generation = ++session.generation;
         scheduler.runAsync(() -> {
             try {
                 boolean blocked = repository.isBlocked(record.ownerId());
                 scheduler.runEntity(player, () -> {
-                    if (sessions.get(player.getUniqueId()) != session || session.selected != record) return;
+                    if (!active(player, session) || session.generation != generation || session.selected != record) return;
                     Inventory inventory = inventory(session, DETAIL_TITLE);
-                    ItemStack preview = photos.adminBag(player.getWorld(), record);
+                    ItemStack preview = preview(player, session, record);
                     inventory.setItem(22, preview);
                     activation.attachGalleryPreview(player, session.previewSource(), preview);
                     inventory.setItem(0, item(Material.PLAYER_HEAD, "上传者", owner(record), record.ownerId().toString()));
@@ -140,7 +146,7 @@ public final class PhotoGalleryListener implements Listener {
         }
         switch (slot) {
             case 45 -> { session.state.previousPage(); showList(player, session); }
-            case 46 -> { session.awaitingSearch = true; player.closeInventory(); player.sendMessage(Component.text("输入玩家名称、UUID 前缀或照片 ID 前缀进行搜索。")); }
+            case 46 -> { awaitingSearch.put(player.getUniqueId(), session); player.closeInventory(); player.sendMessage(Component.text("输入玩家名称、UUID 前缀或照片 ID 前缀进行搜索。")); }
             case 47 -> { session.state.clearTerm(); showList(player, session); }
             case 48 -> { session.state.toggleSort(); showList(player, session); }
             case 49 -> player.closeInventory();
@@ -174,7 +180,9 @@ public final class PhotoGalleryListener implements Listener {
             try {
                 if (repository.isBlocked(record.ownerId())) repository.unblock(record.ownerId());
                 else repository.block(new UploadBlock(record.ownerId(), player.getUniqueId(), java.time.Instant.now()));
-                showDetail(player, session, record);
+                scheduler.runEntity(player, () -> {
+                    if (active(player, session) && session.selected == record) showDetail(player, session, record);
+                }, () -> { });
             } catch (IOException exception) { failure(player, "Could not update photo upload block", exception); }
         });
     }
@@ -188,8 +196,12 @@ public final class PhotoGalleryListener implements Listener {
         scheduler.runAsync(() -> {
             try {
                 photos.delete(record.photoId());
-                session.deleteArmed = false;
-                scheduler.runEntity(player, () -> { player.sendMessage(Component.text("照片已删除。")); showList(player, session); }, () -> { });
+                scheduler.runEntity(player, () -> {
+                    if (!active(player, session) || session.selected != record) return;
+                    session.deleteArmed = false;
+                    player.sendMessage(Component.text("照片已删除。"));
+                    showList(player, session);
+                }, () -> { });
             } catch (IOException exception) { failure(player, "Could not delete photo", exception); }
         });
     }
@@ -209,12 +221,16 @@ public final class PhotoGalleryListener implements Listener {
 
     @EventHandler public void onChat(AsyncChatEvent event) {
         Player player = event.getPlayer();
-        Session session = sessions.get(player.getUniqueId());
-        if (session == null || !session.awaitingSearch) return;
+        Session captured = awaitingSearch.get(player.getUniqueId());
+        if (captured == null) return;
         event.setCancelled(true);
         String term = PlainTextComponentSerializer.plainText().serialize(event.message());
-        session.awaitingSearch = false;
-        scheduler.runEntity(player, () -> { session.state.setTerm(term); showList(player, session); }, () -> { });
+        scheduler.runEntity(player, () -> {
+            if (!awaitingSearch.remove(player.getUniqueId(), captured) || sessions.get(player.getUniqueId()) != captured) return;
+            Session session = captured;
+            session.state.setTerm(term);
+            showList(player, session);
+        }, () -> { });
     }
 
     @EventHandler public void onClose(InventoryCloseEvent event) {
@@ -222,7 +238,7 @@ public final class PhotoGalleryListener implements Listener {
         scheduler.runEntityDelayed(player, 1L, () -> {
             if (player.getOpenInventory().getTopInventory().getHolder() == holder) return;
             Session session = sessions.get(player.getUniqueId());
-            if (session != null && session.awaitingSearch) return;
+            if (awaitingSearch.containsKey(player.getUniqueId())) return;
             if (session != null && session.holder == holder) closeSession(player.getUniqueId());
         }, () -> closeSession(player.getUniqueId()));
     }
@@ -239,7 +255,21 @@ public final class PhotoGalleryListener implements Listener {
 
     private void closeSession(UUID playerId) {
         Session removed = sessions.remove(playerId);
+        if (removed != null) awaitingSearch.remove(playerId, removed);
         if (removed != null) activation.detachGalleryPreview(removed.previewSource());
+    }
+
+    private boolean active(Player player, Session session) {
+        if (sessions.get(player.getUniqueId()) != session) return false;
+        if (player.hasPermission("tobyscamera.admin")) return true;
+        closeSession(player.getUniqueId());
+        player.closeInventory();
+        return false;
+    }
+
+    private ItemStack preview(Player player, Session session, PhotoRecord record) {
+        if (session.previewMapId < 0) session.previewMapId = photos.allocateGalleryPreviewMapId();
+        return photos.galleryPreview(record, session.previewMapId);
     }
 
     private void failure(Player player, String message, IOException exception) {
@@ -262,14 +292,16 @@ public final class PhotoGalleryListener implements Listener {
 
     private static final class Session {
         private final UUID playerId;
+        private final UUID sessionId = UUID.randomUUID();
         private final PhotoGalleryState state = new PhotoGalleryState();
         private GalleryHolder holder;
         private PhotoPage page;
         private PhotoRecord selected;
-        private boolean awaitingSearch;
         private boolean deleteArmed;
+        private long generation;
+        private int previewMapId = -1;
         private Session(UUID playerId) { this.playerId = playerId; }
-        private String previewSource() { return "gallery:" + playerId; }
+        private String previewSource() { return "gallery:" + playerId + ':' + sessionId; }
     }
 
     private static final class GalleryHolder implements InventoryHolder {
