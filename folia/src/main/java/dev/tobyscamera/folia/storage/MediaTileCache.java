@@ -14,6 +14,7 @@ public final class MediaTileCache {
     private final long maximumBytes;
     private final Map<Key, byte[]> entries = new LinkedHashMap<>(16, 0.75f, true);
     private final Map<Key, CompletableFuture<byte[]>> loading = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> invalidationGenerations = new java.util.HashMap<>();
     private long cachedBytes;
 
     public MediaTileCache(long maximumBytes) {
@@ -22,9 +23,11 @@ public final class MediaTileCache {
     }
 
     public byte[] getOrLoad(Key key, Loader loader) throws IOException {
+        long generation;
         synchronized (this) {
             byte[] cached = entries.get(key);
             if (cached != null) return cached;
+            generation = invalidationGenerations.getOrDefault(key.mediaId(), 0L);
         }
         CompletableFuture<byte[]> created = new CompletableFuture<>();
         CompletableFuture<byte[]> pending = loading.putIfAbsent(key, created);
@@ -32,7 +35,9 @@ public final class MediaTileCache {
             try {
                 byte[] pixels = loader.load();
                 if (pixels == null || pixels.length != TILE_BYTES) throw new IOException("cached media tile must contain 16384 bytes");
-                synchronized (this) { put(key, pixels); }
+                synchronized (this) {
+                    if (generation == invalidationGenerations.getOrDefault(key.mediaId(), 0L)) put(key, pixels);
+                }
                 created.complete(pixels);
                 return pixels;
             } catch (IOException exception) {
@@ -59,6 +64,18 @@ public final class MediaTileCache {
     }
 
     public synchronized byte[] find(Key key) { return entries.get(key); }
+
+    /** Removes every cached preview and tile belonging to a deleted photo. */
+    public synchronized void invalidatePhoto(UUID photoId) {
+        invalidationGenerations.merge(photoId, 1L, Long::sum);
+        var iterator = entries.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Key, byte[]> entry = iterator.next();
+            if (!entry.getKey().mediaId().equals(photoId)) continue;
+            cachedBytes -= entry.getValue().length;
+            iterator.remove();
+        }
+    }
 
     private void put(Key key, byte[] pixels) {
         byte[] prior = entries.put(key, pixels);

@@ -44,15 +44,19 @@ public final class MapPhotoService {
         this.virtualMapIds = new VirtualMapIdAllocator(nextVanillaMapId);
     }
 
-    public PhotoRecord createMaps(UUID ownerId, World world, UploadSession session) {
+    public PhotoRecord createMaps(UUID ownerId, String ownerName, World world, UploadSession session, PhotoMetadata metadata) {
         UUID photoId = UUID.randomUUID();
         Map<TileCoordinate, Integer> mapIds = new LinkedHashMap<>();
         for (int y = 0; y < session.height(); y++) for (int x = 0; x < session.width(); x++) {
             TileCoordinate coordinate = new TileCoordinate(x, y);
             mapIds.put(coordinate, virtualMapIds.allocate());
         }
-        PhotoRecord record = new PhotoRecord(photoId, ownerId, Instant.now(), session.width(), session.height(), mapIds);
+        PhotoRecord record = new PhotoRecord(photoId, ownerId, ownerName, Instant.now(), session.width(), session.height(), mapIds, metadata);
         return record;
+    }
+
+    public PhotoRecord createMaps(UUID ownerId, World world, UploadSession session) {
+        return createMaps(ownerId, null, world, session, null);
     }
 
     public void persist(PhotoRecord record, UploadSession session) throws IOException {
@@ -70,21 +74,36 @@ public final class MapPhotoService {
     public PhotoRecord record(UUID photoId) throws IOException { return repository.find(photoId); }
 
     public ItemStack bag(World world, PhotoRecord record, UploadSession session) {
-        return bag(world, record, session, null);
+        return originalBag(world, record);
     }
 
     public ItemStack bag(World world, PhotoRecord record, UploadSession session, PhotoMetadata metadata) {
-        return PhotoBagFactory.createNegative(new PhotoBagData(record.photoId(), PhotoBagKind.PHOTO, virtualMapIds.allocate(),
-                record.gridWidth(), record.gridHeight(), metadata));
+        return originalBag(world, record);
     }
 
-    public ItemStack bag(World world, PhotoRecord record) throws IOException {
-        return bag(world, record, (PhotoMetadata) null);
+    public ItemStack bag(World world, PhotoRecord record) {
+        return originalBag(world, record);
     }
 
-    public ItemStack bag(World world, PhotoRecord record, PhotoMetadata metadata) throws IOException {
+    public ItemStack bag(World world, PhotoRecord record, PhotoMetadata metadata) {
+        return originalBag(world, record);
+    }
+
+    /** Restores a stored photo as the original negative, using only persisted record metadata. */
+    public ItemStack originalBag(World world, PhotoRecord record) {
         return PhotoBagFactory.createNegative(new PhotoBagData(record.photoId(), PhotoBagKind.PHOTO, virtualMapIds.allocate(),
-                record.gridWidth(), record.gridHeight(), metadata));
+                record.gridWidth(), record.gridHeight(), record.metadata()));
+    }
+
+    /** Restores a stored photo as an unpackable administrator print. */
+    public ItemStack adminBag(World world, PhotoRecord record) {
+        return PhotoBagFactory.copyForPrint(originalBag(world, record));
+    }
+
+    /** Deletes persisted media and removes its cached preview and tiles. */
+    public void delete(UUID photoId) throws IOException {
+        repository.delete(photoId);
+        cache.invalidatePhoto(photoId);
     }
 
     /** Reads the client-generated preview persisted with the photo. Legacy bags are unsupported. */
@@ -100,7 +119,8 @@ public final class MapPhotoService {
                 () -> repository.readTile(tile.mediaId(), tile.coordinate()));
     }
 
-    public ItemStack mapItem(PhotoRecord record, TileCoordinate coordinate, PhotoMetadata metadata) {
+    public ItemStack mapItem(PhotoRecord record, TileCoordinate coordinate) {
+        PhotoMetadata metadata = record.metadata();
         ItemStack item = new ItemStack(org.bukkit.Material.FILLED_MAP);
         var meta = (org.bukkit.inventory.meta.MapMeta) item.getItemMeta();
         meta.setMapId(record.mapIds().get(coordinate));

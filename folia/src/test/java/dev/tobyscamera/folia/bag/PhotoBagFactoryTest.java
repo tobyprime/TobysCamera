@@ -1,16 +1,66 @@
 package dev.tobyscamera.folia.bag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import dev.tobyscamera.folia.upload.PhotoMetadata;
 import dev.tobyscamera.common.protocol.PhotoPresentation;
+import dev.tobyscamera.folia.item.RootCustomData;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.minecraft.nbt.CompoundTag;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.MapMeta;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 class PhotoBagFactoryTest {
+    @Test
+    void marksNewlyCreatedBagsAsNegative() {
+        ItemStack original = mock(ItemStack.class);
+        ItemStack negative = mock(ItemStack.class);
+        MapMeta meta = mock(MapMeta.class);
+        when(original.clone()).thenReturn(negative);
+        when(negative.getItemMeta()).thenReturn(meta);
+        when(meta.lore()).thenReturn(List.of(net.kyori.adventure.text.Component.text("尺寸: 1×1")));
+
+        assertSame(negative, PhotoBagFactory.markNegative(original));
+
+        verify(meta).lore(PhotoBagFactory.withNegativeLore(List.of(net.kyori.adventure.text.Component.text("尺寸: 1×1"))));
+    }
+
+    @Test
+    void printableCopyMarksTheBagAndRemovesNegativeLore() {
+        ItemStack original = mock(ItemStack.class);
+        ItemStack printable = mock(ItemStack.class);
+        MapMeta meta = mock(MapMeta.class);
+        CompoundTag tags = new CompoundTag();
+        when(original.clone()).thenReturn(printable);
+        when(printable.getItemMeta()).thenReturn(meta);
+        when(meta.lore()).thenReturn(PhotoBagFactory.withNegativeLore(List.of(net.kyori.adventure.text.Component.text("尺寸: 1×1"))));
+
+        try (MockedStatic<RootCustomData> customData = org.mockito.Mockito.mockStatic(RootCustomData.class)) {
+            customData.when(() -> RootCustomData.update(eq(printable), any())).thenAnswer(invocation -> {
+                @SuppressWarnings("unchecked") java.util.function.Consumer<CompoundTag> editor = invocation.getArgument(1);
+                editor.accept(tags);
+                return null;
+            });
+
+            assertSame(printable, PhotoBagFactory.copyForPrint(original));
+        }
+
+        assertTrue(tags.getBoolean("tobyscamera:photo_copy").orElse(false));
+        verify(meta).lore(PhotoBagFactory.withoutNegativeLore(PhotoBagFactory.withNegativeLore(List.of(net.kyori.adventure.text.Component.text("尺寸: 1×1")))));
+    }
+
     @Test
     void addsAndRemovesTheVisibleNegativeMarkerWithoutChangingOtherLore() {
         var text = PlainTextComponentSerializer.plainText();

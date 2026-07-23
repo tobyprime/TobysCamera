@@ -25,6 +25,12 @@ public final class PendingDeliveryRepository {
         List<UUID> result = entries.stream().filter(entry -> entry.playerId.equals(playerId)).map(Entry::photoId).toList();
         entries.removeIf(entry -> entry.playerId.equals(playerId)); save(); return result;
     }
+    public synchronized List<UUID> pending(UUID playerId) {
+        return entries.stream().filter(entry -> entry.playerId.equals(playerId)).map(Entry::photoId).toList();
+    }
+    public synchronized void acknowledge(UUID playerId, UUID photoId) throws IOException {
+        if (entries.remove(new Entry(playerId, photoId))) save();
+    }
     private void save() throws IOException {
         Files.write(file, entries.stream().map(entry -> entry.playerId + " " + entry.photoId).toList(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
