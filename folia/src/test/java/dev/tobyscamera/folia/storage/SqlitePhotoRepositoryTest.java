@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.tobyscamera.common.protocol.PhotoPresentation;
 import dev.tobyscamera.folia.upload.PhotoMetadata;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -154,6 +155,20 @@ class SqlitePhotoRepositoryTest {
             assertFalse(Files.exists(targetContainer));
             assertEquals(retained.photoId(), repository.find(retained.photoId()).photoId());
             assertTrue(Files.exists(retainedContainer));
+        }
+    }
+
+    @Test
+    void preservesCommittedDeleteWhenStagedMediaCleanupFails() throws Exception {
+        PhotoRecord target = record(1, 1);
+        try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory, path -> {
+            throw new IOException("simulated staged cleanup failure");
+        })) {
+            repository.save(target, pixels(1, 1), filled((byte) 1));
+
+            repository.delete(target.photoId());
+
+            assertNull(repository.find(target.photoId()));
         }
     }
 

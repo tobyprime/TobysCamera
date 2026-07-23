@@ -24,9 +24,15 @@ public final class SqlitePhotoRepository implements PhotoRepository {
     private final Path photosDirectory;
     private final Path temporaryDirectory;
     private final Connection connection;
+    private final StagedMediaCleanup stagedMediaCleanup;
 
     public SqlitePhotoRepository(Path dataDirectory) throws IOException {
+        this(dataDirectory, path -> { Files.deleteIfExists(path); });
+    }
+
+    SqlitePhotoRepository(Path dataDirectory, StagedMediaCleanup stagedMediaCleanup) throws IOException {
         try {
+            this.stagedMediaCleanup = stagedMediaCleanup;
             Files.createDirectories(dataDirectory);
             photosDirectory = dataDirectory.resolve("photos");
             temporaryDirectory = dataDirectory.resolve("upload-tmp");
@@ -189,7 +195,9 @@ public final class SqlitePhotoRepository implements PhotoRepository {
             deleteRows("photo_metadata", photoId); deleteRows("photo_tile_data", photoId); deleteRows("tiles", photoId); deleteRows("photos", photoId);
             connection.commit();
             databaseDeleted = true;
-            if (moved) Files.deleteIfExists(staged);
+            if (moved) {
+                try { stagedMediaCleanup.delete(staged); } catch (IOException ignored) { }
+            }
         } catch (SQLException exception) { throw new IOException("could not delete photo", exception); }
         catch (IOException exception) { throw new IOException("could not delete photo", exception); }
         finally {
@@ -297,6 +305,11 @@ public final class SqlitePhotoRepository implements PhotoRepository {
 
     private static String escapeLikeTerm(String term) {
         return term.toLowerCase(java.util.Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_");
+    }
+
+    @FunctionalInterface
+    interface StagedMediaCleanup {
+        void delete(Path path) throws IOException;
     }
 
     private static String tileKey(TileCoordinate coordinate) { return coordinate.x() + "-" + coordinate.y(); }
