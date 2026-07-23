@@ -16,4 +16,17 @@ public final class MapDeliveryService {
     public void queue(Player player, PhotoRecord record) throws IOException {
         pending.add(player.getUniqueId(), record.photoId());
     }
+    public void deliverPending(Player player, RecordLookup records) throws IOException {
+        for (java.util.UUID photoId : pending.pending(player.getUniqueId())) {
+            PhotoRecord record = records.find(photoId);
+            if (record == null) continue;
+            deliver(player, record);
+            pending.acknowledge(player.getUniqueId(), photoId);
+        }
+    }
+
+    @FunctionalInterface
+    public interface RecordLookup {
+        PhotoRecord find(java.util.UUID photoId) throws IOException;
+    }
 }

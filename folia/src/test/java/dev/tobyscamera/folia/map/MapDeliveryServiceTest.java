@@ -1,6 +1,7 @@
 package dev.tobyscamera.folia.map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -94,6 +95,71 @@ class MapDeliveryServiceTest {
             bags.verify(() -> PhotoBagFactory.createNegative(new PhotoBagData(restored.photoId(), PhotoBagKind.PHOTO, 7,
                     restored.gridWidth(), restored.gridHeight(), saved.metadata())));
         }
+    }
+
+    @Test
+    void retainsPendingPhotoWhenRecordLookupFails() throws Exception {
+        UUID playerId = UUID.randomUUID();
+        PhotoRecord record = record();
+        PendingDeliveryRepository pending = new PendingDeliveryRepository(directory);
+        pending.add(playerId, record.photoId());
+        Player player = mock(Player.class);
+        when(player.getUniqueId()).thenReturn(playerId);
+        MapDeliveryService deliveries = new MapDeliveryService(new MapPhotoService(null, mock(PhotoRepository.class),
+                new MediaTileCache(16_384), () -> 7), pending);
+
+        assertThrows(java.io.IOException.class, () -> deliveries.deliverPending(player, ignored -> {
+            throw new java.io.IOException("storage unavailable");
+        }));
+
+        assertEquals(List.of(record.photoId()), pending.pending(playerId));
+    }
+
+    @Test
+    void retainsPendingPhotoWhenDeliveryFails() throws Exception {
+        UUID playerId = UUID.randomUUID();
+        PhotoRecord record = record();
+        PendingDeliveryRepository pending = new PendingDeliveryRepository(directory);
+        pending.add(playerId, record.photoId());
+        Player player = mock(Player.class);
+        when(player.getUniqueId()).thenReturn(playerId);
+        when(player.getWorld()).thenReturn(mock(World.class));
+        MapDeliveryService deliveries = new MapDeliveryService(new MapPhotoService(null, mock(PhotoRepository.class),
+                new MediaTileCache(16_384), () -> 7), pending);
+
+        try (MockedStatic<PhotoBagFactory> bags = org.mockito.Mockito.mockStatic(PhotoBagFactory.class)) {
+            bags.when(() -> PhotoBagFactory.createNegative(org.mockito.ArgumentMatchers.any(PhotoBagData.class)))
+                    .thenThrow(new IllegalStateException("delivery failed"));
+
+            assertThrows(IllegalStateException.class, () -> deliveries.deliverPending(player, ignored -> record));
+        }
+
+        assertEquals(List.of(record.photoId()), pending.pending(playerId));
+    }
+
+    @Test
+    void acknowledgesPendingPhotoOnlyAfterDeliverySucceeds() throws Exception {
+        UUID playerId = UUID.randomUUID();
+        PhotoRecord record = record();
+        PendingDeliveryRepository pending = new PendingDeliveryRepository(directory);
+        pending.add(playerId, record.photoId());
+        Player player = mock(Player.class);
+        PlayerInventory inventory = mock(PlayerInventory.class);
+        when(player.getUniqueId()).thenReturn(playerId);
+        when(player.getWorld()).thenReturn(mock(World.class));
+        when(player.getInventory()).thenReturn(inventory);
+        when(inventory.addItem(any(ItemStack.class))).thenReturn(new HashMap<>());
+        MapDeliveryService deliveries = new MapDeliveryService(new MapPhotoService(null, mock(PhotoRepository.class),
+                new MediaTileCache(16_384), () -> 7), pending);
+
+        try (MockedStatic<PhotoBagFactory> bags = org.mockito.Mockito.mockStatic(PhotoBagFactory.class)) {
+            bags.when(() -> PhotoBagFactory.createNegative(org.mockito.ArgumentMatchers.any(PhotoBagData.class)))
+                    .thenReturn(mock(ItemStack.class));
+
+            deliveries.deliverPending(player, ignored -> record);
+        }
+
+        assertEquals(List.of(), pending.pending(playerId));
     }
 
     private static PhotoRecord record() {

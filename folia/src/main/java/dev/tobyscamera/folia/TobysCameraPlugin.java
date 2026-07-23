@@ -210,10 +210,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         Player player = event.getPlayer();
         scheduler.runEntity(player, () -> {
             try {
-                for (var photoId : new PendingDeliveryRepository(getDataFolder().toPath()).take(player.getUniqueId())) {
-                    var record = repository.find(photoId);
-                    if (record != null) deliveries.deliver(player, record);
-                }
+                deliveries.deliverPending(player, repository::find);
             } catch (IOException exception) { getLogger().warning("Could not deliver queued photos: " + exception.getMessage()); }
         }, () -> { });
     }
