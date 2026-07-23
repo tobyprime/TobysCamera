@@ -15,11 +15,13 @@ import dev.tobyscamera.folia.delivery.PendingDeliveryRepository;
 import dev.tobyscamera.folia.storage.MediaTileCache;
 import dev.tobyscamera.folia.storage.PhotoRecord;
 import dev.tobyscamera.folia.storage.PhotoRepository;
+import dev.tobyscamera.folia.storage.SqlitePhotoRepository;
 import dev.tobyscamera.folia.storage.TileCoordinate;
 import dev.tobyscamera.folia.upload.PhotoMetadata;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.World;
@@ -58,6 +60,40 @@ class MapDeliveryServiceTest {
         ArgumentCaptor<ItemStack> delivered = ArgumentCaptor.forClass(ItemStack.class);
         verify(inventory).addItem(delivered.capture());
         assertEquals(bag, delivered.getValue());
+    }
+
+    @Test
+    void deliversQueuedPhotoFromReopenedStorageWithoutTransientMetadata() throws Exception {
+        UUID playerId = UUID.randomUUID();
+        PhotoRecord saved = record();
+        Player queuedPlayer = mock(Player.class);
+        when(queuedPlayer.getUniqueId()).thenReturn(playerId);
+        try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
+            repository.save(saved, Map.of(new TileCoordinate(0, 0), new byte[16_384]), new byte[16_384]);
+            new MapDeliveryService(new MapPhotoService(null, repository, new MediaTileCache(16_384), () -> 7),
+                    new PendingDeliveryRepository(directory)).queue(queuedPlayer, saved);
+        }
+
+        List<UUID> queuedIds = new PendingDeliveryRepository(directory).take(playerId);
+        assertEquals(List.of(saved.photoId()), queuedIds);
+
+        ItemStack bag = mock(ItemStack.class);
+        Player reconnectedPlayer = mock(Player.class);
+        PlayerInventory inventory = mock(PlayerInventory.class);
+        when(reconnectedPlayer.getWorld()).thenReturn(mock(World.class));
+        when(reconnectedPlayer.getInventory()).thenReturn(inventory);
+        when(inventory.addItem(any(ItemStack.class))).thenReturn(new HashMap<>());
+        try (SqlitePhotoRepository reopened = new SqlitePhotoRepository(directory);
+                MockedStatic<PhotoBagFactory> bags = org.mockito.Mockito.mockStatic(PhotoBagFactory.class)) {
+            PhotoRecord restored = reopened.find(queuedIds.getFirst());
+            bags.when(() -> PhotoBagFactory.createNegative(org.mockito.ArgumentMatchers.any(PhotoBagData.class))).thenReturn(bag);
+
+            new MapDeliveryService(new MapPhotoService(null, reopened, new MediaTileCache(16_384), () -> 7),
+                    new PendingDeliveryRepository(directory)).deliver(reconnectedPlayer, restored);
+
+            bags.verify(() -> PhotoBagFactory.createNegative(new PhotoBagData(restored.photoId(), PhotoBagKind.PHOTO, 7,
+                    restored.gridWidth(), restored.gridHeight(), saved.metadata())));
+        }
     }
 
     private static PhotoRecord record() {

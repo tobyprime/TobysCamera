@@ -22,10 +22,19 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.inventory.ItemStack;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 class MapPhotoServiceTest {
+    @BeforeAll
+    static void bootstrapMinecraftItems() {
+        net.minecraft.SharedConstants.tryDetectVersion();
+        net.minecraft.server.Bootstrap.bootStrap();
+        org.bukkit.craftbukkit.CraftRegistry.setMinecraftRegistry(net.minecraft.core.RegistryAccess
+                .fromRegistryOfRegistries(net.minecraft.core.registries.BuiltInRegistries.REGISTRY));
+    }
+
     @Test
     void createsRecordsWithTheCapturedOwnerNameAndMetadata() {
         MapPhotoService photos = new MapPhotoService(null, mock(PhotoRepository.class), new MediaTileCache(16_384), () -> 7);
@@ -74,6 +83,18 @@ class MapPhotoServiceTest {
                     record.gridWidth(), record.gridHeight(), record.metadata())));
             bags.verify(() -> PhotoBagFactory.copyForPrint(negative));
         }
+    }
+
+    @Test
+    void adminBagIsARealPrintableCopyThatRetainsPersistedMetadata() {
+        MapPhotoService photos = new MapPhotoService(null, mock(PhotoRepository.class), new MediaTileCache(16_384), () -> 7);
+        PhotoRecord record = record();
+
+        ItemStack bag = photos.adminBag(null, record);
+
+        org.junit.jupiter.api.Assertions.assertFalse(PhotoBagFactory.isNegative(bag));
+        assertTrue(PhotoBagFactory.isCopy(bag));
+        org.junit.jupiter.api.Assertions.assertEquals(record.metadata(), PhotoBagFactory.read(bag).metadata());
     }
 
     @Test
