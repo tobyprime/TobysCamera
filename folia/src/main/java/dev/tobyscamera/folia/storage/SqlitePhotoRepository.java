@@ -112,6 +112,49 @@ public final class SqlitePhotoRepository implements PhotoRepository {
     }
 
     @Override
+    public synchronized PhotoOwnerPage findOwners(PhotoQuery query) throws IOException {
+        String order = query.sort() == PhotoQuery.Sort.NEWEST ? "desc" : "asc";
+        String sql = "select p.owner, coalesce(max(p.owner_name), '') as owner_name, count(*) as photo_count, max(p.created) as latest_created "
+                + "from photos p where lower(coalesce(p.owner_name, '')) like ? escape '!' or lower(p.owner) like ? escape '!' "
+                + "or lower(p.id) like ? escape '!' group by p.owner order by latest_created " + order + ", p.owner " + order + " limit ? offset ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, containsLikePattern(query.term()));
+            statement.setString(2, uuidPrefixLikePattern(query.term()));
+            statement.setString(3, uuidPrefixLikePattern(query.term()));
+            statement.setInt(4, query.pageSize() + 1);
+            statement.setLong(5, (long) query.page() * query.pageSize());
+            try (ResultSet rows = statement.executeQuery()) {
+                List<PhotoOwner> owners = new ArrayList<>();
+                while (rows.next() && owners.size() <= query.pageSize()) {
+                    String ownerName = rows.getString("owner_name");
+                    owners.add(new PhotoOwner(UUID.fromString(rows.getString("owner")), ownerName == null || ownerName.isBlank() ? null : ownerName,
+                            rows.getLong("photo_count"), Instant.ofEpochMilli(rows.getLong("latest_created"))));
+                }
+                boolean hasNext = owners.size() > query.pageSize();
+                if (hasNext) owners.removeLast();
+                return new PhotoOwnerPage(owners, hasNext);
+            }
+        } catch (SQLException exception) { throw new IOException("could not query photo owners", exception); }
+    }
+
+    @Override
+    public synchronized PhotoPage findPageForOwner(UUID ownerId, PhotoQuery query) throws IOException {
+        String order = query.sort() == PhotoQuery.Sort.NEWEST ? "desc" : "asc";
+        try (PreparedStatement statement = connection.prepareStatement(photoSelect("where p.owner=? order by p.created " + order + ", p.id " + order + " limit ? offset ?"))) {
+            statement.setString(1, ownerId.toString());
+            statement.setInt(2, query.pageSize() + 1);
+            statement.setLong(3, (long) query.page() * query.pageSize());
+            try (ResultSet rows = statement.executeQuery()) {
+                List<PhotoRecord> records = new ArrayList<>();
+                while (rows.next() && records.size() <= query.pageSize()) records.add(readRecord(rows));
+                boolean hasNext = records.size() > query.pageSize();
+                if (hasNext) records.removeLast();
+                return new PhotoPage(records, hasNext);
+            }
+        } catch (SQLException exception) { throw new IOException("could not query owner photos", exception); }
+    }
+
+    @Override
     public synchronized PhotoStorageStats stats() throws IOException {
         try (Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery("select count(*), coalesce(sum(width * height), 0) from photos")) {

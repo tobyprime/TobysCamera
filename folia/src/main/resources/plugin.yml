@@ -14,7 +14,7 @@ permissions:
     default: true
   tobyscamera.admin:
     description: Grants administrative TobysCamera commands.
-    default: false
+    default: op
     children:
       tobyscamera.reload: true
       tobyscamera.status: true

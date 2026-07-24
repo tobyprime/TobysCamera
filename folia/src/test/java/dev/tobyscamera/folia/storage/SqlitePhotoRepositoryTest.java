@@ -95,6 +95,24 @@ class SqlitePhotoRepositoryTest {
     }
 
     @Test
+    void groupsPhotosByOwnerAndFindsAnOwnersPhotos() throws Exception {
+        try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
+            PhotoRecord tobyOld = record("Toby", "11111111-0000-0000-0000-000000000001", "2026-07-20T00:00:00Z");
+            PhotoRecord tobyNew = record("Toby", "11111111-0000-0000-0000-000000000001", "2026-07-22T00:00:00Z");
+            PhotoRecord alex = record("Alex", "22222222-0000-0000-0000-000000000002", "2026-07-21T00:00:00Z");
+            repository.save(tobyOld, pixels(1, 1), filled((byte) 1));
+            repository.save(tobyNew, pixels(1, 1), filled((byte) 2));
+            repository.save(alex, pixels(1, 1), filled((byte) 3));
+
+            PhotoOwnerPage owners = repository.findOwners(new PhotoQuery("toby", PhotoQuery.Sort.NEWEST, 0, 45));
+
+            assertEquals(List.of(new PhotoOwner(tobyNew.ownerId(), "Toby", 2, tobyNew.createdAt())), owners.owners());
+            assertEquals(List.of(tobyNew, tobyOld), repository.findPageForOwner(tobyNew.ownerId(),
+                    new PhotoQuery("", PhotoQuery.Sort.NEWEST, 0, 45)).records());
+        }
+    }
+
+    @Test
     void matchesOwnerAndPhotoUuidsOnlyAtTheirPrefixes() throws Exception {
         try (SqlitePhotoRepository repository = new SqlitePhotoRepository(directory)) {
             PhotoRecord ownerContainsTerm = new PhotoRecord(UUID.fromString("aaaaaaaa-2222-0000-0000-000000000001"),

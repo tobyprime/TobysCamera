@@ -9,6 +9,8 @@ public interface PhotoRepository extends AutoCloseable {
     void save(PhotoRecord record, Map<TileCoordinate, byte[]> tiles, byte[] previewPixels) throws IOException;
     List<PhotoRecord> loadAll() throws IOException;
     PhotoPage findPage(PhotoQuery query) throws IOException;
+    PhotoOwnerPage findOwners(PhotoQuery query) throws IOException;
+    PhotoPage findPageForOwner(UUID ownerId, PhotoQuery query) throws IOException;
     PhotoStorageStats stats() throws IOException;
     PhotoRecord find(UUID photoId) throws IOException;
     byte[] readTile(UUID photoId, TileCoordinate coordinate) throws IOException;
