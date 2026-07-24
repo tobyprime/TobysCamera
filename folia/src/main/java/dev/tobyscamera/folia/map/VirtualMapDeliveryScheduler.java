@@ -47,6 +47,7 @@ public final class VirtualMapDeliveryScheduler {
         Source source = new Source(sourceId, player, mapId, priority, distanceSquared, loader);
         sourcesById.put(sourceId, source);
         demand.sources.put(sourceId, source);
+        if (!demand.sent) demand.failed = false;
     }
 
     public synchronized void detach(String sourceId) {
@@ -93,7 +94,7 @@ public final class VirtualMapDeliveryScheduler {
 
     private Demand selectUnreadDemand(ReadAdmission admission) {
         return demandsByKey.values().stream()
-                .filter(demand -> !demand.sent && demand.pixels == null && !demand.reading
+                .filter(demand -> !demand.sent && !demand.failed && demand.pixels == null && !demand.reading
                         && admission.canReserve(demand.key.playerId()))
                 .min(demandOrder())
                 .orElse(null);
@@ -131,6 +132,7 @@ public final class VirtualMapDeliveryScheduler {
         if (demandsByKey.get(demand.key) != demand) return;
         demand.reading = false;
         if (failure != null) {
+            demand.failed = true;
             failures.accept(failure);
             return;
         }
@@ -192,6 +194,7 @@ public final class VirtualMapDeliveryScheduler {
         final Map<String, Source> sources = new LinkedHashMap<>();
         boolean reading;
         boolean sent;
+        boolean failed;
         byte[] pixels;
 
         Demand(DemandKey key, long sequence) { this.key = key; this.sequence = sequence; }

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -152,15 +153,35 @@ class VirtualMapDeliverySchedulerTest {
         verify(fixture.sender, never()).sendFull(any(), any(Integer.class), any(byte[].class));
     }
 
+    @Test
+    void doesNotRetryFailedDemandEveryTick() {
+        Fixture fixture = new Fixture(new VirtualMapDeliveryScheduler.Limits(1, 4, 65_536L, 65_536L));
+        Player player = fixture.player();
+        fixture.scheduler.attach("source", player, 9, VirtualMapDeliveryScheduler.Priority.MAIN_HAND, 0L,
+                () -> { throw new IOException("missing photo preview"); });
+
+        fixture.scheduler.tick();
+        fixture.runAsync();
+        fixture.runGlobal();
+        fixture.scheduler.tick();
+        fixture.scheduler.tick();
+
+        assertEquals(1, fixture.failures.size());
+        assertEquals("missing photo preview", fixture.failures.getFirst().getMessage());
+        assertEquals(0, fixture.async.size());
+        verify(fixture.sender, never()).sendFull(any(), any(Integer.class), any(byte[].class));
+    }
+
     private static final class Fixture {
         final List<Runnable> async = new ArrayList<>();
         final List<Runnable> global = new ArrayList<>();
         final List<String> loaded = new ArrayList<>();
+        final List<IOException> failures = new ArrayList<>();
         final VirtualMapPacketSender sender = mock(VirtualMapPacketSender.class);
         final VirtualMapDeliveryScheduler scheduler;
 
         Fixture(VirtualMapDeliveryScheduler.Limits limits) {
-            scheduler = new VirtualMapDeliveryScheduler(async::add, global::add, ignored -> { }, sender, limits);
+            scheduler = new VirtualMapDeliveryScheduler(async::add, global::add, failures::add, sender, limits);
         }
 
         Player player() {
