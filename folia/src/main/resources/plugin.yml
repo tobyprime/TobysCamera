@@ -9,9 +9,6 @@ commands:
     description: Reload TobysCamera or show its runtime status.
     usage: /tobyscamera <reload|status|detail|gallery>
 permissions:
-  tobyscamera.upload:
-    description: Allows a player to capture and upload photos.
-    default: true
   tobyscamera.admin:
     description: Grants administrative TobysCamera commands.
     default: op

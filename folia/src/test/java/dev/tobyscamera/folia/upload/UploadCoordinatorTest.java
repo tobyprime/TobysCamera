@@ -121,9 +121,8 @@ class UploadCoordinatorTest {
     }
 
     @Test
-    void rejectsCaptureWhenPlayerLacksUploadPermission() {
+    void captureDoesNotCheckBukkitUploadPermissionWhenCameraIsHeld() {
         Player player = player();
-        when(player.hasPermission("tobyscamera.upload")).thenReturn(false);
         List<CameraPacket> sent = new ArrayList<>();
         CameraFilmService films = mock(CameraFilmService.class);
         when(films.heldCamera(player)).thenReturn(mock(ItemStack.class));
@@ -131,7 +130,27 @@ class UploadCoordinatorTest {
 
         coordinator.handle(player, new Packets.CaptureIntent());
 
-        assertEquals(Packets.UploadRejected.class, sent.getFirst().getClass());
+        assertTrue(sent.isEmpty());
+        verify(films).heldCamera(player);
+        verify(player, never()).hasPermission("tobyscamera.upload");
+    }
+
+    @Test
+    void beginDoesNotCheckBukkitUploadPermissionWhenPlayerIsNotBlocked() {
+        Player player = player();
+        List<CameraPacket> sent = new ArrayList<>();
+        CameraFilmService films = mock(CameraFilmService.class);
+        ItemStack camera = mock(ItemStack.class);
+        when(films.heldCamera(player)).thenReturn(camera);
+        when(films.maximumForFilm(camera, 4)).thenReturn(1);
+        when(films.consume(camera, 1)).thenReturn(true);
+        UploadCoordinator coordinator = coordinator(sent, films, (ignored, session, metadata) -> { });
+
+        coordinator.handle(player, new Packets.UploadBegin(1, 1));
+
+        assertEquals(Packets.UploadGranted.class, sent.getFirst().getClass());
+        verify(films).consume(camera, 1);
+        verify(player, never()).hasPermission("tobyscamera.upload");
     }
 
     @Test
@@ -248,7 +267,6 @@ class UploadCoordinatorTest {
 
     private static Player player() {
         Player player = mock(Player.class);
-        when(player.hasPermission("tobyscamera.upload")).thenReturn(true);
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
         org.bukkit.World world = mock(org.bukkit.World.class);
         when(world.getKey()).thenReturn(new org.bukkit.NamespacedKey("minecraft", "world"));
