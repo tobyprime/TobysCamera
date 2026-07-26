@@ -89,6 +89,24 @@ class PhotoUploadControllerTest {
         assertEquals(19, Byte.toUnsignedInt(((Packets.UploadPreviewChunk) sent.get(1)).data()[0]));
     }
 
+    @Test
+    void abortingPendingUploadAfterAllChunksAreSentClearsProgressAndAllowsAnotherUpload() {
+        List<CameraPacket> sent = new ArrayList<>();
+        java.util.concurrent.atomic.AtomicLong now = new java.util.concurrent.atomic.AtomicLong(1_000L);
+        PhotoUploadController controller = new PhotoUploadController(sent::add, now::get);
+
+        controller.confirm(new MapTileEncoder.EncodedPhoto(1, 1, List.of(new byte[16_384])), new byte[16_384]);
+        controller.handleServerPacket(new Packets.UploadGranted(UUID.randomUUID(), Long.MAX_VALUE, 16_384, 120));
+        now.set(1_050L);
+        controller.tick();
+
+        assertEquals(100, controller.progress().percentage());
+        controller.abortPendingUpload();
+
+        assertEquals(UploadProgress.NONE, controller.progress());
+        assertTrue(controller.confirm(new MapTileEncoder.EncodedPhoto(1, 1, List.of(new byte[16_384])), new byte[16_384]));
+    }
+
     private static byte[] filled(byte value) {
         byte[] pixels = new byte[16_384];
         java.util.Arrays.fill(pixels, value);

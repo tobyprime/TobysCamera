@@ -81,6 +81,7 @@ public final class PhotoUploadController {
     }
 
     public UploadProgress progress() { return new UploadProgress(completedChunks, totalChunks); }
+    public void abortPendingUpload() { clearPending(); }
     public void clearPending() { pendingPhoto = null; previewPixels = null; token = null; allowance = null; previewOffset = tile = offset = completedChunks = totalChunks = 0; finishSent = false; }
 
     private static void send(CameraPacket packet) {

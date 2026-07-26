@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.loader.api.FabricLoader;
@@ -86,6 +87,8 @@ public final class TobysCameraClient implements ClientModInitializer {
         });
         ClientPlayNetworking.registerGlobalReceiver(CameraPayload.TYPE,
                 (payload, context) -> handleServerPacket(PacketCodec.decode(payload.data())));
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> resetPlayConnectionState());
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> resetPlayConnectionState());
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
     }
 
@@ -180,6 +183,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     }
 
     private static UploadProgress uploadProgress() { return UPLOADS.progress(); }
+    private static void resetPlayConnectionState() { UPLOADS.abortPendingUpload(); VIEWFINDER.close(); }
     public static void logViewfinderKeyEvent(int action, KeyEvent event) { }
     public static float viewfinderZoom() { return VIEWFINDER.zoomActive() ? VIEWFINDER.targetZoom() : 1.0f; }
     public static float viewfinderRollRadians() { return VIEWFINDER.zoomActive() ? (float) Math.toRadians(VIEWFINDER.composition().rollDegrees()) : 0.0f; }
