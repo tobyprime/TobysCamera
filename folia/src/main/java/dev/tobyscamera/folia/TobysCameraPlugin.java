@@ -15,6 +15,7 @@ import dev.tobyscamera.folia.delivery.PendingDeliveryRepository;
 import dev.tobyscamera.folia.storage.PhotoRepository;
 import dev.tobyscamera.folia.storage.SqlitePhotoRepository;
 import dev.tobyscamera.folia.upload.UploadCoordinator;
+import dev.tobyscamera.folia.upload.PhotoCompletionNotifier;
 import dev.tobyscamera.folia.status.PluginRuntimeStatus;
 import dev.tobyscamera.folia.map.MediaMapActivationListener;
 import dev.tobyscamera.folia.map.VirtualMapDeliveryScheduler;
@@ -42,6 +43,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
     private PhotoRepository repository;
     private MapPhotoService photos;
     private MapDeliveryService deliveries;
+    private PhotoCompletionNotifier completionNotifier;
     private ServerTaskScheduler scheduler;
     private ServerTaskScheduler.TaskHandle uploadCleanupTask;
     private ServerTaskScheduler.TaskHandle deliveryTickTask;
@@ -66,6 +68,7 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
         bagPlacement = new PhotoBagPlacementListener(this, photos, scheduler);
         try { deliveries = new MapDeliveryService(photos, new PendingDeliveryRepository(getDataFolder().toPath())); }
         catch (IOException exception) { throw new IllegalStateException("Could not initialize pending deliveries", exception); }
+        completionNotifier = new PhotoCompletionNotifier(deliveries::deliver, deliveries::queue, this::send, message -> getLogger().warning(message));
         configureRuntime(PluginSettings.from(flatten(getConfig())));
         mediaActivation = new MediaMapActivationListener(this, scheduler, photos);
         mediaActivation.setDeliveryLimits(deliveryLimits(PluginSettings.from(flatten(getConfig()))));
@@ -170,10 +173,8 @@ public final class TobysCameraPlugin extends JavaPlugin implements Listener, Com
                         photos.persist(record, session);
                         runtimeStatus.recordPersisted(record.mapIds().size());
                         scheduler.runGlobal(() -> {
-                            scheduler.runEntity(player, () -> {
-                                deliveries.deliver(player, record);
-                                send(player, new Packets.PhotoCreated(record.photoId(), record.mapIds().values().stream().toList(), record.gridWidth(), record.gridHeight()));
-                            }, () -> { try { deliveries.queue(player, record); } catch (IOException exception) { getLogger().warning("Could not queue photo delivery: " + exception.getMessage()); } });
+                            scheduler.runEntity(player, () -> completionNotifier.complete(player, record),
+                                    () -> { try { deliveries.queue(player, record); } catch (IOException exception) { getLogger().warning("Could not queue photo delivery: " + exception.getMessage()); } });
                         });
                     } catch (IOException exception) {
                         scheduler.runGlobal(() -> photos.discard(record));
