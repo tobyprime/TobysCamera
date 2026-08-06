@@ -66,3 +66,28 @@ tasks.runServer {
         }
     }
 }
+
+runPaper {
+    folia {
+        registerTask {
+            minecraftVersion("1.21.11")
+            runDirectory(file("folia-test-run"))
+            doFirst {
+                val directory = runDirectory.get().asFile
+                directory.mkdirs()
+                directory.resolve("eula.txt").writeText("eula=true\n")
+
+                val propertiesFile = directory.resolve("server.properties")
+                val properties = Properties()
+                if (propertiesFile.isFile) {
+                    propertiesFile.inputStream().use { input -> properties.load(input) }
+                }
+                properties.setProperty("online-mode", "false")
+                properties.setProperty("server-port", "25566")
+                propertiesFile.outputStream().use {
+                    properties.store(it, "Local Folia development server configuration")
+                }
+            }
+        }
+    }
+}

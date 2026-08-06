@@ -115,3 +115,9 @@ tasks.register("runServer") {
     description = "Starts a Paper development server with the Paper/Folia-compatible TobysCamera plugin."
     dependsOn(":folia:runServer")
 }
+
+tasks.register("runFoliaServer") {
+    group = "application"
+    description = "Starts a Folia 1.21.11 development server with the TobysCamera plugin."
+    dependsOn(":folia:runFolia")
+}

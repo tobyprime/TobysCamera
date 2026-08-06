@@ -47,6 +47,14 @@ loads the plugin JAR, accepts the EULA for this local project run, and sets
 `online-mode=false`. The generated JAR is the same artifact for both Paper and Folia;
 use normal production authentication settings when deploying it.
 
+## Local Folia development server
+
+Run `./gradlew runFoliaServer` (or `./gradlew.bat runFoliaServer` on Windows) to
+build the plugin and start an independent Folia 1.21.11 server. Its generated
+runtime state is stored in `folia/folia-test-run`, uses port `25566`, accepts
+the EULA for this local project run, and sets `online-mode=false`. It loads the
+same plugin JAR as the Paper development server.
+
 ## Server setup and manual verification
 
 1. Put the plugin JAR in the `plugins/` directory of either Paper or Folia, start the server once, then configure `plugins/TobysCamera/config.yml` as required.
