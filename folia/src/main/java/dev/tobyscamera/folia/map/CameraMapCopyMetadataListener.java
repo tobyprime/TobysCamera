@@ -181,6 +181,7 @@ public final class CameraMapCopyMetadataListener implements Listener {
     }
 
     private static boolean isCameraMap(ItemStack item) {
+        if (item == null || item.isEmpty()) return false;
         return PhotoBagFactory.isBag(item) || RootCustomData.contains(item, PHOTO_ID);
     }
 }
