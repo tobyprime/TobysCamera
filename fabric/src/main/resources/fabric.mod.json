@@ -3,7 +3,14 @@
   "id": "tobyscamera",
   "version": "${version}",
   "name": "TobysCamera",
+  "description": "A client-side Minecraft camera mod for capturing persistent, shareable map photos on Paper and Folia servers.",
+  "icon": "assets/tobyscamera/icon.png",
   "license": "MIT",
+  "contact": {
+    "homepage": "https://github.com/tobyprime/TobysCamera",
+    "sources": "https://github.com/tobyprime/TobysCamera",
+    "issues": "https://github.com/tobyprime/TobysCamera/issues"
+  },
   "environment": "client",
   "entrypoints": { "client": ["dev.tobyscamera.fabric.TobysCameraClient"] },
   "mixins": ["tobyscamera.mixins.json"],

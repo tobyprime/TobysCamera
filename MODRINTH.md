@@ -4,7 +4,7 @@ Turn the Minecraft world in front of you into persistent, shareable map photos.
 
 Only the **photographer** needs the Fabric client mod. The server runs the Paper/Folia plugin, while finished media is delivered as vanilla `filled_map` items that every player can view, hold, trade, and place in item frames.
 
-> Supports Fabric **1.21.11 / 26.1** clients and Paper or Folia **1.21.11+** servers.
+> Supports Fabric **1.21.11 / 26.1 / 26.2** clients and Paper or Folia **1.21.11+** servers.
 
 Keep the client mod and server plugin on the same TobysCamera release. Older clients receive an explicit rejection for unsupported camera packets.
 
@@ -143,7 +143,7 @@ upload:
 
 只需要**摄影师**安装 Fabric 客户端 Mod；服务器安装 Paper/Folia 插件。成片是原版 `filled_map`，没有安装 Mod 的玩家同样可以查看、持有、交易和挂到展示框中。
 
-> 适用于 Fabric **1.21.11 / 26.1** 客户端，以及 Paper 或 Folia **1.21.11+** 服务器。
+> 适用于 Fabric **1.21.11 / 26.1 / 26.2** 客户端，以及 Paper 或 Folia **1.21.11+** 服务器。
 
 请保持客户端 Mod 与服务端插件处于同一 TobysCamera 版本；旧客户端发送不受支持的相机数据包时会收到明确的拒绝提示。
 

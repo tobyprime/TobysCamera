@@ -25,7 +25,7 @@ rootProject.name = "TobysCamera"
 include("common", "fabric", "folia")
 
 providers.gradleProperty("supported_mc_versions")
-    .orElse("1.21.11")
+    .orElse("1.21.11,26.1,26.2")
     .get()
     .split(',')
     .map(String::trim)

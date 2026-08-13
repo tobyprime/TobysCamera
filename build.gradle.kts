@@ -13,7 +13,7 @@ val artifactVersion = providers.gradleProperty("artifact_version")
     .orElse(providers.gradleProperty("mod_version"))
     .get()
 val supportedMinecraftVersions = providers.gradleProperty("supported_mc_versions")
-    .orElse("1.21.11,26.1")
+    .orElse("1.21.11,26.1,26.2")
     .get()
     .split(',')
     .map(String::trim)
@@ -85,10 +85,13 @@ tasks.register("verifyModules") {
         ":fabric-1.21.11:verifyPublishedJar",
         ":fabric-26.1:test",
         ":fabric-26.1:buildAndCollect",
-        ":fabric-26.1:verifyPublishedJar"
+        ":fabric-26.1:verifyPublishedJar",
+        ":fabric-26.2:test",
+        ":fabric-26.2:buildAndCollect",
+        ":fabric-26.2:verifyPublishedJar"
     )
     doLast {
-        listOf("1.21.11", "26.1").forEach { minecraftVersion ->
+        listOf("1.21.11", "26.1", "26.2").forEach { minecraftVersion ->
             check(layout.buildDirectory.file("libs/$minecraftVersion/tobyscamera-$artifactVersion+mc$minecraftVersion.jar").get().asFile.isFile) {
                 "Missing collected Fabric JAR for Minecraft $minecraftVersion"
             }
@@ -100,9 +103,9 @@ tasks.register("verifyModules") {
 }
 
 tasks.register("verifyFabricTargets") {
-    dependsOn(":fabric-1.21.11:remapJar", ":fabric-26.1:jar")
+    dependsOn(":fabric-1.21.11:remapJar", ":fabric-26.1:jar", ":fabric-26.2:jar")
     doLast {
-        listOf("1.21.11", "26.1").forEach { minecraftVersion ->
+        listOf("1.21.11", "26.1", "26.2").forEach { minecraftVersion ->
             check(findProject(":fabric-$minecraftVersion") != null) {
                 "Missing Fabric target $minecraftVersion"
             }

@@ -55,7 +55,7 @@ jobs:
           case "$RELEASE_KIND" in
             mod)
               artifacts=(build/libs/*/tobyscamera-"$ARTIFACT_VERSION"+mc*.jar)
-              expected_count=2
+              expected_count=3
               ;;
             plugin)
               artifacts=(folia/build/libs/tobyscamera-plugin-"$ARTIFACT_VERSION".jar)
