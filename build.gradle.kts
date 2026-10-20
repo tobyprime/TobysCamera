@@ -88,10 +88,13 @@ tasks.register("verifyModules") {
         ":fabric-26.1:verifyPublishedJar",
         ":fabric-26.2:test",
         ":fabric-26.2:buildAndCollect",
-        ":fabric-26.2:verifyPublishedJar"
+        ":fabric-26.2:verifyPublishedJar",
+        ":fabric-26.3:test",
+        ":fabric-26.3:buildAndCollect",
+        ":fabric-26.3:verifyPublishedJar"
     )
     doLast {
-        listOf("1.21.11", "26.1", "26.2").forEach { minecraftVersion ->
+        listOf("1.21.11", "26.1", "26.2", "26.3").forEach { minecraftVersion ->
             check(layout.buildDirectory.file("libs/$minecraftVersion/tobyscamera-$artifactVersion+mc$minecraftVersion.jar").get().asFile.isFile) {
                 "Missing collected Fabric JAR for Minecraft $minecraftVersion"
             }
