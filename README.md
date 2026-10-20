@@ -1,6 +1,6 @@
 # TobysCamera
 
-Fabric 1.21.11, 26.1, and 26.2 client Mod + Paper and Folia 1.21.11+ plugin. Only the photographer installs the Mod; completed pictures are ordinary `filled_map` items visible to every vanilla client.
+Fabric 1.21.11, 26.1, 26.2, and 26.3 client Mod + Paper and Folia 1.21.11+ plugin. Only the photographer installs the Mod; completed pictures are ordinary `filled_map` items visible to every vanilla client.
 
 Licensed under the [MIT License](LICENSE).
 
@@ -28,7 +28,7 @@ The release artifacts are generated as:
 
 GitHub Actions creates normal GitHub Releases only from tags whose commits are on `main`.
 
-- Push `mod-vX.Y.Z` to publish the three Fabric Mod JARs (for Minecraft 1.21.11, 26.1, and 26.2).
+- Push `mod-vX.Y.Z` to publish the four Fabric Mod JARs (for Minecraft 1.21.11, 26.1, 26.2, and 26.3).
 - Push `plugin-vX.Y.Z` to publish the Paper/Folia plugin JAR.
 
 `X.Y.Z` must be a numeric version with no prerelease or build suffix. CI writes this version into Mod and plugin metadata, then appends `+build.<GitHub run number>` only to the JAR filenames. For example, `mod-v1.2.3` can produce `tobyscamera-1.2.3+build.42+mc1.21.11.jar`. Each release also includes a SHA-256 file for every JAR.

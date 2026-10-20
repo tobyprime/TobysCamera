@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "package": "dev.tobyscamera.fabric.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "AvatarRendererMixin",
+    "CameraMixin",
+    "EntityRendererMixin",
+    "KeyboardHandlerMixin",
+    "MouseHandlerMixin",
+    "PlayerMixin",
+    "WorldCaptureMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
