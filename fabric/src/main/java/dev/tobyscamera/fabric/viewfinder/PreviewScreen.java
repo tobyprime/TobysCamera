@@ -123,7 +123,7 @@ public final class PreviewScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderTransparentBackground(graphics);
+        // Screen already renders the blurred in-world background before this method; drawing it again blurs twice per frame.
         if (!previewResult.ready()) {
             graphics.drawCenteredString(font, Component.translatable("tobyscamera.preview.processing"), width / 2, height / 2, 0xFFFFFFFF);
             super.render(graphics, mouseX, mouseY, partialTick);

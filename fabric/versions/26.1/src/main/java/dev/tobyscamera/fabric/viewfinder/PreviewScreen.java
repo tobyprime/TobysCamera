@@ -123,7 +123,7 @@ public final class PreviewScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        extractTransparentBackground(graphics);
+        // Screen already extracts the blurred in-world background before this method; extracting it again blurs twice per frame.
         if (!previewResult.ready()) {
             graphics.centeredText(font, Component.translatable("tobyscamera.preview.processing"), width / 2, height / 2, 0xFFFFFFFF);
             super.extractRenderState(graphics, mouseX, mouseY, partialTick);
