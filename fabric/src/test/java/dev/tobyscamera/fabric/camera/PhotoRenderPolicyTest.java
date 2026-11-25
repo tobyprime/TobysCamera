@@ -14,4 +14,14 @@ class PhotoRenderPolicyTest {
         assertTrue(PhotoRenderPolicy.hideNameTags(ViewfinderState.CAPTURING, true));
         assertFalse(PhotoRenderPolicy.hideNameTags(ViewfinderState.PREVIEW, true));
     }
+
+    @Test
+    void hidesFirstPersonHandsWheneverTheViewfinderIsOpen() {
+        assertFalse(PhotoRenderPolicy.hideFirstPersonHands(ViewfinderState.CLOSED));
+        assertTrue(PhotoRenderPolicy.hideFirstPersonHands(ViewfinderState.VIEWFINDER));
+        assertTrue(PhotoRenderPolicy.hideFirstPersonHands(ViewfinderState.AWAITING_GRANT));
+        assertTrue(PhotoRenderPolicy.hideFirstPersonHands(ViewfinderState.CAPTURING));
+        assertTrue(PhotoRenderPolicy.hideFirstPersonHands(ViewfinderState.PREVIEW));
+        assertTrue(PhotoRenderPolicy.hideFirstPersonHands(ViewfinderState.UPLOADING));
+    }
 }

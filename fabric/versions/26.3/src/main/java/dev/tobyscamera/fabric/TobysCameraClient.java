@@ -187,6 +187,7 @@ public final class TobysCameraClient implements ClientModInitializer {
     public static float viewfinderZoom() { return VIEWFINDER.zoomActive() ? VIEWFINDER.targetZoom() : 1.0f; }
     public static float viewfinderRollRadians() { return VIEWFINDER.zoomActive() ? (float) Math.toRadians(VIEWFINDER.composition().rollDegrees()) : 0.0f; }
     public static boolean hideNameTagsForPhoto() { return PhotoRenderPolicy.hideNameTags(VIEWFINDER.state(), CAPTURE.captureReady()); }
+    public static boolean hideFirstPersonHands() { return PhotoRenderPolicy.hideFirstPersonHands(VIEWFINDER.state()); }
 
     private static void openPreview(net.minecraft.client.Minecraft client, CapturedFrame frame) {
         if (!VIEWFINDER.captureComplete()) return;
